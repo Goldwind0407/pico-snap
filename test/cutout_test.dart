@@ -60,7 +60,7 @@ void main() {
     });
   });
 
-  testWidgets('去背頁：AI 不能用時自動改用 GrabCut，完成後回傳貼紙 PNG', (tester) async {
+  testWidgets('去背頁：AI 不能用時自動改用手動去背，完成後回傳貼紙 PNG', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -74,12 +74,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600)); // page transition
 
-    // 解碼、GrabCut 都在背景跑：等到狀態列說用了 GrabCut
-    for (var i = 0; i < 200 && find.textContaining('改用 GrabCut').evaluate().isEmpty; i++) {
+    // 解碼、GrabCut 都在背景跑：等到狀態列說改用了手動去背
+    for (var i = 0; i < 200 && find.textContaining('改用手動去背').evaluate().isEmpty; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
       await tester.pump();
     }
-    expect(find.textContaining('AI 這次認不出來，改用 GrabCut 去背'), findsOneWidget);
+    expect(find.textContaining('AI 這次認不出來，改用手動去背'), findsOneWidget);
 
     await tester.tap(find.text('完成'));
     for (var i = 0; i < 200 && result == null; i++) {

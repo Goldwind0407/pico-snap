@@ -530,7 +530,7 @@ class _EditorScreenState extends State<EditorScreen> {
         const SizedBox(height: 4),
         Text(
           hasPhoto
-            ? '先用手機內建 AI 去背，認不出來會改用 GrabCut；也可以自己換方法、用筆刷修邊。'
+            ? '先用手機內建 AI 去背，認不出來會改用手動去背；也可以自己換方法、用筆刷修邊。'
             : '先放一張照片，再把人或東西去背，做成貼紙。',
           style: TextStyle(fontSize: 12, height: 1.4, color: muted.withValues(alpha: .95), fontWeight: FontWeight.w600),
         ),

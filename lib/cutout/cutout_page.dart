@@ -54,7 +54,9 @@ class _CutoutPageState extends State<CutoutPage> {
   bool _painted = false;
   DateTime _lastRefresh = DateTime(0);
 
-  static const double _brushScreen = 26;
+  /// 筆刷半徑（螢幕上的點）。
+  double _brushScreen = 22;
+  static const double _minBrush = 6, _maxBrush = 60;
 
   @override
   void initState() {
@@ -103,7 +105,7 @@ class _CutoutPageState extends State<CutoutPage> {
     if (rgba == null) return;
     setState(() {
       _busy = true;
-      _status = engine == _Engine.ai ? 'AI 去背中…' : 'GrabCut 去背中…';
+      _status = engine == _Engine.ai ? 'AI 去背中…' : '手動去背中…';
     });
     final x = at?.dx.floor(), y = at?.dy.floor();
     final hints = Int8List(_w * _h);
@@ -122,8 +124,8 @@ class _CutoutPageState extends State<CutoutPage> {
     _busy = false;
     _status = switch ((engine, used)) {
       (_Engine.ai, _Engine.ai) => '用手機內建 AI 去背',
-      (_Engine.ai, _) => 'AI 這次認不出來，改用 GrabCut 去背',
-      _ => '用 GrabCut 去背（依顏色和邊緣判斷）',
+      (_Engine.ai, _) => 'AI 這次認不出來，改用手動去背',
+      _ => '用手動去背（依顏色和邊緣判斷）',
     };
     await _refresh();
   }
@@ -143,8 +145,9 @@ class _CutoutPageState extends State<CutoutPage> {
 
   double _brushInPhoto(Size box) => _brushScreen / (_fitted(box).width / _w);
 
-  /// 貼齊邊緣的筆畫在照片上多粗：細細一條就好，畫歪一點跨到主體也沒關係。
-  double get _strokeRadius => math.max(1.5, math.max(_w, _h) * .004);
+  /// 貼齊邊緣的筆畫在照片上多粗：細細一條就好，畫歪一點跨到主體也沒關係；
+  /// 筆刷調粗時跟著粗一點，一筆可以蓋到比較大的東西。
+  double _strokeRadius(Size box) => math.max(math.max(1.5, math.max(_w, _h) * .004), _brushInPhoto(box) * .35);
 
   void _paintHint(Int8List a, double cx, double cy, double r, int v) {
     final x0 = math.max(0, (cx - r).floor()), x1 = math.min(_w - 1, (cx + r).ceil());
@@ -156,7 +159,11 @@ class _CutoutPageState extends State<CutoutPage> {
     }
   }
 
+  /// 編輯區的大小（最近一次手勢時），放開手指時換算筆畫粗細用。
+  Size _box = Size.zero;
+
   void _onPanStart(DragStartDetails d, Size box) {
+    _box = box;
     if (_busy || _mask == null) return;
     _strokeScreen
       ..clear()
@@ -188,7 +195,7 @@ class _CutoutPageState extends State<CutoutPage> {
   void _onPanEnd() {
     setState(() => _cursor = null);
     if (_snap && _strokePhoto.isNotEmpty) {
-      _applyStroke(List.of(_strokePhoto));
+      _applyStroke(List.of(_strokePhoto), _strokeRadius(_box));
     } else if (_painted) {
       _painted = false;
       _refresh();
@@ -216,11 +223,10 @@ class _CutoutPageState extends State<CutoutPage> {
   }
 
   /// 貼齊邊緣：剛畫的一筆當作提示，用 GrabCut 重切一次。
-  Future<void> _applyStroke(List<Offset> pts) async {
+  Future<void> _applyStroke(List<Offset> pts, double radius) async {
     final rgba = _rgba, mask = _mask;
     if (rgba == null || mask == null || pts.isEmpty) return;
     final v = _brush == _Brush.erase ? -1 : 1;
-    final radius = _strokeRadius;
     final stroke = Int8List(_w * _h);
     for (var i = 0; i < pts.length; i++) {
       final a = pts[i], b = i + 1 < pts.length ? pts[i + 1] : pts[i];
@@ -384,8 +390,8 @@ class _CutoutPageState extends State<CutoutPage> {
             ]),
           )),
           if (_strokeScreen.length > 1)
-            Positioned.fill(child: CustomPaint(painter: _StrokePainter(List.of(_strokeScreen), _brush == _Brush.erase ? coral : const Color(0xFF4CB97A)))),
-          if (_cursor != null && !_snap)
+            Positioned.fill(child: CustomPaint(painter: _StrokePainter(List.of(_strokeScreen), _brush == _Brush.erase ? coral : const Color(0xFF4CB97A), math.max(4, _brushScreen * .7)))),
+          if (_cursor != null)
             Positioned(
               left: _cursor!.dx - _brushScreen, top: _cursor!.dy - _brushScreen,
               child: IgnorePointer(child: Container(
@@ -425,7 +431,7 @@ class _CutoutPageState extends State<CutoutPage> {
       Row(children: [
         Expanded(child: _ChoiceButton(icon: Icons.auto_awesome_rounded, label: 'AI 去背', onTap: _busy ? null : () => _run(_Engine.ai))),
         const SizedBox(width: 8),
-        Expanded(child: _ChoiceButton(icon: Icons.palette_outlined, label: 'GrabCut', onTap: _busy ? null : () => _run(_Engine.grabcut))),
+        Expanded(child: _ChoiceButton(icon: Icons.touch_app_outlined, label: '手動去背', onTap: _busy ? null : () => _run(_Engine.grabcut))),
       ]),
       const SizedBox(height: 10),
       Row(children: [
@@ -435,6 +441,23 @@ class _CutoutPageState extends State<CutoutPage> {
         const Spacer(),
         const Text('貼齊邊緣', style: TextStyle(fontSize: 13, color: ink, fontWeight: FontWeight.w800)),
         Switch(value: _snap, activeTrackColor: coral, onChanged: (v) => setState(() => _snap = v)),
+      ]),
+      Row(children: [
+        const Text('筆刷大小', style: TextStyle(fontSize: 13, color: ink, fontWeight: FontWeight.w800)),
+        Expanded(child: Slider(
+          value: _brushScreen, min: _minBrush, max: _maxBrush,
+          activeColor: coral, inactiveColor: line,
+          onChanged: (v) => setState(() => _brushScreen = v),
+        )),
+        // 實際大小的預覽
+        SizedBox.square(dimension: 40, child: Center(child: Container(
+          width: math.min(40, _brushScreen), height: math.min(40, _brushScreen),
+          decoration: BoxDecoration(
+            color: (_brush == _Brush.erase ? coral : const Color(0xFF4CB97A)).withValues(alpha: .35),
+            shape: BoxShape.circle,
+            border: Border.all(color: _brush == _Brush.erase ? coral : const Color(0xFF4CB97A), width: 1.5),
+          ),
+        ))),
       ]),
       Text(_snap ? '在要擦掉（或補回）的東西上隨手畫一筆，會自動沿著邊緣切。' : '筆刷塗到哪裡就擦到哪裡，適合修小地方。',
         style: TextStyle(fontSize: 11, color: muted.withValues(alpha: .9))),
@@ -509,17 +532,18 @@ class _CheckerPainter extends CustomPainter {
 class _StrokePainter extends CustomPainter {
   final List<Offset> points;
   final Color color;
-  const _StrokePainter(this.points, this.color);
+  final double width;
+  const _StrokePainter(this.points, this.color, this.width);
 
   @override
   void paint(Canvas canvas, Size size) => canvas.drawPoints(ui.PointMode.polygon, points, Paint()
-    ..color = color
-    ..strokeWidth = 4
+    ..color = color.withValues(alpha: .7)
+    ..strokeWidth = width
     ..strokeCap = StrokeCap.round
     ..strokeJoin = StrokeJoin.round);
 
   @override
-  bool shouldRepaint(_StrokePainter old) => old.points.length != points.length || old.color != color;
+  bool shouldRepaint(_StrokePainter old) => old.points.length != points.length || old.color != color || old.width != width;
 }
 
 // ---------------- 在背景執行緒跑的工作 ----------------
