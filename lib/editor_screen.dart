@@ -1,9 +1,14 @@
 import 'dart:math';
+import 'dart:typed_data';
+
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'cutout/cutout_page.dart';
 import 'models.dart';
+import 'services/photo_save_service.dart';
 import 'theme.dart';
 import 'widgets/frames.dart';
 import 'widgets/sticker_item.dart';
@@ -19,7 +24,7 @@ enum _Tool {
   filter(Icons.filter_vintage_outlined, '濾鏡');
 
   /// Tools that are only placeholders for now.
-  bool get comingSoon => this == brush || this == cutout || this == filter;
+  bool get comingSoon => this == brush || this == filter;
 
   final IconData icon;
   final String label;
@@ -49,14 +54,23 @@ class EditorScreen extends StatefulWidget {
 class _EditorScreenState extends State<EditorScreen> {
   final _picker = ImagePicker();
   final _canvasKey = GlobalKey();
+  /// What gets saved: the canvas without the shadow around it.
+  final _shotKey = GlobalKey();
   final _textCtrl = TextEditingController();
-  late final List<ImageProvider?> _photos = List<ImageProvider?>.filled(widget.mode == EditorMode.sticker ? 1 : 4, null);
+  late final int _cells = widget.mode == EditorMode.sticker ? 1 : 4;
+  late final List<ImageProvider?> _photos = List<ImageProvider?>.filled(_cells, null);
+  /// Original files of [_photos], for cutting out.
+  late final List<Uint8List?> _photoBytes = List<Uint8List?>.filled(_cells, null);
+  /// Sticker mode: the cut-out subject (PNG with a white die-cut border).
+  Uint8List? _subject;
+  /// While saving: hide hints, selection outlines and sticker handles.
+  bool _capturing = false, _saving = false;
   final _polaroidCaptions = ['good day', 'little joy', 'sunny!', 'us ♡'];
   late int _template = widget.template;
   late String _category = stripTemplates[widget.template].category;
   String? _stripCaption;
   String _bubble = 'DREAM';
-  int _pack = 0;
+  int _pack = 1;
   int _pattern = 0, _backdrop = 1, _format = 3, _selectedCell = 0;
   List<StickerData> _stickers = [];
   final List<List<StickerData>> _history = [];
@@ -106,7 +120,60 @@ class _EditorScreenState extends State<EditorScreen> {
     final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 95);
     if (file == null) return;
     final bytes = await file.readAsBytes();
-    if (mounted) setState(() => _photos[i] = MemoryImage(bytes));
+    if (!mounted) return;
+    setState(() {
+      _photos[i] = MemoryImage(bytes);
+      _photoBytes[i] = bytes;
+      if (widget.mode == EditorMode.sticker) {
+        // New photo: the old cut-out no longer matches; offer to cut this one.
+        _subject = null;
+        _tool = _Tool.cutout;
+      }
+    });
+  }
+
+  /// Sticker mode: cut the subject out of the photo.
+  Future<void> _cutSubject() async {
+    final bytes = _photoBytes[0];
+    if (bytes == null) return _pickPhoto(0);
+    final png = await CutoutPage.open(context, bytes);
+    if (png != null && mounted) setState(() => _subject = png);
+  }
+
+  /// Any mode: pick a photo, cut it out and stick it on as a sticker.
+  Future<void> _addPhotoSticker() async {
+    final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 95);
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+    final png = await CutoutPage.open(context, bytes);
+    if (png == null || !mounted) return;
+    final id = 'mem:${customStickers.length}';
+    customStickers[id] = png;
+    _addSticker(id);
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _capturing = true;
+      _selectedSticker = null;
+    });
+    // Let the frame without hints and handles paint before capturing it.
+    await WidgetsBinding.instance.endOfFrame;
+    final error = await PhotoSaveService.saveBoundary(_shotKey);
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      _capturing = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(error ?? '已存到相簿 ♡'),
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: error == null ? ink : const Color(0xFFB4483C),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    ));
   }
 
   void _tapCell(int i) {
@@ -172,7 +239,7 @@ class _EditorScreenState extends State<EditorScreen> {
         _TopButton(label: '匯入', onTap: () => _pickPhoto()),
         const SizedBox(width: 8),
       ],
-      _TopButton(label: '儲存', filled: true, onTap: () => showSoonToast(context, '儲存作品')),
+      _TopButton(label: _saving ? '儲存中…' : '儲存', filled: true, onTap: _save),
     ]),
   );
 
@@ -180,7 +247,7 @@ class _EditorScreenState extends State<EditorScreen> {
     final size = c.biggest;
     return DecoratedBox(
       decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .10), blurRadius: 18, offset: const Offset(0, 8))]),
-      child: Stack(key: _canvasKey, clipBehavior: Clip.none, children: [
+      child: RepaintBoundary(key: _shotKey, child: Stack(key: _canvasKey, clipBehavior: Clip.none, children: [
         Positioned.fill(child: GestureDetector(
           onTap: () => setState(() => _selectedSticker = null),
           child: _artwork(size),
@@ -189,7 +256,7 @@ class _EditorScreenState extends State<EditorScreen> {
           StickerItem(
             data: _stickers[i],
             canvas: size,
-            selected: _selectedSticker == i,
+            selected: !_capturing && _selectedSticker == i,
             toLocal: _toCanvas,
             onSelect: () => setState(() => _selectedSticker = i),
             onEditStart: () => setState(() {
@@ -203,14 +270,14 @@ class _EditorScreenState extends State<EditorScreen> {
               _selectedSticker = null;
             }),
           ),
-      ]),
+      ])),
     );
   })));
 
   Widget _artwork(Size size) => switch (widget.mode) {
     EditorMode.fourCut => FittedBox(child: PhotoStrip(
       template: stripTemplates[_template], photos: _photos, caption: _stripCaption,
-      placeholder: const AddPhotoHint(scale: 1.4), selected: _selectedCell, onTapCell: _tapCell,
+      placeholder: _capturing ? null : const AddPhotoHint(scale: 1.4), selected: _capturing ? null : _selectedCell, onTapCell: _tapCell,
     )),
     EditorMode.polaroid => _polaroidArtwork(size),
     EditorMode.sticker => _stickerArtwork(),
@@ -238,8 +305,8 @@ class _EditorScreenState extends State<EditorScreen> {
             left: _scatter[i].$1.dx * size.width - w / 2, top: _scatter[i].$1.dy * size.height - h / 2, width: w, height: h,
             child: Transform.rotate(angle: _scatter[i].$2, child: FittedBox(child: PolaroidCard(
               image: _photos[i], caption: _polaroidCaptions[i], color: const [blush, lilac, butter, sky][i],
-              placeholder: const AddPhotoHint(scale: 1.3), tape: _tapes[i], tapeRight: i.isOdd,
-              selected: _selectedCell == i, onTap: () => _tapCell(i),
+              placeholder: _capturing ? null : const AddPhotoHint(scale: 1.3), tape: _tapes[i], tapeRight: i.isOdd,
+              selected: !_capturing && _selectedCell == i, onTap: () => _tapCell(i),
             ))),
           ),
       ]),
@@ -249,15 +316,29 @@ class _EditorScreenState extends State<EditorScreen> {
   Widget _stickerArtwork() => CustomPaint(
     painter: GinghamPainter(ginghamPatterns[_pattern].base, ginghamPatterns[_pattern].right),
     child: Stack(children: [
-      // White die-cut border behind the photo.
-      Positioned.fill(child: FractionallySizedBox(widthFactor: .84, heightFactor: .78, child: PhysicalShape(
-        clipper: const BlobClipper(phase: 1.3), color: Colors.white, elevation: 5, shadowColor: ink.withValues(alpha: .5),
-        child: const SizedBox.expand(),
-      ))),
-      Positioned.fill(child: FractionallySizedBox(widthFactor: .76, heightFactor: .70, child: ClipPath(
-        clipper: const BlobClipper(phase: 1.3),
-        child: PhotoSlot(image: _photos[0], color: const Color(0xFFFFF6F2), outlineWidth: 0, placeholder: const AddPhotoHint(scale: 1.3), onTap: () => _tapCell(0)),
-      ))),
+      if (_subject != null)
+        // The cut-out subject, with a soft shadow under its white border.
+        Positioned.fill(child: FractionallySizedBox(widthFactor: .88, heightFactor: .84, alignment: const Alignment(0, .3), child: GestureDetector(
+          onTap: () => setState(() => _tool = _Tool.cutout),
+          child: Stack(fit: StackFit.expand, children: [
+            Transform.translate(offset: const Offset(0, 4), child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+              child: ColorFiltered(colorFilter: const ColorFilter.mode(Color(0x40000000), BlendMode.srcIn), child: Image.memory(_subject!, fit: BoxFit.contain, gaplessPlayback: true)),
+            )),
+            Image.memory(_subject!, fit: BoxFit.contain, gaplessPlayback: true),
+          ]),
+        )))
+      else ...[
+        // White die-cut border behind the photo.
+        Positioned.fill(child: FractionallySizedBox(widthFactor: .84, heightFactor: .78, child: PhysicalShape(
+          clipper: const BlobClipper(phase: 1.3), color: Colors.white, elevation: 5, shadowColor: ink.withValues(alpha: .5),
+          child: const SizedBox.expand(),
+        ))),
+        Positioned.fill(child: FractionallySizedBox(widthFactor: .76, heightFactor: .70, child: ClipPath(
+          clipper: const BlobClipper(phase: 1.3),
+          child: PhotoSlot(image: _photos[0], color: const Color(0xFFFFF6F2), outlineWidth: 0, placeholder: _capturing ? null : const AddPhotoHint(scale: 1.3), onTap: () => _tapCell(0)),
+        ))),
+      ],
       if (_bubble.isNotEmpty)
         Positioned(right: 14, top: 14, child: Transform.rotate(angle: .06, child: SpeechBubble(_bubble))),
     ]),
@@ -277,7 +358,8 @@ class _EditorScreenState extends State<EditorScreen> {
         _Tool.layout => _layoutTool(),
         _Tool.pattern => _patternTool(),
         _Tool.sticker => _stickerTool(),
-        _Tool.text || _Tool.brush || _Tool.cutout || _Tool.filter => _textTool(),
+        _Tool.cutout => _cutoutTool(),
+        _Tool.text || _Tool.brush || _Tool.filter => _textTool(),
       }),
       Container(
         decoration: BoxDecoration(
@@ -381,15 +463,17 @@ class _EditorScreenState extends State<EditorScreen> {
   );
 
   Widget _stickerTool() {
-    final pack = stickerPacks[_pack].$3;
+    final packs = [('📷', '我的', customStickers.keys.toList()), ...stickerPacks];
+    final mine = _pack == 0;
+    final pack = packs[_pack].$3;
     return Column(children: [
       SizedBox(height: 46, child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-        itemCount: stickerPacks.length,
+        itemCount: packs.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
-          final (icon, label, _) = stickerPacks[i];
+          final (icon, label, _) = packs[i];
           final selected = _pack == i;
           return GestureDetector(
             onTap: () => setState(() => _pack = i),
@@ -408,17 +492,74 @@ class _EditorScreenState extends State<EditorScreen> {
       Expanded(child: GridView.builder(
         padding: EdgeInsets.zero,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 6),
-        itemCount: pack.length,
-        itemBuilder: (_, i) => InkWell(
-          onTap: () => _addSticker(pack[i]),
-          child: Container(
-            decoration: const BoxDecoration(border: Border(top: BorderSide(color: line), right: BorderSide(color: line))),
-            padding: const EdgeInsets.all(9),
-            child: StickerVisual(pack[i]),
-          ),
-        ),
+        itemCount: pack.length + (mine ? 1 : 0),
+        itemBuilder: (_, k) {
+          if (mine && k == 0) {
+            return InkWell(
+              onTap: _addPhotoSticker,
+              child: Container(
+                decoration: const BoxDecoration(border: Border(top: BorderSide(color: line), right: BorderSide(color: line))),
+                child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(Icons.add_photo_alternate_outlined, color: coral, size: 24),
+                  SizedBox(height: 2),
+                  Text('照片去背', style: TextStyle(fontSize: 10, color: ink, fontWeight: FontWeight.w800)),
+                ]),
+              ),
+            );
+          }
+          final id = pack[mine ? k - 1 : k];
+          return InkWell(
+            onTap: () => _addSticker(id),
+            child: Container(
+              decoration: const BoxDecoration(border: Border(top: BorderSide(color: line), right: BorderSide(color: line))),
+              padding: const EdgeInsets.all(9),
+              child: StickerVisual(id),
+            ),
+          );
+        },
       )),
     ]);
+  }
+
+  Widget _cutoutTool() {
+    final hasPhoto = _photoBytes[0] != null;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('去背', style: TextStyle(fontSize: 17, color: ink, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text(
+          hasPhoto
+            ? '先用手機內建 AI 去背，認不出來會改用 GrabCut；也可以自己換方法、用筆刷修邊。'
+            : '先放一張照片，再把人或東西去背，做成貼紙。',
+          style: TextStyle(fontSize: 12, height: 1.4, color: muted.withValues(alpha: .95), fontWeight: FontWeight.w600),
+        ),
+        const Spacer(),
+        Row(children: [
+          Expanded(child: FilledButton.icon(
+            onPressed: _cutSubject,
+            icon: Icon(hasPhoto ? Icons.content_cut_rounded : Icons.add_photo_alternate_outlined, size: 18),
+            label: Text(!hasPhoto ? '選照片' : _subject == null ? '開始去背' : '重新去背', style: const TextStyle(fontWeight: FontWeight.w800)),
+            style: FilledButton.styleFrom(
+              backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+          )),
+          if (_subject != null) ...[
+            const SizedBox(width: 10),
+            Expanded(child: OutlinedButton.icon(
+              onPressed: () => setState(() => _subject = null),
+              icon: const Icon(Icons.image_outlined, size: 18),
+              label: const Text('還原照片', style: TextStyle(fontWeight: FontWeight.w800)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ink, side: const BorderSide(color: line, width: 1.3), padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            )),
+          ],
+        ]),
+      ]),
+    );
   }
 
   Widget _textTool() => widget.mode == EditorMode.fourCut && stripTemplates[_template].art != null

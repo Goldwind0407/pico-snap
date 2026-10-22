@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
@@ -228,6 +230,10 @@ final stickerPacks = <(String, String, List<String>)>[
   ('🌸', '裝飾', [_hand('star'), _hand('heart'), _hand('bow'), _hand('sparkle'), _hand('cloud'), _hand('letter'), _hand('camera'), _hand('daisy'), _hand('tulip'), '🌈', '💌', '🫧']),
   ('🍰', '食物', [_hand('ice_cream'), _hand('strawberry'), _hand('egg'), _hand('cherry'), _hand('cake'), '🧁', '🍩', '🍑', '🧋', '🍪', '🍭', '🥞']),
 ];
+
+/// Stickers the user cut out of their own photos, keyed by sticker id
+/// (`mem:<n>`) → PNG. Kept in memory for now; lost when the app closes.
+final customStickers = <String, Uint8List>{};
 
 /// A sticker placed on the canvas. [center] is normalised (0–1) so it
 /// survives the canvas resizing, e.g. when the keyboard opens.

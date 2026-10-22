@@ -500,16 +500,20 @@ class EmojiSticker extends StatelessWidget {
   }
 }
 
-/// Renders a sticker id: an asset path for hand-drawn stickers, else an emoji.
+/// Renders a sticker id: an asset path for hand-drawn stickers, `mem:` for
+/// stickers cut out of the user's photos, else an emoji.
 class StickerVisual extends StatelessWidget {
   final String sticker;
   final double size;
   const StickerVisual(this.sticker, {super.key, this.size = 40});
 
   @override
-  Widget build(BuildContext context) => sticker.startsWith('assets/')
-    ? Image.asset(sticker, width: size, height: size, filterQuality: FilterQuality.medium)
-    : SizedBox.square(dimension: size, child: FittedBox(child: EmojiSticker(sticker, size: size * .8)));
+  Widget build(BuildContext context) {
+    if (sticker.startsWith('assets/')) return Image.asset(sticker, width: size, height: size, filterQuality: FilterQuality.medium);
+    final custom = customStickers[sticker];
+    if (custom != null) return Image.memory(custom, width: size, height: size, gaplessPlayback: true, filterQuality: FilterQuality.medium);
+    return SizedBox.square(dimension: size, child: FittedBox(child: EmojiSticker(sticker, size: size * .8)));
+  }
 }
 
 class GinghamPainter extends CustomPainter {
