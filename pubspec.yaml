@@ -17,6 +17,7 @@ flutter:
   assets:
     - assets/samples/
     - assets/stickers/
+    - assets/templates/
   fonts:
     - family: Nunito
       fonts:

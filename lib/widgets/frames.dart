@@ -52,7 +52,6 @@ class AddPhotoHint extends StatelessWidget {
 /// A four-cut photo booth strip drawn at a fixed design size; wrap it in a
 /// FittedBox to show it at any size.
 class PhotoStrip extends StatelessWidget {
-  static const width = 200.0, height = 620.0;
   final StripTemplate template;
   final List<ImageProvider?> photos;
   final Widget? placeholder;
@@ -68,8 +67,9 @@ class PhotoStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = template;
+    if (t.art != null) return _artStrip(t.art!);
     return SizedBox(
-      width: width, height: height,
+      width: 200, height: 620,
       child: Stack(clipBehavior: Clip.none, children: [
         Positioned.fill(child: DecoratedBox(
           decoration: BoxDecoration(
@@ -108,6 +108,26 @@ class PhotoStrip extends StatelessWidget {
           ),
       ]),
     );
+  }
+
+  Widget _artStrip(ArtFrame art) {
+    final size = template.designSize;
+    Rect px(Rect r) => Rect.fromLTWH(r.left * size.width, r.top * size.height, r.width * size.width, r.height * size.height);
+    return SizedBox.fromSize(size: size, child: Stack(children: [
+      for (var i = 0; i < art.cells.length; i++)
+        Positioned.fromRect(rect: px(art.cells[i]), child: GestureDetector(
+          onTap: onTapCell == null ? null : () => onTapCell!(i),
+          child: ColoredBox(color: template.cell, child: SizedBox.expand(child: i < photos.length && photos[i] != null
+            ? Image(image: photos[i]!, fit: BoxFit.cover, gaplessPlayback: true)
+            : Center(child: placeholder ?? const SizedBox.shrink()))),
+        )),
+      // The illustration sits on top so its decorations overlap the photos.
+      Positioned.fill(child: IgnorePointer(child: Image.asset(art.asset, fit: BoxFit.fill, filterQuality: FilterQuality.medium))),
+      if (selected != null && selected! < art.cells.length)
+        Positioned.fromRect(rect: px(art.cells[selected!]), child: IgnorePointer(child: DecoratedBox(
+          decoration: BoxDecoration(border: Border.all(color: coral, width: 3.5)),
+        ))),
+    ]));
   }
 
   Widget _footer() {

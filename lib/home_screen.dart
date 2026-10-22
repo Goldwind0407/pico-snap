@@ -108,7 +108,7 @@ class _HeroCard extends StatelessWidget {
         Positioned(left: 22, top: 22, child: Transform.rotate(angle: -.18, child: SizedBox(
           width: 62, height: 192,
           child: FittedBox(child: PhotoStrip(
-            template: stripTemplates[1], photos: samplePhotos,
+            template: stripTemplates.firstWhere((t) => t.name == 'Coral'), photos: samplePhotos,
             captionWidget: const Icon(Icons.photo_camera_outlined, color: Colors.white, size: 30),
           )),
         ))),

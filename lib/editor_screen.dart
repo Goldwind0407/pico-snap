@@ -76,7 +76,7 @@ class _EditorScreenState extends State<EditorScreen> {
   };
 
   double get _aspect => switch (widget.mode) {
-    EditorMode.fourCut => PhotoStrip.width / PhotoStrip.height,
+    EditorMode.fourCut => stripTemplates[_template].designSize.aspectRatio,
     EditorMode.polaroid => formats[_format].$2,
     EditorMode.sticker => 4 / 5,
   };
@@ -421,7 +421,13 @@ class _EditorScreenState extends State<EditorScreen> {
     ]);
   }
 
-  Widget _textTool() => Padding(
+  Widget _textTool() => widget.mode == EditorMode.fourCut && stripTemplates[_template].art != null
+    ? Center(child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Text('這款模板的文字是印好的，可以用貼紙裝飾，或換一款模板來寫字。', textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, height: 1.5, color: muted.withValues(alpha: .9), fontWeight: FontWeight.w700)),
+      ))
+    : Padding(
     padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(switch (widget.mode) {

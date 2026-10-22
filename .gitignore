@@ -46,3 +46,7 @@ app.*.map.json
 
 # Real photo booth photos kept locally as design reference only (copyrighted)
 /design/拍貼機範本/
+
+# Raw design material (Gemini outputs) stays local; processed assets live in assets/
+/design/templates/
+/design/mockups/

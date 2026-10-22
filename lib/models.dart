@@ -37,6 +37,16 @@ class Deco {
   const Deco.bubble(this.content, this.center, {this.size = 15, this.angle = 0}) : bubble = true;
 }
 
+/// A finished template illustration (generated with Gemini) whose photo
+/// windows are transparent. [cells] are normalised window rects.
+class ArtFrame {
+  final String asset;
+  /// Width / height of the illustration.
+  final double aspect;
+  final List<Rect> cells;
+  const ArtFrame(this.asset, this.aspect, this.cells);
+}
+
 class StripTemplate {
   final String name, category, caption, subtitle;
   final Color frame, cell, captionColor;
@@ -52,19 +62,58 @@ class StripTemplate {
   /// Print photos in black and white.
   final bool mono;
   final List<Deco> decos;
+  /// When set, the strip is this illustration and the drawing options above
+  /// (except [cell], used for empty windows) are ignored.
+  final ArtFrame? art;
   const StripTemplate({
     required this.name, required this.category, required this.caption, this.subtitle = '',
     required this.frame, this.frame2, required this.cell, this.captionColor = ink,
     this.pattern = FramePattern.none, this.patternColor = Colors.white, this.cellShape = CellShape.square,
-    this.footer = FooterStyle.caption, this.outline = true, this.tape = false, this.mono = false, this.decos = const [],
+    this.footer = FooterStyle.caption, this.outline = true, this.tape = false, this.mono = false, this.decos = const [], this.art,
   });
+
+  /// Size of the strip in PhotoStrip design units (always 200 wide).
+  Size get designSize => Size(200, art == null ? 620 : 200 / art!.aspect);
 }
 
-const stripCategories = ['可愛', '經典', '生日', '應援'];
+const stripCategories = ['精選', '可愛', '經典', '生日', '應援'];
 
 const _navy = Color(0xFF1F1D2B);
 
 const stripTemplates = [
+  // Featured illustrated templates
+  StripTemplate(
+    name: 'Cat Party', category: '精選', caption: '', frame: Color(0xFFF9D3D6), cell: Color(0xFFFFE9E9),
+    art: ArtFrame('assets/templates/t1-cat-party.webp', 0.3304, [Rect.fromLTWH(0.1005, 0.055, 0.8007, 0.2003), Rect.fromLTWH(0.1005, 0.2815, 0.8015, 0.2001), Rect.fromLTWH(0.1005, 0.5086, 0.8015, 0.1959), Rect.fromLTWH(0.1005, 0.7319, 0.8015, 0.2001)]),
+  ),
+  StripTemplate(
+    name: 'Morning Friends', category: '精選', caption: '', frame: Color(0xFFFBE3D8), cell: Color(0xFFFFF6EC),
+    art: ArtFrame('assets/templates/t2-morning-friends.webp', 0.3304, [Rect.fromLTWH(0.1149, 0.0631, 0.772, 0.1906), Rect.fromLTWH(0.1149, 0.2824, 0.772, 0.1903), Rect.fromLTWH(0.1149, 0.5017, 0.772, 0.1881), Rect.fromLTWH(0.1149, 0.7188, 0.772, 0.1889)]),
+  ),
+  StripTemplate(
+    name: 'Birthday Party', category: '精選', caption: '', frame: Color(0xFFE7C3EC), cell: Color(0xFFFBEAF4),
+    art: ArtFrame('assets/templates/t3-birthday-party.webp', 0.3304, [Rect.fromLTWH(0.1301, 0.082, 0.7399, 0.1875), Rect.fromLTWH(0.1301, 0.2919, 0.7399, 0.1875), Rect.fromLTWH(0.1301, 0.5017, 0.7399, 0.1875), Rect.fromLTWH(0.1301, 0.7115, 0.7399, 0.1872)]),
+  ),
+  StripTemplate(
+    name: 'Strawberry Picnic', category: '精選', caption: '', frame: Color(0xFFF4A3A3), cell: Color(0xFFFFF2EF),
+    art: ArtFrame('assets/templates/t4-strawberry-picnic.webp', 0.3304, [Rect.fromLTWH(0.114, 0.0424, 0.7728, 0.195), Rect.fromLTWH(0.1132, 0.2656, 0.7736, 0.195), Rect.fromLTWH(0.1132, 0.4874, 0.7736, 0.1864), Rect.fromLTWH(0.1132, 0.7003, 0.7728, 0.1864)]),
+  ),
+  StripTemplate(
+    name: 'Dreamy Space', category: '精選', caption: '', frame: Color(0xFFB8AEE3), cell: Color(0xFFEAE5F8),
+    art: ArtFrame('assets/templates/t5-dreamy-space.webp', 0.3304, [Rect.fromLTWH(0.0997, 0.0438, 0.8007, 0.1989), Rect.fromLTWH(0.0997, 0.267, 0.8007, 0.1989), Rect.fromLTWH(0.0997, 0.4897, 0.8007, 0.1967), Rect.fromLTWH(0.0997, 0.7098, 0.8007, 0.197)]),
+  ),
+  StripTemplate(
+    name: 'Forest Camping', category: '精選', caption: '', frame: Color(0xFF8FA996), cell: Color(0xFFEEF3EB),
+    art: ArtFrame('assets/templates/t6-forest-camping.webp', 0.3304, [Rect.fromLTWH(0.1486, 0.077, 0.7027, 0.1844), Rect.fromLTWH(0.1486, 0.2919, 0.7027, 0.1878), Rect.fromLTWH(0.1486, 0.5081, 0.7027, 0.1822), Rect.fromLTWH(0.1486, 0.7188, 0.7027, 0.1825)]),
+  ),
+  StripTemplate(
+    name: 'Ocean Summer', category: '精選', caption: '', frame: Color(0xFFA9DDF0), cell: Color(0xFFE6F5FB),
+    art: ArtFrame('assets/templates/t7-ocean-summer.webp', 0.3112, [Rect.fromLTWH(0.0966, 0.0469, 0.8068, 0.1922), Rect.fromLTWH(0.0966, 0.2673, 0.8068, 0.1916), Rect.fromLTWH(0.0966, 0.4854, 0.8068, 0.1919), Rect.fromLTWH(0.0966, 0.7053, 0.8068, 0.1845)]),
+  ),
+  StripTemplate(
+    name: 'Classic Film', category: '精選', caption: '', frame: Color(0xFF6C6A78), cell: Color(0xFF3A3746),
+    art: ArtFrame('assets/templates/t8-classic-film.webp', 0.3306, [Rect.fromLTWH(0.1588, 0.0262, 0.6824, 0.2089), Rect.fromLTWH(0.1588, 0.2577, 0.6824, 0.2075), Rect.fromLTWH(0.1588, 0.4881, 0.6824, 0.1985), Rect.fromLTWH(0.1588, 0.7079, 0.6824, 0.198)]),
+  ),
   // Cute
   StripTemplate(name: 'Peach', category: '可愛', caption: 'cute caption ♡', frame: Color(0xFFF9CACB), cell: sky, tape: true),
   StripTemplate(name: 'Coral', category: '可愛', caption: 'little moments', frame: Color(0xFFF2867B), cell: Color(0xFFF8D0D4), captionColor: Colors.white),
