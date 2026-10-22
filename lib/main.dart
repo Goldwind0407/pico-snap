@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'home_screen.dart';
+import 'services/my_library.dart';
 import 'theme.dart';
 
-void main() => runApp(const PicoSnapApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await MyLibrary.load();
+  runApp(const PicoSnapApp());
+}
 
 class PicoSnapApp extends StatelessWidget {
   const PicoSnapApp({super.key});

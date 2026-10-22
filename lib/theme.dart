@@ -27,3 +27,19 @@ void showSoonToast(BuildContext context, String feature) => ScaffoldMessenger.of
   backgroundColor: ink,
   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
 ));
+
+/// Asks before deleting something; true when the user confirms.
+Future<bool> confirmDelete(BuildContext context, String title, String message) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: cream,
+        title: Text(title, style: const TextStyle(fontSize: 18, color: ink, fontWeight: FontWeight.w900)),
+        content: Text(message, style: const TextStyle(color: ink)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消', style: TextStyle(color: muted))),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('刪除', style: TextStyle(color: coral, fontWeight: FontWeight.w800))),
+        ],
+      ),
+    ) ==
+    true;

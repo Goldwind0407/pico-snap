@@ -231,13 +231,72 @@ final stickerPacks = <(String, String, List<String>)>[
   ('🍰', '食物', [_hand('ice_cream'), _hand('strawberry'), _hand('egg'), _hand('cherry'), _hand('cake'), '🧁', '🍩', '🍑', '🧋', '🍪', '🍭', '🥞']),
 ];
 
-/// Stickers the user cut out of their own photos, keyed by sticker id
-/// (`mem:<n>`) → PNG. Kept in memory for now; lost when the app closes.
+/// Stickers the user cut out of their own photos on the 我的素材 page, keyed
+/// by sticker id (`my:<key>`) → PNG. Managed (and saved) by MyLibrary.
 final customStickers = <String, Uint8List>{};
-int _customStickerSeq = 0;
 
-/// A fresh id for [customStickers]; never reused, even after deletions.
-String newCustomStickerId() => 'mem:${_customStickerSeq++}';
+/// Templates the user designed on the 我的素材 page. Managed by MyLibrary.
+final customTemplates = <CustomTemplate>[];
+
+const myCategory = '我的';
+
+/// Built-in strip templates followed by the user's own.
+List<StripTemplate> get allStripTemplates => [...stripTemplates, for (final t in customTemplates) t.template];
+
+/// A strip template the user designed: just the choices they made; the
+/// colours of the cells, pattern and text are worked out from the frame.
+class CustomTemplate {
+  final String id, caption;
+  final Color frame;
+  /// Bottom colour of a vertical gradient; null for a plain frame.
+  final Color? frame2;
+  final FramePattern pattern;
+  final CellShape cellShape;
+  final FooterStyle footer;
+  /// Up to [decoSpots].length sticker ids printed on the frame.
+  final List<String> stickers;
+  const CustomTemplate({
+    required this.id, this.caption = '', required this.frame, this.frame2, this.pattern = FramePattern.none,
+    this.cellShape = CellShape.square, this.footer = FooterStyle.caption, this.stickers = const [],
+  });
+
+  /// Where printed stickers go, in PhotoStrip design units, with their tilt.
+  static const decoSpots = [(Offset(26, 26), -.2), (Offset(176, 300), .15), (Offset(24, 470), -.1)];
+
+  StripTemplate get template {
+    final darkTop = frame.computeLuminance() < .4;
+    final darkBottom = (frame2 ?? frame).computeLuminance() < .4;
+    return StripTemplate(
+      name: '我的模板', category: myCategory, caption: caption,
+      frame: frame, frame2: frame2,
+      cell: darkTop ? Color.lerp(frame, Colors.white, .15)! : Colors.white,
+      captionColor: darkBottom ? Colors.white : ink,
+      pattern: pattern,
+      patternColor: darkTop ? Colors.white.withValues(alpha: .35) : Color.lerp(frame, Colors.white, .6)!,
+      cellShape: cellShape, footer: footer, outline: !darkTop,
+      decos: [
+        for (var i = 0; i < stickers.length && i < decoSpots.length; i++)
+          Deco(stickers[i], decoSpots[i].$1, size: 40, angle: decoSpots[i].$2),
+      ],
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+    'id': id, 'caption': caption, 'frame': frame.toARGB32(), 'frame2': frame2?.toARGB32(),
+    'pattern': pattern.name, 'cellShape': cellShape.name, 'footer': footer.name, 'stickers': stickers,
+  };
+
+  factory CustomTemplate.fromJson(Map<String, Object?> j) => CustomTemplate(
+    id: j['id']! as String,
+    caption: j['caption'] as String? ?? '',
+    frame: Color(j['frame']! as int),
+    frame2: j['frame2'] == null ? null : Color(j['frame2']! as int),
+    pattern: FramePattern.values.byName(j['pattern']! as String),
+    cellShape: CellShape.values.byName(j['cellShape']! as String),
+    footer: FooterStyle.values.byName(j['footer']! as String),
+    stickers: [for (final s in j['stickers'] as List? ?? const []) s as String],
+  );
+}
 
 /// A sticker placed on the canvas. [center] is normalised (0–1) so it
 /// survives the canvas resizing, e.g. when the keyboard opens.

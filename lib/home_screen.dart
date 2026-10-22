@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'editor_screen.dart';
+import 'library_screen.dart';
 import 'models.dart';
 import 'theme.dart';
 import 'widgets/frames.dart';
@@ -55,6 +56,7 @@ class HomeScreen extends StatelessWidget {
     bottomNavigationBar: _BottomBar(
       onCamera: () => _open(context, EditorMode.fourCut),
       onSoon: (label) => showSoonToast(context, label),
+      onMine: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
     ),
   );
 }
@@ -257,7 +259,8 @@ class _StyleCard extends StatelessWidget {
 class _BottomBar extends StatelessWidget {
   final VoidCallback onCamera;
   final ValueChanged<String> onSoon;
-  const _BottomBar({required this.onCamera, required this.onSoon});
+  final VoidCallback onMine;
+  const _BottomBar({required this.onCamera, required this.onSoon, required this.onMine});
 
   @override
   Widget build(BuildContext context) => SizedBox(
@@ -274,7 +277,7 @@ class _BottomBar extends StatelessWidget {
           Expanded(child: _NavItem(icon: Icons.menu_book_outlined, label: '日記', onTap: () => onSoon('日記'))),
           const SizedBox(width: 72),
           Expanded(child: _NavItem(icon: Icons.shopping_bag_outlined, label: '商店', onTap: () => onSoon('商店'))),
-          Expanded(child: _NavItem(icon: Icons.person_outline_rounded, label: '我的', onTap: () => onSoon('我的'))),
+          Expanded(child: _NavItem(icon: Icons.person_outline_rounded, label: '我的', onTap: onMine)),
         ])),
       )),
       Positioned(top: 0, left: 0, right: 0, child: Center(child: GestureDetector(

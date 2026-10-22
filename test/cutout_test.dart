@@ -6,17 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/cutout/cutout_page.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/models.dart';
-import 'package:pico_snap/widgets/frames.dart';
-import 'package:pico_snap/widgets/sticker_item.dart';
 
-/// 1×1 的透明 PNG：當作使用者自己做的貼紙。
-final _tinyPng = Uint8List.fromList([
-  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
-  0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
-  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
-  0x42, 0x60, 0x82,
-]);
 
 /// 白底上一個紅色圓（測試用的照片）。
 Future<Uint8List> _circlePhoto() async {
@@ -120,41 +110,5 @@ void main() {
     }
     expect(find.byType(SnackBar), findsOneWidget);
     expect(find.text('儲存'), findsOneWidget, reason: '按鈕恢復原狀');
-  });
-
-  testWidgets('自己做的貼紙可以刪除，畫面上的也一起拿掉；新貼紙不會重用舊編號', (tester) async {
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    customStickers.clear();
-    final a = newCustomStickerId(), b = newCustomStickerId();
-    customStickers[a] = _tinyPng;
-    customStickers[b] = _tinyPng;
-
-    await tester.pumpWidget(const MaterialApp(home: EditorScreen()));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('貼紙').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('📷 我的'));
-    await tester.pumpAndSettle();
-    // 把 a 貼到畫面上
-    await tester.tap(find.byWidgetPredicate((w) => w is StickerVisual && w.sticker == a));
-    await tester.pumpAndSettle();
-    expect(find.byType(StickerItem), findsOneWidget);
-
-    // 按 a 角落的 ×，確認刪除
-    await tester.tap(find.byIcon(Icons.close_rounded).first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('刪除'));
-    await tester.pumpAndSettle();
-    expect(customStickers.keys, [b]);
-    expect(find.byType(StickerItem), findsNothing, reason: '畫面上的那張也拿掉');
-    // 復原也不會把已刪掉的貼紙找回來
-    await tester.tap(find.byIcon(Icons.undo_rounded));
-    await tester.pumpAndSettle();
-    expect(find.byType(StickerItem), findsNothing);
-
-    expect(newCustomStickerId(), isNot(anyOf(a, b)), reason: '刪掉之後新的編號不重複');
-    customStickers.clear();
   });
 }

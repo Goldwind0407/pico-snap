@@ -500,7 +500,7 @@ class EmojiSticker extends StatelessWidget {
   }
 }
 
-/// Renders a sticker id: an asset path for hand-drawn stickers, `mem:` for
+/// Renders a sticker id: an asset path for hand-drawn stickers, `my:` for
 /// stickers cut out of the user's photos, else an emoji.
 class StickerVisual extends StatelessWidget {
   final String sticker;
@@ -510,7 +510,7 @@ class StickerVisual extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (sticker.startsWith('assets/')) return Image.asset(sticker, width: size, height: size, filterQuality: FilterQuality.medium);
-    if (sticker.startsWith('mem:')) {
+    if (sticker.startsWith('my:')) {
       final custom = customStickers[sticker];
       // Deleted while still referenced somewhere: draw nothing.
       if (custom == null) return SizedBox.square(dimension: size);

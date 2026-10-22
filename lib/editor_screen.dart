@@ -67,7 +67,7 @@ class _EditorScreenState extends State<EditorScreen> {
   bool _capturing = false, _saving = false;
   final _polaroidCaptions = ['good day', 'little joy', 'sunny!', 'us ♡'];
   late int _template = widget.template;
-  late String _category = stripTemplates[widget.template].category;
+  late String _category = allStripTemplates[widget.template].category;
   String? _stripCaption;
   String _bubble = 'DREAM';
   int _pack = 1;
@@ -90,13 +90,13 @@ class _EditorScreenState extends State<EditorScreen> {
   };
 
   double get _aspect => switch (widget.mode) {
-    EditorMode.fourCut => stripTemplates[_template].designSize.aspectRatio,
+    EditorMode.fourCut => allStripTemplates[_template].designSize.aspectRatio,
     EditorMode.polaroid => formats[_format].$2,
     EditorMode.sticker => 4 / 5,
   };
 
   String get _text => switch (widget.mode) {
-    EditorMode.fourCut => _stripCaption ?? stripTemplates[_template].caption,
+    EditorMode.fourCut => _stripCaption ?? allStripTemplates[_template].caption,
     EditorMode.polaroid => _polaroidCaptions[_selectedCell],
     EditorMode.sticker => _bubble,
   };
@@ -138,45 +138,6 @@ class _EditorScreenState extends State<EditorScreen> {
     if (bytes == null) return _pickPhoto(0);
     final png = await CutoutPage.open(context, bytes);
     if (png != null && mounted) setState(() => _subject = png);
-  }
-
-  /// Any mode: pick a photo, cut it out and stick it on as a sticker.
-  Future<void> _addPhotoSticker() async {
-    final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 95);
-    if (file == null) return;
-    final bytes = await file.readAsBytes();
-    if (!mounted) return;
-    final png = await CutoutPage.open(context, bytes);
-    if (png == null || !mounted) return;
-    final id = newCustomStickerId();
-    customStickers[id] = png;
-    _addSticker(id);
-  }
-
-  /// Delete one of the user's own stickers, and every copy of it on the
-  /// canvas and in the undo history.
-  Future<void> _deleteCustomSticker(String id) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: cream,
-        title: const Text('刪除這張貼紙？', style: TextStyle(fontSize: 18, color: ink, fontWeight: FontWeight.w900)),
-        content: const Text('畫面上用到這張貼紙的地方也會一起拿掉。', style: TextStyle(color: ink)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消', style: TextStyle(color: muted))),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('刪除', style: TextStyle(color: coral, fontWeight: FontWeight.w800))),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-    setState(() {
-      customStickers.remove(id);
-      _stickers = [for (final s in _stickers) if (s.sticker != id) s];
-      for (var i = 0; i < _history.length; i++) {
-        _history[i] = [for (final s in _history[i]) if (s.sticker != id) s];
-      }
-      _selectedSticker = null;
-    });
   }
 
   Future<void> _save() async {
@@ -306,7 +267,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Widget _artwork(Size size) => switch (widget.mode) {
     EditorMode.fourCut => FittedBox(child: PhotoStrip(
-      template: stripTemplates[_template], photos: _photos, caption: _stripCaption,
+      template: allStripTemplates[_template], photos: _photos, caption: _stripCaption,
       placeholder: _capturing ? null : const AddPhotoHint(scale: 1.4), selected: _capturing ? null : _selectedCell, onTapCell: _tapCell,
     )),
     EditorMode.polaroid => _polaroidArtwork(size),
@@ -408,9 +369,9 @@ class _EditorScreenState extends State<EditorScreen> {
   );
 
   Widget _templateTool() {
-    final visible = [for (var i = 0; i < stripTemplates.length; i++) if (stripTemplates[i].category == _category) i];
+    final visible = [for (var i = 0; i < allStripTemplates.length; i++) if (allStripTemplates[i].category == _category) i];
     return Column(children: [
-      _CategoryRow(labels: stripCategories, selected: _category, onTap: (c) => setState(() => _category = c)),
+      _CategoryRow(labels: [if (customTemplates.isNotEmpty) myCategory, ...stripCategories], selected: _category, onTap: (c) => setState(() => _category = c)),
       Expanded(child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
@@ -418,7 +379,7 @@ class _EditorScreenState extends State<EditorScreen> {
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (_, k) {
           final i = visible[k];
-          return _TemplateThumb(template: stripTemplates[i], selected: _template == i, onTap: () => setState(() => _template = i));
+          return _TemplateThumb(template: allStripTemplates[i], selected: _template == i, onTap: () => setState(() => _template = i));
         },
       )),
     ]);
@@ -519,47 +480,21 @@ class _EditorScreenState extends State<EditorScreen> {
           );
         },
       )),
-      Expanded(child: GridView.builder(
+      if (mine && pack.isEmpty)
+        const Expanded(child: Center(child: Text('還沒有自己的貼紙\n可以到首頁的「我的」把照片做成貼紙', textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, height: 1.6, color: muted, fontWeight: FontWeight.w600))))
+      else Expanded(child: GridView.builder(
         padding: EdgeInsets.zero,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 6),
-        itemCount: pack.length + (mine ? 1 : 0),
-        itemBuilder: (_, k) {
-          if (mine && k == 0) {
-            return InkWell(
-              onTap: _addPhotoSticker,
-              child: Container(
-                decoration: const BoxDecoration(border: Border(top: BorderSide(color: line), right: BorderSide(color: line))),
-                child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(Icons.add_photo_alternate_outlined, color: coral, size: 24),
-                  SizedBox(height: 2),
-                  Text('照片去背', style: TextStyle(fontSize: 10, color: ink, fontWeight: FontWeight.w800)),
-                ]),
-              ),
-            );
-          }
-          final id = pack[mine ? k - 1 : k];
-          final tile = InkWell(
-            onTap: () => _addSticker(id),
-            child: Container(
-              decoration: const BoxDecoration(border: Border(top: BorderSide(color: line), right: BorderSide(color: line))),
-              padding: const EdgeInsets.all(9),
-              child: StickerVisual(id),
-            ),
-          );
-          if (!mine) return tile;
-          // The user's own stickers can be deleted.
-          return Stack(children: [
-            Positioned.fill(child: tile),
-            Positioned(right: 3, top: 3, child: GestureDetector(
-              onTap: () => _deleteCustomSticker(id),
-              child: Container(
-                width: 20, height: 20,
-                decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: line), boxShadow: [BoxShadow(color: ink.withValues(alpha: .15), blurRadius: 3)]),
-                child: const Icon(Icons.close_rounded, size: 13, color: ink),
-              ),
-            )),
-          ]);
-        },
+        itemCount: pack.length,
+        itemBuilder: (_, k) => InkWell(
+          onTap: () => _addSticker(pack[k]),
+          child: Container(
+            decoration: const BoxDecoration(border: Border(top: BorderSide(color: line), right: BorderSide(color: line))),
+            padding: const EdgeInsets.all(9),
+            child: StickerVisual(pack[k]),
+          ),
+        ),
       )),
     ]);
   }
@@ -605,7 +540,7 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  Widget _textTool() => widget.mode == EditorMode.fourCut && stripTemplates[_template].art != null
+  Widget _textTool() => widget.mode == EditorMode.fourCut && allStripTemplates[_template].art != null
     ? Center(child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 28),
         child: Text('這款模板的文字是印好的，可以用貼紙裝飾，或換一款模板來寫字。', textAlign: TextAlign.center,
