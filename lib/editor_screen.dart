@@ -264,6 +264,10 @@ class _EditorScreenState extends State<EditorScreen> {
               _selectedSticker = i;
             }),
             onChanged: (d) => setState(() => _stickers[i] = d),
+            onFlip: () => setState(() {
+              _remember();
+              _stickers[i] = _stickers[i].copyWith(flipped: !_stickers[i].flipped);
+            }),
             onDelete: () => setState(() {
               _remember();
               _stickers.removeAt(i);

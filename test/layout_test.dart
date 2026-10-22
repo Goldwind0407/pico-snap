@@ -47,8 +47,12 @@ void main() {
         await t.pumpAndSettle();
         await t.drag(find.byIcon(Icons.open_in_full_rounded), const Offset(25, 25));
         await t.pumpAndSettle();
-        await t.drag(find.byIcon(Icons.rotate_right_rounded), const Offset(-20, 10));
+        // Tap the flip handle: the sticker is mirrored left to right.
+        bool mirrored() => find.byWidgetPredicate((w) => w is Transform && w.transform.storage[0] == -1).evaluate().isNotEmpty;
+        expect(mirrored(), isFalse);
+        await t.tap(find.byIcon(Icons.flip_rounded));
         await t.pumpAndSettle();
+        expect(mirrored(), isTrue);
         await t.tap(find.byIcon(Icons.undo_rounded));
         await t.pumpAndSettle();
         await t.tap(find.byType(StickerItem));

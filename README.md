@@ -47,7 +47,7 @@
 ### 貼紙
 
 - 三種模式都可以加貼紙，包含 16 款手繪貼紙和一些 emoji。
-- 貼紙可以拖曳、雙指縮放和旋轉，也可以用角落的把手調整大小和角度。
+- 貼紙可以拖曳、雙指縮放和旋轉，也可以拖右下角的把手調整大小和角度；按右上角的按鈕可以左右翻轉。
 - 可以刪除，也可以復原上一步。
 
 ### 尚未完成
@@ -67,7 +67,7 @@
 | `lib/home_screen.dart` | 首頁 |
 | `lib/editor_screen.dart` | 編輯器（四格、拍立得、貼紙三種模式） |
 | `lib/widgets/frames.dart` | 拍貼條、拍立得、紙膠帶、格紋等元件 |
-| `lib/widgets/sticker_item.dart` | 可拖曳、縮放、旋轉的貼紙 |
+| `lib/widgets/sticker_item.dart` | 可拖曳、縮放、旋轉、翻轉的貼紙 |
 | `lib/cutout/` | 去背：去背頁面、手機內建 AI、GrabCut、筆刷工具（移植自 color_pic） |
 | `lib/services/photo_save_service.dart` | 存到相簿 |
 | `test/` | 版面、去背、儲存的測試 |

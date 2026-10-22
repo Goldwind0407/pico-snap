@@ -7,19 +7,19 @@ import '../theme.dart';
 import 'frames.dart';
 
 /// A sticker inside the canvas Stack. Drag or pinch the body to move, scale
-/// and rotate it; drag a right-hand corner handle to scale and rotate with one
-/// finger; tap the trash handle to delete it.
+/// and rotate it; drag the bottom-right handle to scale and rotate with one
+/// finger; tap the top-right handle to flip it and the trash handle to delete it.
 class StickerItem extends StatefulWidget {
   static const baseFraction = .2, handle = 13.0;
   final StickerData data;
   final Size canvas;
   final bool selected;
-  final VoidCallback onSelect, onDelete, onEditStart;
+  final VoidCallback onSelect, onDelete, onFlip, onEditStart;
   final ValueChanged<StickerData> onChanged;
   final Offset Function(Offset global) toLocal;
   const StickerItem({
     super.key, required this.data, required this.canvas, required this.selected, required this.onSelect,
-    required this.onDelete, required this.onEditStart, required this.onChanged, required this.toLocal,
+    required this.onDelete, required this.onFlip, required this.onEditStart, required this.onChanged, required this.toLocal,
   });
 
   @override
@@ -51,8 +51,8 @@ class _StickerItemState extends State<StickerItem> {
     ));
   }
 
-  /// Drag a corner handle to scale and rotate. [cornerAngle] is where the
-  /// handle sits relative to the centre before rotation (bottom-right = 45°).
+  /// Drag the bottom-right handle to scale and rotate. [cornerAngle] is where
+  /// the handle sits relative to the centre before rotation (45°).
   void _onHandleUpdate(DragUpdateDetails d, double cornerAngle) {
     final v = widget.toLocal(d.globalPosition) - _centerPx;
     final reach = _baseSize / 2 * sqrt2;
@@ -76,7 +76,7 @@ class _StickerItemState extends State<StickerItem> {
             onScaleUpdate: _onScaleUpdate,
             child: CustomPaint(
               foregroundPainter: widget.selected ? const _DashedRectPainter() : null,
-              child: StickerVisual(widget.data.sticker, size: 120),
+              child: Transform.flip(flipX: widget.data.flipped, child: StickerVisual(widget.data.sticker, size: 120)),
             ),
           ),
         )),
@@ -87,9 +87,8 @@ class _StickerItemState extends State<StickerItem> {
             child: const _Handle(child: Icon(Icons.delete_outline_rounded, size: 15, color: ink)),
           )),
           Positioned(right: 0, top: 0, child: GestureDetector(
-            onPanStart: (_) => widget.onEditStart(),
-            onPanUpdate: (d) => _onHandleUpdate(d, -pi / 4),
-            child: const _Handle(child: Icon(Icons.rotate_right_rounded, size: 15, color: ink)),
+            onTap: widget.onFlip,
+            child: const _Handle(child: Icon(Icons.flip_rounded, size: 15, color: ink)),
           )),
           Positioned(right: 0, bottom: 0, child: GestureDetector(
             onPanStart: (_) => widget.onEditStart(),
