@@ -1,3 +1,4 @@
+import AVFoundation
 import CoreVideo
 import Flutter
 import UIKit
@@ -17,6 +18,7 @@ import Vision
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     SubjectSegmenter.register(messenger: engineBridge.applicationRegistrar.messenger())
+    VideoEncoder.register(messenger: engineBridge.applicationRegistrar.messenger())
   }
 }
 
@@ -126,5 +128,118 @@ enum SubjectSegmenter {
       }
     }
     return out
+  }
+}
+
+/// 縮時影片：把一張張 PNG 畫格用 AVAssetWriter 做成 H.264 的 MP4。
+///
+/// Dart 那邊(lib/services/timelapse_recorder.dart)送來畫格路徑(同一張重複送
+/// 就是停在那一格)、fps、寬高、輸出路徑;做好回傳輸出路徑,失敗回錯誤。
+enum VideoEncoder {
+  /// 通道要留著(放在 static),不然離開這個函式就被釋放,Dart 那邊叫不到。
+  private static var channel: FlutterMethodChannel?
+
+  enum EncodeError: Error { case setup, decode, append, finish }
+
+  static func register(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "picosnap/video", binaryMessenger: messenger)
+    Self.channel = channel
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "encode",
+        let args = call.arguments as? [String: Any],
+        let frames = args["frames"] as? [String], !frames.isEmpty,
+        let out = args["out"] as? String,
+        let width = args["width"] as? Int,
+        let height = args["height"] as? Int
+      else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      let fps = args["fps"] as? Int ?? 12
+      DispatchQueue.global(qos: .userInitiated).async {
+        do {
+          try encode(frames: frames, out: out, fps: fps, width: width, height: height)
+          DispatchQueue.main.async { result(out) }
+        } catch {
+          try? FileManager.default.removeItem(atPath: out)
+          DispatchQueue.main.async {
+            result(FlutterError(code: "encode", message: "\(error)", details: nil))
+          }
+        }
+      }
+    }
+  }
+
+  static func encode(frames: [String], out: String, fps: Int, width: Int, height: Int) throws {
+    let url = URL(fileURLWithPath: out)
+    try? FileManager.default.removeItem(at: url)
+    let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
+    let input = AVAssetWriterInput(
+      mediaType: .video,
+      outputSettings: [
+        AVVideoCodecKey: AVVideoCodecType.h264,
+        AVVideoWidthKey: width,
+        AVVideoHeightKey: height,
+        AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: 4_000_000],
+      ])
+    input.expectsMediaDataInRealTime = false
+    let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+      assetWriterInput: input,
+      sourcePixelBufferAttributes: [
+        kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
+        kCVPixelBufferWidthKey as String: width,
+        kCVPixelBufferHeightKey as String: height,
+      ])
+    guard writer.canAdd(input) else { throw EncodeError.setup }
+    writer.add(input)
+    guard writer.startWriting() else { throw writer.error ?? EncodeError.setup }
+    writer.startSession(atSourceTime: .zero)
+
+    var loaded: String?
+    var buffer: CVPixelBuffer?
+    for (i, path) in frames.enumerated() {
+      // 同一張重複出現(最後停住的成品)就不用重新讀
+      if path != loaded {
+        buffer = try pixelBuffer(path: path, width: width, height: height)
+        loaded = path
+      }
+      while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.005) }
+      let time = CMTime(value: CMTimeValue(i), timescale: CMTimeScale(fps))
+      guard let frame = buffer, adaptor.append(frame, withPresentationTime: time) else {
+        throw writer.error ?? EncodeError.append
+      }
+    }
+    input.markAsFinished()
+    let done = DispatchSemaphore(value: 0)
+    writer.finishWriting { done.signal() }
+    done.wait()
+    guard writer.status == .completed else { throw writer.error ?? EncodeError.finish }
+  }
+
+  /// 讀一張 PNG,畫進編碼器要的像素緩衝(大小不同就縮放)。
+  static func pixelBuffer(path: String, width: Int, height: Int) throws -> CVPixelBuffer {
+    guard let image = UIImage(contentsOfFile: path)?.cgImage else { throw EncodeError.decode }
+    var created: CVPixelBuffer?
+    let attrs = [
+      kCVPixelBufferCGImageCompatibilityKey: true,
+      kCVPixelBufferCGBitmapContextCompatibilityKey: true,
+    ] as CFDictionary
+    guard
+      CVPixelBufferCreate(
+        kCFAllocatorDefault, width, height, kCVPixelFormatType_32ARGB, attrs, &created)
+        == kCVReturnSuccess,
+      let buffer = created
+    else { throw EncodeError.decode }
+    CVPixelBufferLockBaseAddress(buffer, [])
+    defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+    guard
+      let context = CGContext(
+        data: CVPixelBufferGetBaseAddress(buffer), width: width, height: height,
+        bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue)
+    else { throw EncodeError.decode }
+    context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+    return buffer
   }
 }

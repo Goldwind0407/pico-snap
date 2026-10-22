@@ -8,5 +8,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         // 去背用的主體分割（ML Kit）
         SubjectSegmenterChannel.register(flutterEngine.dartExecutor.binaryMessenger, applicationContext)
+        // 縮時影片編碼
+        VideoEncoderChannel.register(flutterEngine.dartExecutor.binaryMessenger)
     }
 }

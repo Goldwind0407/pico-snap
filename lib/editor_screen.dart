@@ -1,14 +1,17 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'dart:ui' as ui;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'cutout/cutout_page.dart';
 import 'models.dart';
 import 'services/photo_save_service.dart';
+import 'services/timelapse_recorder.dart';
 import 'theme.dart';
 import 'widgets/frames.dart';
 import 'widgets/sticker_item.dart';
@@ -65,6 +68,9 @@ class _EditorScreenState extends State<EditorScreen> {
   Uint8List? _subject;
   /// While saving: hide hints, selection outlines and sticker handles.
   bool _capturing = false, _saving = false;
+  /// Records the editing for the timelapse video.
+  final _recorder = TimelapseRecorder();
+  bool _withVideo = true;
   final _polaroidCaptions = ['good day', 'little joy', 'sunny!', 'us ♡'];
   late int _template = widget.template;
   late String _category = allStripTemplates[widget.template].category;
@@ -111,6 +117,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
   @override
   void dispose() {
+    _recorder.dispose();
     _textCtrl.dispose();
     super.dispose();
   }
@@ -136,11 +143,69 @@ class _EditorScreenState extends State<EditorScreen> {
   Future<void> _cutSubject() async {
     final bytes = _photoBytes[0];
     if (bytes == null) return _pickPhoto(0);
-    final png = await CutoutPage.open(context, bytes);
+    final png = await CutoutPage.open(context, bytes, recorder: _recorder);
     if (png != null && mounted) setState(() => _subject = png);
   }
 
-  Future<void> _save() async {
+  /// One timelapse frame: the canvas as it looks now (handles and all).
+  Future<ui.Image?> _snapshot() async {
+    final b = _shotKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    if (!mounted || b == null || !b.attached || b.size.isEmpty) return null;
+    return b.toImage(pixelRatio: 1000 / b.size.longestSide);
+  }
+
+  /// Ask whether to save the timelapse too, then save.
+  Future<void> _askSave() async {
+    if (_saving) return;
+    final canVideo = _recorder.frameCount >= 3;
+    final go = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+      builder: (context) => StatefulBuilder(builder: (context, setSheet) => SafeArea(child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 16),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('存到相簿', style: TextStyle(fontSize: 19, color: ink, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          const Text('作品圖片會存成高畫質 PNG。', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 14),
+          GestureDetector(
+            onTap: canVideo ? () => setSheet(() => _withVideo = !_withVideo) : null,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+              decoration: BoxDecoration(
+                color: canVideo && _withVideo ? blush : cream, borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: canVideo && _withVideo ? blushLine : line),
+              ),
+              child: Row(children: [
+                Icon(Icons.movie_filter_outlined, color: canVideo ? coral : muted),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('同時存「製作過程」縮時影片', style: TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 2),
+                  Text(canVideo ? '你放照片、去背、貼貼紙的過程，約 ${_recorder.seconds} 秒，適合發 Reels、TikTok' : '多編輯一下就能做成影片',
+                    style: const TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
+                ])),
+                Checkbox(value: canVideo && _withVideo, activeColor: coral, onChanged: canVideo ? (v) => setSheet(() => _withVideo = v ?? false) : null),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(width: double.infinity, child: FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            child: const Text('存到相簿', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+          )),
+        ]),
+      ))),
+    );
+    if (go == true && mounted) await _save(video: canVideo && _withVideo);
+  }
+
+  Future<void> _save({bool video = false}) async {
     if (_saving) return;
     setState(() {
       _saving = true;
@@ -149,14 +214,23 @@ class _EditorScreenState extends State<EditorScreen> {
     });
     // Let the frame without hints and handles paint before capturing it.
     await WidgetsBinding.instance.endOfFrame;
-    final error = await PhotoSaveService.saveBoundary(_shotKey);
+    var error = await PhotoSaveService.saveBoundary(_shotKey);
+    var saved = '已存到相簿 ♡';
+    if (error == null && video) {
+      // The clean finished piece ends the video.
+      final finished = await _snapshot();
+      if (mounted) setState(() => _capturing = false);
+      final path = finished == null ? null : await _recorder.render(finished);
+      error = path == null ? '圖片已存好，但縮時影片做不出來' : await PhotoSaveService.saveVideo(path);
+      if (error == null) saved = '已存到相簿 ♡ 圖片和縮時影片';
+    }
     if (!mounted) return;
     setState(() {
       _saving = false;
       _capturing = false;
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(error ?? '已存到相簿 ♡'),
+      content: Text(error ?? saved),
       behavior: SnackBarBehavior.floating,
       backgroundColor: error == null ? ink : const Color(0xFFB4483C),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -200,7 +274,13 @@ class _EditorScreenState extends State<EditorScreen> {
   Offset _toCanvas(Offset global) => (_canvasKey.currentContext!.findRenderObject()! as RenderBox).globalToLocal(global);
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    // Every rebuild means something changed: record it for the timelapse.
+    if (!_capturing) WidgetsBinding.instance.addPostFrameCallback((_) => _recorder.request(_snapshot));
+    return _scaffold();
+  }
+
+  Widget _scaffold() => Scaffold(
     backgroundColor: cream,
     body: SafeArea(bottom: false, child: Column(children: [
       _topBar(),
@@ -226,7 +306,7 @@ class _EditorScreenState extends State<EditorScreen> {
         _TopButton(label: '匯入', onTap: () => _pickPhoto()),
         const SizedBox(width: 8),
       ],
-      _TopButton(label: _saving ? '儲存中…' : '儲存', filled: true, onTap: _save),
+      _TopButton(label: _saving ? '儲存中…' : '儲存', filled: true, onTap: _askSave),
     ]),
   );
 

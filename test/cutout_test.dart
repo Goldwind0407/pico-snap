@@ -104,6 +104,9 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: EditorScreen(mode: EditorMode.polaroid)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('儲存'));
+    await tester.pumpAndSettle();
+    expect(find.text('同時存「製作過程」縮時影片'), findsOneWidget);
+    await tester.tap(find.text('存到相簿').last);
     for (var i = 0; i < 100 && find.byType(SnackBar).evaluate().isEmpty; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
       await tester.pump();

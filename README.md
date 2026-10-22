@@ -31,6 +31,14 @@
 - 按「儲存」會輸出高畫質圖片（最長邊約 3000 像素），存到手機相簿的「PICO SNAP」相簿。
 - 存檔時會自動隱藏「tap to add」、選取框和貼紙的把手。
 
+### 製作過程縮時影片
+
+- 編輯時會自動記錄過程：放照片、去背（包括筆刷修邊）、貼貼紙、拖曳、縮放、翻轉。畫面有變化才截圖，最多每秒 4 張。
+- 按「儲存」時可以勾選「同時存『製作過程』縮時影片」，跟作品圖片一起存到相簿。
+- 影片是 9:16（720×1280，適合 Reels、TikTok）的 MP4：奶油色底、上方有 PICO SNAP 和 the making of ♡，最後停在完成的作品 2 秒。編輯得少的時候每一格會多停一下，過程至少約 4 秒；編輯很久的話會自動抽掉一半的畫格，影片不會太長。
+- 用手機內建的編碼器做影片（Android 是 MediaCodec，iPhone 是 AVAssetWriter），不需要額外的套件。
+- 之後計畫：在作品角落加上 QR Code，掃描就能下載這支影片（需要先決定影片要放在哪個雲端）。
+
 ### 去背
 
 - 會先用**手機內建 AI** 去背：iPhone 用 Vision（iOS 17 以上可以切任何主體，iOS 15、16 只能切人像），Android 用 ML Kit。
@@ -80,7 +88,9 @@
 | `lib/services/photo_save_service.dart` | 存到相簿 |
 | `lib/library_screen.dart`、`lib/template_maker_screen.dart` | 我的素材、設計模板 |
 | `lib/services/my_library.dart` | 自己的貼紙和模板存在手機裡 |
-| `test/` | 版面、去背、儲存、我的素材的測試 |
+| `lib/services/timelapse_recorder.dart` | 錄製編輯過程、做成縮時影片 |
+| `android/.../VideoEncoderChannel.kt`、`ios/Runner/AppDelegate.swift` | 手機內建的影片編碼 |
+| `test/` | 版面、去背、儲存、我的素材、縮時影片的測試 |
 | `assets/stickers/` | 手繪貼紙 PNG |
 | `assets/templates/` | 精選插畫模板（照片格已去背的 WebP） |
 | `assets/samples/` | 首頁用的範例照片 |

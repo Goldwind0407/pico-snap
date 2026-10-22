@@ -67,6 +67,21 @@ class PhotoSaveService {
     }
   }
 
+  /// 把影片檔存進相簿。成功回傳 null，失敗回傳可以直接顯示給使用者的訊息。
+  static Future<String?> saveVideo(String path) async {
+    try {
+      final denied = await _ensureAccess();
+      if (denied != null) return denied;
+      await Gal.putVideo(path, album: _album);
+      return null;
+    } on GalException catch (e) {
+      return _message(e);
+    } catch (e) {
+      debugPrint('[SAVE] 存影片失敗: $e');
+      return '存影片失敗：$e';
+    }
+  }
+
   /// 沒有相簿權限就先要一次。Android 13+ 通常直接回 true。
   /// 有權限回傳 null，沒有的話回傳要顯示的訊息。
   static Future<String?> _ensureAccess() async {

@@ -5,8 +5,10 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
+import '../services/timelapse_recorder.dart';
 import '../theme.dart';
 import 'cutout.dart';
 import 'grabcut.dart';
@@ -26,10 +28,12 @@ enum _Brush { erase, restore }
 class CutoutPage extends StatefulWidget {
   /// 照片原檔（jpg、png…）。
   final Uint8List photo;
-  const CutoutPage({super.key, required this.photo});
+  /// 有的話，去背的過程也錄進縮時影片。
+  final TimelapseRecorder? recorder;
+  const CutoutPage({super.key, required this.photo, this.recorder});
 
-  static Future<Uint8List?> open(BuildContext context, Uint8List photo) =>
-      Navigator.push<Uint8List>(context, MaterialPageRoute(builder: (_) => CutoutPage(photo: photo)));
+  static Future<Uint8List?> open(BuildContext context, Uint8List photo, {TimelapseRecorder? recorder}) =>
+      Navigator.push<Uint8List>(context, MaterialPageRoute(builder: (_) => CutoutPage(photo: photo, recorder: recorder)));
 
   @override
   State<CutoutPage> createState() => _CutoutPageState();
@@ -52,6 +56,7 @@ class _CutoutPageState extends State<CutoutPage> {
   final _strokePhoto = <Offset>[];
   Offset? _cursor;
   bool _painted = false;
+  final _shotKey = GlobalKey();
   DateTime _lastRefresh = DateTime(0);
 
   /// 筆刷半徑（螢幕上的點）。
@@ -314,6 +319,15 @@ class _CutoutPageState extends State<CutoutPage> {
     final old = _masked;
     setState(() => _masked = img);
     old?.dispose();
+    final recorder = widget.recorder;
+    if (recorder != null) WidgetsBinding.instance.addPostFrameCallback((_) => recorder.request(_frame));
+  }
+
+  /// 縮時影片的一格：去背中的照片（格紋底）。
+  Future<ui.Image?> _frame() async {
+    final b = _shotKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    if (!mounted || b == null || !b.attached || b.size.isEmpty) return null;
+    return b.toImage(pixelRatio: 1000 / b.size.longestSide);
   }
 
   // ---------------- 完成 ----------------
@@ -380,7 +394,7 @@ class _CutoutPageState extends State<CutoutPage> {
           if (p.dx >= 0 && p.dy >= 0 && p.dx < _w && p.dy < _h) _run(_Engine.ai, at: p);
         },
         child: Stack(children: [
-          Positioned.fromRect(rect: rect, child: ClipRRect(
+          Positioned.fromRect(rect: rect, child: RepaintBoundary(key: _shotKey, child: ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: Stack(fit: StackFit.expand, children: [
               const CustomPaint(painter: _CheckerPainter()),
@@ -388,7 +402,7 @@ class _CutoutPageState extends State<CutoutPage> {
               Opacity(opacity: .22, child: RawImage(image: photo, fit: BoxFit.fill)),
               if (_masked != null) RawImage(image: _masked, fit: BoxFit.fill),
             ]),
-          )),
+          ))),
           if (_strokeScreen.length > 1)
             Positioned.fill(child: CustomPaint(painter: _StrokePainter(List.of(_strokeScreen), _brush == _Brush.erase ? coral : const Color(0xFF4CB97A), math.max(4, _brushScreen * .7)))),
           if (_cursor != null)
