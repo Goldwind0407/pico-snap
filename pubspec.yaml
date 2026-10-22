@@ -1,5 +1,5 @@
 name: pico_snap
-description: A polished local-first photo booth and polaroid app prototype.
+description: 可愛的韓系拍貼 App：四格拍貼、拍立得拼貼與貼紙裝飾。
 publish_to: 'none'
 version: 0.1.0+1
 environment:
@@ -14,3 +14,21 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 flutter:
   uses-material-design: true
+  assets:
+    - assets/samples/
+    - assets/stickers/
+  fonts:
+    - family: Nunito
+      fonts:
+        - asset: assets/fonts/Nunito-500.ttf
+          weight: 500
+        - asset: assets/fonts/Nunito-700.ttf
+          weight: 700
+        - asset: assets/fonts/Nunito-800.ttf
+          weight: 800
+        - asset: assets/fonts/Nunito-900.ttf
+          weight: 900
+    - family: Caveat
+      fonts:
+        - asset: assets/fonts/Caveat-600.ttf
+          weight: 600

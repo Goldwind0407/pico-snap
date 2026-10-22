@@ -1,0 +1,15 @@
+A flat graphic design of a vertical photo booth strip template in the Korean "four cuts" style, front view, perfectly straight, filling the whole image edge to edge. Aspect ratio 1:3 (tall and narrow). If the image has to be wider than 1:3, place the strip in the center on a plain pure white background.
+No people, no photos, no hands, no table, no shadow, no perspective, no mockup - only the flat printable template.
+
+Layout (very important):
+- Four identical empty photo windows stacked vertically, each a perfect sharp-cornered rectangle with a 4:3 landscape ratio.
+- All four windows have exactly the same size, are centered horizontally, have about 6% side margins and small equal gaps between them.
+- The bottom 10% of the strip, below the last window, is a footer area.
+- Fill every photo window with solid flat pure green #00FF00: no gradient, no texture, no pattern, nothing drawn inside the green.
+- Never use bright green anywhere else in the design.
+- Decorations live on the frame around the windows. They may overlap a window corner slightly, but never cover more than a small corner of any window.
+
+Style: cute, polished, print quality, clean vector-like illustration, soft pastel colors, consistent line weight, legible lettering. Only the text written below, no other words.
+
+Theme:
+Minimal classic photo booth print: solid deep navy frame (#1F1D2B) with no illustrations. Small white film sprocket holes running down both outer edges. Footer: a tiny white camera icon and the text "PICO SNAP" in spaced-out white capital letters, very clean and elegant.

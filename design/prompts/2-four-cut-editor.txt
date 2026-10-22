@@ -1,0 +1,11 @@
+A high-fidelity mobile app UI mockup, single iPhone screen, portrait 9:16, flat screenshot with no device frame and no hands, no background outside the screen.
+App name: "PICO SNAP", a cute Korean-style photo booth and photo diary app.
+Visual style: soft pastel, cozy scrapbook / photo diary aesthetic. Cream white background (#FFFAF4), coral pink accents (#F27E72), with blush pink, lilac, butter yellow and sage green as secondary pastels. Subtle paper texture, rounded corners, soft shadows, generous white space, lots of breathing room.
+Typography: rounded friendly sans-serif for UI, plus a handwritten script font for small decorative captions.
+Decorations: washi tape, small hand-drawn doodles (stars, hearts, sparkles), polaroid photos with white borders, photos of young people smiling.
+Clean, polished, Dribbble-quality, consistent icon style (rounded line icons). Legible English text only.
+
+Screen: FOUR-CUT PHOTO BOOTH EDITOR.
+Top bar: back arrow on the left, small title "Four Cut", a white "Import" pill and a coral "Save" pill on the right.
+Center: a tall vertical photo-booth strip with 4 photos of a smiling girl, pastel pink frame, small handwritten caption at the bottom of the strip, a few cute stickers (bunny, heart, star) placed on the photos, one sticker selected with a dashed outline and small round delete and resize handles.
+Bottom panel: white rounded sheet with a row of category tabs ("Daily", "Birthday", "Cheer"), a horizontal row of template thumbnails with the first one selected, and a bottom tool bar with icons: "Template", "Sticker", "Text", "Filter".
