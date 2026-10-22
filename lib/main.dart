@@ -121,7 +121,7 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(child: _ModeCard(title: '拍立得', subtitle: 'POLAROID', icon: Icons.photo_size_select_actual_outlined, color: butter, onTap: () => _open(context, 'Polaroid'))),
           const SizedBox(width: 10),
-          Expanded(child: _ModeCard(title: '去背貼紙', subtitle: 'CUT-OUT', icon: Icons.auto_fix_high_rounded, color: sage, onTap: () => _open(context, 'Sticker')),
+          Expanded(child: _ModeCard(title: '去背貼紙', subtitle: 'CUT-OUT', icon: Icons.auto_fix_high_rounded, color: sage, onTap: () => _open(context, 'Sticker'))),
         ])),
       ),
       SliverPadding(
