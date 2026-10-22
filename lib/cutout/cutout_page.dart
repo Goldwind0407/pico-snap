@@ -45,8 +45,9 @@ class _CutoutPageState extends State<CutoutPage> {
   _Brush _brush = _Brush.erase;
   /// 開著：畫一筆之後用 GrabCut 沿著邊緣重切；關著：筆刷塗到哪就是哪。
   bool _snap = true;
-  final _undo = <(Uint8List, Int8List)>[];
-  final _redo = <(Uint8List, Int8List)>[];
+  // 每一步連狀態列的說明一起記，復原之後才不會顯示錯的去背方法
+  final _undo = <(Uint8List, Int8List, String)>[];
+  final _redo = <(Uint8List, Int8List, String)>[];
   final _strokeScreen = <Offset>[];
   final _strokePhoto = <Offset>[];
   Offset? _cursor;
@@ -267,7 +268,7 @@ class _CutoutPageState extends State<CutoutPage> {
 
   // ---------------- 復原 ----------------
 
-  (Uint8List, Int8List) _snapshot() => (Uint8List.fromList(_mask!), Int8List.fromList(_hints ?? Int8List(_w * _h)));
+  (Uint8List, Int8List, String) _snapshot() => (Uint8List.fromList(_mask!), Int8List.fromList(_hints ?? Int8List(_w * _h)), _status);
 
   void _pushUndo() {
     if (_mask == null) return;
@@ -279,18 +280,20 @@ class _CutoutPageState extends State<CutoutPage> {
   void _undoStep() {
     if (_undo.isEmpty || _mask == null || _busy) return;
     _redo.add(_snapshot());
-    final (mask, hints) = _undo.removeLast();
+    final (mask, hints, status) = _undo.removeLast();
     _mask = mask;
     _hints = hints;
+    _status = status;
     _refresh();
   }
 
   void _redoStep() {
     if (_redo.isEmpty || _mask == null || _busy) return;
     _undo.add(_snapshot());
-    final (mask, hints) = _redo.removeLast();
+    final (mask, hints, status) = _redo.removeLast();
     _mask = mask;
     _hints = hints;
+    _status = status;
     _refresh();
   }
 

@@ -53,7 +53,11 @@ class PhotoSaveService {
     try {
       final denied = await _ensureAccess();
       if (denied != null) return denied;
-      await Gal.putImageBytes(bytes, album: _album);
+      // 每張不同名字：同名的話有些手機會蓋掉上一張
+      final t = DateTime.now();
+      String two(int v) => v.toString().padLeft(2, '0');
+      final name = 'pico_snap_${t.year}${two(t.month)}${two(t.day)}_${two(t.hour)}${two(t.minute)}${two(t.second)}';
+      await Gal.putImageBytes(bytes, album: _album, name: name);
       return null;
     } on GalException catch (e) {
       return _message(e);

@@ -30,7 +30,9 @@ class _StickerItemState extends State<StickerItem> {
   late StickerData _start;
   Offset _startFocal = Offset.zero;
 
-  double get _baseSize => widget.canvas.width * StickerItem.baseFraction;
+  // On tall narrow canvases (the four-cut strip) the width alone makes
+  // stickers tiny, so the long side sets a minimum.
+  double get _baseSize => max(widget.canvas.shortestSide * StickerItem.baseFraction, widget.canvas.longestSide * .12);
   Offset get _centerPx => Offset(widget.data.center.dx * widget.canvas.width, widget.data.center.dy * widget.canvas.height);
 
   void _onScaleStart(ScaleStartDetails d) {
