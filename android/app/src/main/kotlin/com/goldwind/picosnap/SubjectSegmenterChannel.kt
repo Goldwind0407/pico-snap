@@ -1,4 +1,4 @@
-package com.example.pico_snap
+package com.goldwind.picosnap
 
 import android.content.Context
 import android.graphics.Bitmap

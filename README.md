@@ -92,6 +92,10 @@
 2. 執行 `flutter pub get`。
 3. 執行 `flutter run`。
 
+## App 識別碼
+
+iPhone 和 Android 都是 `com.goldwind.picosnap`。上架之後就不能再改。
+
 ## 建置 iPhone 版（沒有 Mac 也可以）
 
 用 [Codemagic](https://codemagic.io) 在雲端建置，設定寫在 `codemagic.yaml`：

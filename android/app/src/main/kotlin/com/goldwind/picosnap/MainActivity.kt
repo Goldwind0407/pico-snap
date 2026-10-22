@@ -1,4 +1,4 @@
-package com.example.pico_snap
+package com.goldwind.picosnap
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
