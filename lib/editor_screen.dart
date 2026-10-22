@@ -148,9 +148,35 @@ class _EditorScreenState extends State<EditorScreen> {
     if (!mounted) return;
     final png = await CutoutPage.open(context, bytes);
     if (png == null || !mounted) return;
-    final id = 'mem:${customStickers.length}';
+    final id = newCustomStickerId();
     customStickers[id] = png;
     _addSticker(id);
+  }
+
+  /// Delete one of the user's own stickers, and every copy of it on the
+  /// canvas and in the undo history.
+  Future<void> _deleteCustomSticker(String id) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: cream,
+        title: const Text('刪除這張貼紙？', style: TextStyle(fontSize: 18, color: ink, fontWeight: FontWeight.w900)),
+        content: const Text('畫面上用到這張貼紙的地方也會一起拿掉。', style: TextStyle(color: ink)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消', style: TextStyle(color: muted))),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('刪除', style: TextStyle(color: coral, fontWeight: FontWeight.w800))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() {
+      customStickers.remove(id);
+      _stickers = [for (final s in _stickers) if (s.sticker != id) s];
+      for (var i = 0; i < _history.length; i++) {
+        _history[i] = [for (final s in _history[i]) if (s.sticker != id) s];
+      }
+      _selectedSticker = null;
+    });
   }
 
   Future<void> _save() async {
@@ -512,7 +538,7 @@ class _EditorScreenState extends State<EditorScreen> {
             );
           }
           final id = pack[mine ? k - 1 : k];
-          return InkWell(
+          final tile = InkWell(
             onTap: () => _addSticker(id),
             child: Container(
               decoration: const BoxDecoration(border: Border(top: BorderSide(color: line), right: BorderSide(color: line))),
@@ -520,6 +546,19 @@ class _EditorScreenState extends State<EditorScreen> {
               child: StickerVisual(id),
             ),
           );
+          if (!mine) return tile;
+          // The user's own stickers can be deleted.
+          return Stack(children: [
+            Positioned.fill(child: tile),
+            Positioned(right: 3, top: 3, child: GestureDetector(
+              onTap: () => _deleteCustomSticker(id),
+              child: Container(
+                width: 20, height: 20,
+                decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: line), boxShadow: [BoxShadow(color: ink.withValues(alpha: .15), blurRadius: 3)]),
+                child: const Icon(Icons.close_rounded, size: 13, color: ink),
+              ),
+            )),
+          ]);
         },
       )),
     ]);

@@ -510,8 +510,12 @@ class StickerVisual extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (sticker.startsWith('assets/')) return Image.asset(sticker, width: size, height: size, filterQuality: FilterQuality.medium);
-    final custom = customStickers[sticker];
-    if (custom != null) return Image.memory(custom, width: size, height: size, gaplessPlayback: true, filterQuality: FilterQuality.medium);
+    if (sticker.startsWith('mem:')) {
+      final custom = customStickers[sticker];
+      // Deleted while still referenced somewhere: draw nothing.
+      if (custom == null) return SizedBox.square(dimension: size);
+      return Image.memory(custom, width: size, height: size, gaplessPlayback: true, filterQuality: FilterQuality.medium);
+    }
     return SizedBox.square(dimension: size, child: FittedBox(child: EmojiSticker(sticker, size: size * .8)));
   }
 }

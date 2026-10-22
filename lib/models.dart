@@ -234,6 +234,10 @@ final stickerPacks = <(String, String, List<String>)>[
 /// Stickers the user cut out of their own photos, keyed by sticker id
 /// (`mem:<n>`) → PNG. Kept in memory for now; lost when the app closes.
 final customStickers = <String, Uint8List>{};
+int _customStickerSeq = 0;
+
+/// A fresh id for [customStickers]; never reused, even after deletions.
+String newCustomStickerId() => 'mem:${_customStickerSeq++}';
 
 /// A sticker placed on the canvas. [center] is normalised (0–1) so it
 /// survives the canvas resizing, e.g. when the keyboard opens.
