@@ -56,6 +56,7 @@
 | `assets/samples/` | 首頁用的範例照片 |
 | `assets/fonts/` | Nunito、Caveat 字型 |
 | `design/prompts/` | Gemini 提示詞 |
+| `ios/`、`codemagic.yaml` | iPhone 版設定與雲端建置 |
 
 ## 素材來源
 
@@ -68,6 +69,22 @@
 ## 執行方式
 
 1. 安裝 [Flutter](https://docs.flutter.dev/get-started/install)。
-2. 如果還沒有平台資料夾（`android/`、`ios/` 等），先執行 `flutter create .`。
-3. 執行 `flutter pub get`。
-4. 執行 `flutter run`。
+2. 執行 `flutter pub get`。
+3. 執行 `flutter run`。
+
+## 建置 iPhone 版（沒有 Mac 也可以）
+
+用 [Codemagic](https://codemagic.io) 在雲端建置，設定寫在 `codemagic.yaml`：
+
+1. 用 GitHub 帳號登入 Codemagic，加入 `pico-snap` 這個倉庫。
+2. 選 **ios-unsigned** 工作流程，分支選 `main`，按 **Start new build**。只有手動按才會建置，推送程式碼不會自動跑，可以節省免費額度。
+3. 建好之後，在 Artifacts 下載 `pico_snap-unsigned.ipa`。
+4. 在 Windows 用 [Sideloadly](https://sideloadly.io) 以自己的 Apple ID 簽名，裝到 iPhone。
+   - 用免費 Apple ID 安裝的 App，7 天後要重新安裝一次。
+   - 第一次打開前，要先到 iPhone 的「設定 → 一般 → VPN 與裝置管理」信任自己的 Apple ID。
+
+### iOS 設定重點
+
+- Bundle ID：`com.goldwind.picosnap`，最低支援 iOS 15，只支援 iPhone，只能直式使用。
+- `Info.plist` 已經寫好相簿、相機、存到相簿的權限說明。少了這些說明，iOS 會直接讓 App 閃退。
+- 已經採用 UIScene（`SceneDelegate.swift`）。iOS 27 起，沒有採用 UIScene 的 App 一打開就會被系統終止。

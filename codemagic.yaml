@@ -1,0 +1,32 @@
+# Codemagic 雲端建置 iPhone 版（沒有 Mac 的時候用）。
+#
+# 建出來的是「沒簽名」的 IPA：沒有付費的 Apple 開發者帳號，Codemagic 沒辦法
+# 幫忙簽。下載 IPA 之後在 Windows 用 Sideloadly 以自己的 Apple ID 簽名、
+# 裝到 iPhone（免費帳號 7 天後要重裝）。
+#
+# 用法：Codemagic 連上這個 GitHub 倉庫 → 選 ios-unsigned → Start new build，
+# 分支選 main。建好在 Artifacts 下載 pico_snap-unsigned.ipa。
+workflows:
+  ios-unsigned:
+    name: iOS 不簽名 IPA
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: 3.41.0
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events: []  # 只手動按建置，推送不會自動跑（省免費額度）
+    scripts:
+      - name: 下載套件
+        script: flutter pub get
+      - name: 建置（不簽名）
+        script: flutter build ios --release --no-codesign
+      - name: 包成 IPA
+        script: |
+          cd build/ios/iphoneos
+          rm -rf Payload && mkdir Payload
+          cp -R Runner.app Payload/
+          zip -qr "$CM_BUILD_DIR/pico_snap-unsigned.ipa" Payload
+    artifacts:
+      - pico_snap-unsigned.ipa
