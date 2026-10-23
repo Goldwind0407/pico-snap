@@ -13,8 +13,23 @@ import 'models.dart';
 import 'services/photo_save_service.dart';
 import 'theme.dart';
 
-/// Camera body colours, like the pastel instant cameras.
-const _bodyColors = [Color(0xFFF7B9C4), Color(0xFFB9E3D3), Color(0xFFB7D7F0), Color(0xFFF6E3A8)];
+/// Geometry of assets/instant/camera_front.png, as fractions of its width
+/// (x, radius) and height (y), measured from the photo.
+abstract final class _Cam {
+  static const aspect = .99083;
+  static const lens = Offset(.62773, .62523), lensR = .21455;
+  static const slot = Offset(.58201, .02097);
+  static const shutter = Offset(.19709, .39279), shutterR = .07143;
+  static const logo = Rect.fromLTWH(.70833, .06356, .19180, .09567);
+  /// Film width relative to the camera.
+  static const film = .42;
+}
+
+/// Geometry of assets/instant/film.png.
+abstract final class _Film {
+  static const aspect = .85058;
+  static const window = Rect.fromLTWH(.07148, .08732, .85399, .71087);
+}
 
 enum _Stage { aiming, ejecting, developing, done }
 
@@ -50,7 +65,9 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   String? _cameraError;
 
   // Motorised: the print comes out at a steady pace.
-  late final _eject = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800));
+  // Real instax: a short pause while the motor spins up, then the film comes
+  // out of the top at a steady pace and stops abruptly.
+  late final _eject = AnimationController(vsync: this, duration: const Duration(milliseconds: 2300));
   late final _lift = AnimationController(vsync: this, duration: const Duration(milliseconds: 750));
   // Real instant film takes minutes; shaking the phone (like shaking the
   // print) speeds it up. Deliberately not explained in the UI.
@@ -75,7 +92,6 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   _Stage _stage = _Stage.aiming;
   _Print? _current;
   final _prints = <_Print>[];
-  int _body = 0;
   bool _saving = false;
   final _printKey = GlobalKey();
 
@@ -192,10 +208,14 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     });
     _develop.value = 0;
     _lift.value = 0;
-    // The motor whirs while the print comes out.
-    final motor = Timer.periodic(const Duration(milliseconds: 280), (_) => HapticFeedback.selectionClick());
+    // The motor whirs while the film is moving.
+    final motor = Timer.periodic(const Duration(milliseconds: 120), (_) {
+      final e = _eject.value;
+      if (e > _emergeStart && e < _emergeEnd) HapticFeedback.selectionClick();
+    });
     await _eject.forward(from: 0);
     motor.cancel();
+    HapticFeedback.lightImpact(); // stops with a little clunk
     if (!mounted) return;
     _prints.add(print);
     setState(() => _stage = _Stage.developing);
@@ -295,32 +315,37 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     child: Row(children: [
       IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
       const Expanded(child: Text('Instant Camera', style: TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
-      // Body colour.
-      GestureDetector(
-        onTap: () => setState(() => _body = (_body + 1) % _bodyColors.length),
-        child: Container(
-          width: 30, height: 30, margin: const EdgeInsets.only(right: 6),
-          decoration: BoxDecoration(color: _bodyColors[_body], shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3), boxShadow: [BoxShadow(color: ink.withValues(alpha: .2), blurRadius: 4)]),
-        ),
-      ),
       if (_cameras.length > 1)
         IconButton(onPressed: _stage == _Stage.aiming ? _flipCamera : null, icon: const Icon(Icons.cameraswitch_outlined), color: ink, disabledColor: line),
     ]),
   );
 
+  static const _emergeStart = .16, _emergeEnd = .9;
+
+  /// How far the film is out of the slot (0–1) at eject progress [e].
+  static double _emerged(double e) {
+    if (e <= _emergeStart) return 0;
+    if (e >= _emergeEnd) return 1;
+    final t = (e - _emergeStart) / (_emergeEnd - _emergeStart);
+    // Steady motor with a faint gear ripple.
+    return (t + sin(t * pi * 34) * .004).clamp(0.0, 1.0);
+  }
+
   Widget _stageView(Size size) {
-    final cw = [size.width * .82, size.height * .66, 340.0].reduce(min);
-    final ch = cw * .8;
-    final camTop = size.height - ch - 8;
-    final pw = cw * .5, ph = pw * 196 / 160;
-    final slotY = camTop + 6;
-    // Coming out of the slot, with a little motor shake.
+    final cw = [size.width * .86, size.height * .6, 380.0].reduce(min);
+    final ch = cw / _Cam.aspect;
+    final camLeft = (size.width - cw) / 2, camTop = size.height - ch - 4;
+    final pw = cw * _Cam.film, ph = pw / _Film.aspect;
+    final slotX = camLeft + _Cam.slot.dx * cw, slotY = camTop + _Cam.slot.dy * ch + 10;
+    // Coming out of the slot; the tail stays in the slot like the real thing.
     final e = _eject.value;
-    final shake = _eject.isAnimating ? sin(e * 140) * .7 : 0.0;
-    final ejected = Rect.fromLTWH((size.width - pw) / 2 + shake, slotY - e * ph * .9, pw, ph);
+    final out = _emerged(e);
+    final moving = e > _emergeStart && e < _emergeEnd;
+    final jitter = moving ? sin(e * 900) * .6 : 0.0;
+    final ejected = Rect.fromLTWH(slotX - pw / 2 + jitter, slotY - out * ph * .9, pw, ph);
     // Taken to the front to watch it develop.
-    final rw = min(size.width * .66, (size.height - 16) * .9 * 160 / 196);
-    final rh = rw * 196 / 160;
+    final rw = min(size.width * .72, (size.height - 16) * .92 * _Film.aspect);
+    final rh = rw / _Film.aspect;
     final review = Rect.fromLTWH((size.width - rw) / 2, max(8.0, (size.height - rh) / 2 - 4), rw, rh);
     final l = Curves.easeInOutCubic.transform(_lift.value);
     final rect = Rect.lerp(ejected, review, l)!;
@@ -340,10 +365,10 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       ),
     ));
     final camera = Positioned(
-      left: (size.width - cw) / 2, top: camTop, width: cw, height: ch,
+      left: camLeft, top: camTop, width: cw, height: ch,
       child: IgnorePointer(
         ignoring: _stage != _Stage.aiming,
-        child: Opacity(opacity: 1 - .82 * l, child: _CameraBody(color: _bodyColors[_body], lens: _viewfinder(), onShutter: _shoot)),
+        child: Opacity(opacity: 1 - .82 * l, child: _CameraBody(lens: _viewfinder(), onShutter: _shoot)),
       ),
     );
     // Behind the camera while it comes out of the slot, in front once taken out.
@@ -411,12 +436,12 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   };
 }
 
-/// How instant film develops at [t] (0–1): a flat dark sheet, then a pale,
-/// warm, low-contrast picture that gains colour and contrast.
+/// How instax film develops at [t] (0–1): a flat pale grey-blue blank, then
+/// a faint, warm, low-contrast picture that gains colour and contrast.
 @visibleForTesting
 ColorFilter developFilter(double t) {
   t = t.clamp(0.0, 1.0);
-  const blank = <double>[0, 0, 0, 0, 52, 0, 0, 0, 0, 56, 0, 0, 0, 0, 50, 0, 0, 0, 1, 0];
+  const blank = <double>[0, 0, 0, 0, 196, 0, 0, 0, 0, 202, 0, 0, 0, 0, 206, 0, 0, 0, 1, 0];
   final s = Curves.easeIn.transform(t);
   final sat = s, contrast = .5 + .5 * s, warm = 22 * (1 - s);
   const lum = [.2126, .7152, .0722];
@@ -432,8 +457,10 @@ ColorFilter developFilter(double t) {
   return ColorFilter.matrix([for (var i = 0; i < 20; i++) blank[i] + (photo[i] - blank[i]) * k]);
 }
 
-/// An instant print drawn at the same design size as PolaroidCard.
+/// An instax print (assets/instant/film.png) with the photo in its window and
+/// a handwritten caption on the wide bottom border. Design size 160 wide.
 class InstantPrint extends StatelessWidget {
+  static const width = 160.0, height = width / _Film.aspect;
   final Uint8List bytes;
   final double develop;
   final String caption;
@@ -441,89 +468,59 @@ class InstantPrint extends StatelessWidget {
   const InstantPrint({super.key, required this.bytes, required this.develop, required this.caption, this.onCaption});
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: 160, height: 196,
-    padding: const EdgeInsets.fromLTRB(9, 9, 9, 0),
-    decoration: BoxDecoration(color: const Color(0xFFFFFDF9), border: Border.all(color: const Color(0xFFE9E3DA))),
-    child: Column(children: [
-      SizedBox(height: 142, width: double.infinity, child: ClipRect(child: ColorFiltered(
+  Widget build(BuildContext context) {
+    final w = Rect.fromLTWH(_Film.window.left * width, _Film.window.top * height, _Film.window.width * width, _Film.window.height * height);
+    return SizedBox(width: width, height: height, child: Stack(children: [
+      Positioned.fill(child: Image.asset('assets/instant/film.png', fit: BoxFit.fill, filterQuality: FilterQuality.medium)),
+      Positioned.fromRect(rect: w, child: ClipRect(child: ColorFiltered(
         colorFilter: developFilter(develop),
         child: Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true),
       ))),
-      Expanded(child: GestureDetector(
+      Positioned(left: 8, right: 8, top: w.bottom + 2, bottom: 4, child: GestureDetector(
         onTap: onCaption,
         behavior: HitTestBehavior.opaque,
-        child: Center(child: Text(caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: hand(26))),
+        child: Center(child: Text(caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: hand(24))),
       )),
-    ]),
-  );
+    ]));
+  }
 }
 
+/// The instant camera (assets/instant/camera_front.png) with the live picture
+/// in its lens, our own name where the maker's logo was, and a working shutter.
 class _CameraBody extends StatelessWidget {
-  final Color color;
   final Widget lens;
   final VoidCallback onShutter;
-  const _CameraBody({required this.color, required this.lens, required this.onShutter});
+  const _CameraBody({required this.lens, required this.onShutter});
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, c) {
     final w = c.maxWidth, h = c.maxHeight;
-    final dark = Color.lerp(color, ink, .3)!;
-    final r = w * .27;
+    final r = _Cam.lensR * w;
+    final lc = Offset(_Cam.lens.dx * w, _Cam.lens.dy * h);
+    final sr = _Cam.shutterR * w;
+    final sc = Offset(_Cam.shutter.dx * w, _Cam.shutter.dy * h);
+    final logo = Rect.fromLTWH(_Cam.logo.left * w, _Cam.logo.top * h, _Cam.logo.width * w, _Cam.logo.height * h);
     return Stack(clipBehavior: Clip.none, children: [
-      Positioned.fill(child: DecoratedBox(decoration: BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color.lerp(color, Colors.white, .4)!, color]),
-        borderRadius: BorderRadius.circular(w * .11),
-        border: Border.all(color: dark, width: 2),
-        boxShadow: [BoxShadow(color: ink.withValues(alpha: .18), blurRadius: 18, offset: const Offset(0, 10))],
-      ))),
-      // Film slot.
-      Positioned(top: 3, left: w * .22, right: w * .22, height: 7, child: DecoratedBox(decoration: BoxDecoration(color: ink.withValues(alpha: .75), borderRadius: BorderRadius.circular(4)))),
-      // Flash window.
-      Positioned(left: w * .08, top: h * .12, width: w * .26, height: h * .18, child: Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(w * .025), border: Border.all(color: dark, width: 2)),
-        child: Column(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-          for (var i = 0; i < 4; i++) Container(height: 1.5, margin: EdgeInsets.symmetric(horizontal: w * .02), color: const Color(0xFFDADDE3)),
-        ]),
-      )),
-      // Viewfinder.
-      Positioned(right: w * .09, top: h * .12, width: w * .14, height: w * .14, child: Container(
-        decoration: BoxDecoration(color: const Color(0xFF2B2D33), borderRadius: BorderRadius.circular(w * .03), border: Border.all(color: dark, width: 2)),
-        alignment: Alignment.topLeft,
-        child: Container(margin: EdgeInsets.all(w * .02), width: w * .03, height: w * .03, decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle)),
-      )),
-      // Lens with the live picture in it.
-      Positioned(left: w / 2 - r, top: h * .56 - r, width: r * 2, height: r * 2, child: Container(
-        padding: EdgeInsets.all(r * .13),
-        decoration: BoxDecoration(
+      Positioned.fill(child: Image.asset('assets/instant/camera_front.png', fit: BoxFit.fill, filterQuality: FilterQuality.medium)),
+      Positioned.fromRect(rect: Rect.fromCircle(center: lc, radius: r), child: ClipOval(child: Stack(fit: StackFit.expand, children: [
+        lens,
+        // Glass: a highlight and a dark rim.
+        IgnorePointer(child: DecoratedBox(decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFF7F7F9), Color(0xFFB4B7BF)]),
-          border: Border.all(color: dark, width: 2),
-        ),
-        child: Container(
-          padding: EdgeInsets.all(r * .09),
-          decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF1C1D22)),
-          child: ClipOval(child: Stack(fit: StackFit.expand, children: [
-            lens,
-            IgnorePointer(child: DecoratedBox(decoration: BoxDecoration(gradient: RadialGradient(
-              center: const Alignment(-.45, -.55), radius: .9,
-              colors: [Colors.white.withValues(alpha: .28), Colors.transparent],
-            )))),
-          ])),
-        ),
-      )),
-      // Shutter button on the body.
-      Positioned(right: w * .07, bottom: h * .09, width: w * .13, height: w * .13, child: GestureDetector(
+          gradient: RadialGradient(center: const Alignment(-.4, -.5), radius: 1, colors: [Colors.white.withValues(alpha: .26), Colors.transparent, Colors.black.withValues(alpha: .35)], stops: const [0, .55, 1]),
+        ))),
+      ]))),
+      Positioned.fromRect(rect: logo, child: FittedBox(child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        const Text('PICO SNAP', style: TextStyle(fontSize: 40, height: 1, letterSpacing: 1.5, color: Color(0xFF55504A), fontWeight: FontWeight.w900)),
+        const SizedBox(height: 6),
+        Text('Instant Camera', style: TextStyle(fontSize: 20, height: 1, color: const Color(0xFF55504A).withValues(alpha: .9), fontWeight: FontWeight.w700)),
+      ]))),
+      // The red shutter button on the body works too.
+      Positioned.fromRect(rect: Rect.fromCircle(center: sc, radius: sr), child: GestureDetector(
         onTap: onShutter,
-        child: Container(decoration: BoxDecoration(
-          shape: BoxShape.circle, color: coral, border: Border.all(color: Colors.white, width: 3),
-          boxShadow: [BoxShadow(color: ink.withValues(alpha: .25), blurRadius: 4, offset: const Offset(0, 2))],
-        )),
+        behavior: HitTestBehavior.opaque,
+        child: const SizedBox.expand(),
       )),
-      Positioned(left: w * .08, bottom: h * .09, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('instant', style: hand(w * .065, color: Colors.white)),
-        Text('PICO SNAP', style: TextStyle(fontSize: w * .045, letterSpacing: 2, fontWeight: FontWeight.w900, color: dark)),
-      ])),
     ]);
   });
 }

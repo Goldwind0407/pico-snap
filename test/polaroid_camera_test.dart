@@ -17,8 +17,8 @@ Future<Uint8List> _photo() async {
 }
 
 void main() {
-  test('顯影：一開始是一片深色，最後是原本的照片', () {
-    expect(developFilter(0), const ColorFilter.matrix([0, 0, 0, 0, 52, 0, 0, 0, 0, 56, 0, 0, 0, 0, 50, 0, 0, 0, 1, 0]));
+  test('顯影：一開始是一片淡灰藍的空白，最後是原本的照片', () {
+    expect(developFilter(0), const ColorFilter.matrix([0, 0, 0, 0, 196, 0, 0, 0, 0, 202, 0, 0, 0, 0, 206, 0, 0, 0, 1, 0]));
     expect(developFilter(1), const ColorFilter.matrix([1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0]));
     expect(developFilter(.5), isNot(developFilter(1)), reason: '中途還沒完全顯影');
   });
