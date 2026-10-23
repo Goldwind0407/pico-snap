@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 
 import 'editor_screen.dart';
 import 'models.dart';
@@ -28,11 +29,15 @@ class _Print {
 /// 拍立得相機：取景在鏡頭裡，按下快門後相片從上方的出片口慢慢吐出來，
 /// 拿到前面之後從一片深色慢慢顯影。拍好的相片可以存到相簿，或放進拍立得拼貼。
 class PolaroidCameraScreen extends StatefulWidget {
-  const PolaroidCameraScreen({super.key, this.pickPhoto});
+  const PolaroidCameraScreen({super.key, this.pickPhoto, this.motion});
 
   /// Replaces the photo picker (tests).
   @visibleForTesting
   final Future<Uint8List?> Function()? pickPhoto;
+
+  /// Replaces the phone's accelerometer (tests).
+  @visibleForTesting
+  final Stream<UserAccelerometerEvent>? motion;
 
   @override
   State<PolaroidCameraScreen> createState() => _PolaroidCameraScreenState();
@@ -47,11 +52,25 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   // Motorised: the print comes out at a steady pace.
   late final _eject = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800));
   late final _lift = AnimationController(vsync: this, duration: const Duration(milliseconds: 750));
-  late final _develop = AnimationController(vsync: this, duration: const Duration(seconds: 7))
+  // Real instant film takes minutes; shaking the phone (like shaking the
+  // print) speeds it up. Deliberately not explained in the UI.
+  late final _develop = AnimationController(vsync: this, duration: const Duration(seconds: 20))
     ..addStatusListener((s) {
-      if (s == AnimationStatus.completed && mounted && _stage == _Stage.developing) setState(() => _stage = _Stage.done);
+      if (s == AnimationStatus.completed && mounted && _stage == _Stage.developing) {
+        _motion?.cancel();
+        _motion = null;
+        setState(() => _stage = _Stage.done);
+      }
     });
   late final _flash = AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
+  // The print wiggles in your hand while you shake it.
+  late final _wiggle = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
+  StreamSubscription<UserAccelerometerEvent>? _motion;
+  DateTime _lastShake = DateTime(0);
+
+  /// How much each shake develops the print, and how hard a shake must be
+  /// (m/s², gravity removed).
+  static const _shakeBoost = .035, _shakeForce = 12.0;
 
   _Stage _stage = _Stage.aiming;
   _Print? _current;
@@ -75,6 +94,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     _lift.dispose();
     _develop.dispose();
     _flash.dispose();
+    _wiggle.dispose();
+    _motion?.cancel();
     super.dispose();
   }
 
@@ -179,7 +200,30 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     _prints.add(print);
     setState(() => _stage = _Stage.developing);
     _develop.forward(from: 0);
+    _listenForShakes();
     await _lift.forward(from: 0);
+  }
+
+  void _listenForShakes() {
+    _motion?.cancel();
+    try {
+      _motion = (widget.motion ?? userAccelerometerEventStream(samplingPeriod: SensorInterval.gameInterval)).listen(
+        (e) {
+          if (_stage != _Stage.developing) return;
+          if (e.x * e.x + e.y * e.y + e.z * e.z < _shakeForce * _shakeForce) return;
+          final now = DateTime.now();
+          if (now.difference(_lastShake) < const Duration(milliseconds: 90)) return;
+          _lastShake = now;
+          _develop.value = min(1, _develop.value + _shakeBoost);
+          if (_develop.value < 1) _develop.forward();
+          _wiggle.forward(from: 0);
+        },
+        onError: (Object e) => debugPrint('[CAMERA] 讀不到動作感測器: $e'),
+        cancelOnError: true,
+      );
+    } catch (e) {
+      debugPrint('[CAMERA] 讀不到動作感測器: $e');
+    }
   }
 
   void _skipDeveloping() {
@@ -230,7 +274,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       SafeArea(child: Column(children: [
         _topBar(),
         Expanded(child: LayoutBuilder(builder: (context, c) => AnimatedBuilder(
-          animation: Listenable.merge([_eject, _lift, _develop]),
+          animation: Listenable.merge([_eject, _lift, _develop, _wiggle]),
           builder: (context, _) => _stageView(c.biggest),
         ))),
         SizedBox(height: _controlsHeight, child: _bottom()),
@@ -283,7 +327,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
 
     final print = _current;
     final printView = print == null ? null : Positioned.fromRect(rect: rect, child: Transform.rotate(
-      angle: -.035 * l,
+      angle: -.035 * l + (_wiggle.isAnimating ? sin(_wiggle.value * pi * 4) * .06 * (1 - _wiggle.value) : 0),
       child: GestureDetector(
         onTap: _stage == _Stage.developing ? _skipDeveloping : null,
         child: FittedBox(child: DecoratedBox(
