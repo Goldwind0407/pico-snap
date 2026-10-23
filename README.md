@@ -106,7 +106,7 @@
 - 介面示意圖、手繪貼紙和精選模板都是用 Gemini 生成的，提示詞放在 `design/prompts/`。
 - Gemini 生成的原始圖（`design/mockups/`、`design/templates/`）只留在本機，不上傳；App 用的是處理過的版本，放在 `assets/`。
 - `assets/samples/` 的人物照片是從 AI 示意圖裁切下來的，**只是佔位用**。正式發布前請換成有使用權的照片。
-- `assets/instant/` 的相機和底片是從產品照片去背做的（相機上的品牌標誌已擦掉，換成 PICO SNAP）。產品照片和相機外觀屬於原廠，**上架前請換成自己拍攝或設計的圖**。
+- `assets/instant/` 的相機和底片是用 Gemini 生成的圖去背做的。圖裡相機上原本有「instax」品牌標誌，已經擦掉換成 PICO SNAP；相機外型仍然很像真實的 instax mini 7，上架前可以考慮再調整成自己的造型。
 - 實體拍貼機的參考照片（`design/拍貼機範本/`）有版權，只留在本機當設計參考，已加入 `.gitignore`，不會上傳。
 - 字型：[Nunito](https://fonts.google.com/specimen/Nunito)、[Caveat](https://fonts.google.com/specimen/Caveat)，兩者都採用 SIL Open Font License。
 
