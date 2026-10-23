@@ -43,3 +43,13 @@ Future<bool> confirmDelete(BuildContext context, String title, String message) a
       ),
     ) ==
     true;
+
+/// A short floating message at the bottom of the screen; [above] lifts it
+/// over controls it would otherwise cover.
+void showMessage(BuildContext context, String text, {bool error = false, double above = 0}) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+  content: Text(text),
+  behavior: SnackBarBehavior.floating,
+  margin: EdgeInsets.fromLTRB(16, 0, 16, 16 + above),
+  backgroundColor: error ? const Color(0xFFB4483C) : ink,
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+));

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'editor_screen.dart';
 import 'library_screen.dart';
+import 'polaroid_camera_screen.dart';
 import 'models.dart';
 import 'theme.dart';
 import 'widgets/frames.dart';
@@ -34,7 +35,7 @@ class HomeScreen extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(child: _ModeCard(
           label: 'Polaroid', sub: '拍立得', color: lilac, border: lilacLine,
-          art: const _PolaroidArt(), onTap: () => _open(context, EditorMode.polaroid),
+          art: const _PolaroidArt(), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolaroidCameraScreen())),
         )),
         const SizedBox(width: 12),
         Expanded(child: _ModeCard(

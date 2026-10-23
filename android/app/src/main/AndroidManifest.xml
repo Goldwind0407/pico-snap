@@ -1,10 +1,14 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- 存作品到相簿（gal）：Android 10 以上不需要外部儲存權限，只有舊系統要，
          所以加上 maxSdkVersion，新手機上不會多跳一個權限。 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <!-- 相機外掛會帶進錄音權限，但拍立得拍照不錄音，拿掉 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
+    <!-- 相機外掛也宣告了這個權限（上限不同），以這裡的為準 -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="29" />
+        android:maxSdkVersion="29" tools:replace="android:maxSdkVersion" />
     <application
         android:label="PICO SNAP"
         android:name="${applicationName}"

@@ -48,7 +48,10 @@ const _tapes = [
 class EditorScreen extends StatefulWidget {
   final EditorMode mode;
   final int template;
-  const EditorScreen({super.key, this.mode = EditorMode.fourCut, this.template = 0});
+  /// Photos (and Polaroid captions) to start with, e.g. from the instant camera.
+  final List<Uint8List> photos;
+  final List<String> captions;
+  const EditorScreen({super.key, this.mode = EditorMode.fourCut, this.template = 0, this.photos = const [], this.captions = const []});
 
   @override
   State<EditorScreen> createState() => _EditorScreenState();
@@ -114,6 +117,18 @@ class _EditorScreenState extends State<EditorScreen> {
       case EditorMode.sticker: _bubble = value;
     }
   });
+
+  @override
+  void initState() {
+    super.initState();
+    for (var i = 0; i < widget.photos.length && i < _cells; i++) {
+      _photoBytes[i] = widget.photos[i];
+      _photos[i] = MemoryImage(widget.photos[i]);
+    }
+    for (var i = 0; i < widget.captions.length && i < _polaroidCaptions.length; i++) {
+      _polaroidCaptions[i] = widget.captions[i];
+    }
+  }
 
   @override
   void dispose() {
