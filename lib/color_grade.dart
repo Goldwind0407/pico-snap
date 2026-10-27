@@ -341,3 +341,115 @@ List<double> fitMatrix(Float32List lut, int n) {
   out.addAll([0, 0, 0, 1, 0]);
   return out;
 }
+
+/// Film finishing on graded RGBA pixels (in place), the steps that make a
+/// photo read as shot on film rather than coloured:
+/// - [soften] (0–1): takes the edge off phone sharpening.
+/// - [halation] (0–1): light glowing out of bright areas in [halationColor]
+///   (r, g, b 0–1), like light bouncing back through film emulsion.
+/// - [grain] (0–1): film grain, strongest in the mid tones, fading out in
+///   deep shadows and bright highlights.
+/// [source] is the ungraded photo; halation follows its real highlights.
+void finishFilm(Uint8List rgba, Uint8List source, int w, int h,
+    {double soften = 0, double halation = 0, (double, double, double) halationColor = (1, .38, .18), double grain = 0}) {
+  final n = w * h;
+  if (soften > 0) {
+    // Mix in a small blur; the radius follows the image size so a full
+    // photo and its thumbnail look alike.
+    final r = math.max(1, (math.max(w, h) / 1100).round());
+    for (var c = 0; c < 3; c++) {
+      final ch = Float32List(n);
+      for (var i = 0; i < n; i++) {
+        ch[i] = rgba[i * 4 + c].toDouble();
+      }
+      final b = _boxBlur(ch, w, h, r);
+      final k = soften * .55;
+      for (var i = 0; i < n; i++) {
+        rgba[i * 4 + c] = (ch[i] + (b[i] - ch[i]) * k).round().clamp(0, 255);
+      }
+    }
+  }
+  if (halation > 0) {
+    // Bright parts of the original, on a quarter-size grid, spread out.
+    const f = 4;
+    final sw = math.max(1, w ~/ f), sh = math.max(1, h ~/ f);
+    final m = Float32List(sw * sh);
+    for (var y = 0; y < sh; y++) {
+      for (var x = 0; x < sw; x++) {
+        final sx = math.min(w - 1, x * f + f ~/ 2), sy = math.min(h - 1, y * f + f ~/ 2);
+        final j = (sy * w + sx) * 4;
+        final l = (.2126 * source[j] + .7152 * source[j + 1] + .0722 * source[j + 2]) / 255;
+        m[y * sw + x] = _smooth(.7, .97, l);
+      }
+    }
+    final r = math.max(2, (math.min(sw, sh) * .035).round());
+    var b = _boxBlur(m, sw, sh, r);
+    b = _boxBlur(b, sw, sh, r);
+    final (hr, hg, hb) = halationColor;
+    for (var y = 0; y < h; y++) {
+      final fy = ((y + .5) / f - .5).clamp(0.0, sh - 1.0);
+      final y0 = fy.floor(), y1 = math.min(sh - 1, y0 + 1), ty = fy - y0;
+      for (var x = 0; x < w; x++) {
+        final fx = ((x + .5) / f - .5).clamp(0.0, sw - 1.0);
+        final x0 = fx.floor(), x1 = math.min(sw - 1, x0 + 1), tx = fx - x0;
+        final g = ((b[y0 * sw + x0] * (1 - tx) + b[y0 * sw + x1] * tx) * (1 - ty) + (b[y1 * sw + x0] * (1 - tx) + b[y1 * sw + x1] * tx) * ty) *
+            halation * 1.6;
+        if (g < .002) continue;
+        final i = (y * w + x) * 4;
+        // Screen blend: glows over dark areas, can't push whites past white.
+        rgba[i] = (255 - (255 - rgba[i]) * (1 - (g * hr).clamp(0.0, 1.0))).round();
+        rgba[i + 1] = (255 - (255 - rgba[i + 1]) * (1 - (g * hg).clamp(0.0, 1.0))).round();
+        rgba[i + 2] = (255 - (255 - rgba[i + 2]) * (1 - (g * hb).clamp(0.0, 1.0))).round();
+      }
+    }
+  }
+  if (grain > 0) {
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        final i = (y * w + x) * 4;
+        final l = (.2126 * rgba[i] + .7152 * rgba[i + 1] + .0722 * rgba[i + 2]) / 255;
+        // Mid tones carry the most grain, like silver halide density.
+        final a = grain * 30 * (.2 + 3.2 * l * (1 - l));
+        // Two octaves: fine grain with a little clumping.
+        final v = (_noise(x, y) * .7 + _noise(x >> 1, (y >> 1) + 9173) * .3) * a;
+        for (var c = 0; c < 3; c++) {
+          rgba[i + c] = (rgba[i + c] + v).round().clamp(0, 255);
+        }
+      }
+    }
+  }
+}
+
+/// Deterministic noise in −1…1, the same for the same pixel every time.
+double _noise(int x, int y) {
+  var h = (x * 374761393 + y * 668265263) & 0x7fffffff;
+  h = ((h ^ (h >> 13)) * 1274126177) & 0x7fffffff;
+  return (h & 0xffff) / 32767.5 - 1;
+}
+
+/// Separable box blur with radius [r].
+Float32List _boxBlur(Float32List src, int w, int h, int r) {
+  final tmp = Float32List(w * h), out = Float32List(w * h);
+  final d = 2 * r + 1;
+  for (var y = 0; y < h; y++) {
+    var s = 0.0;
+    for (var k = -r; k <= r; k++) {
+      s += src[y * w + k.clamp(0, w - 1)];
+    }
+    for (var x = 0; x < w; x++) {
+      tmp[y * w + x] = s / d;
+      s += src[y * w + math.min(w - 1, x + r + 1)] - src[y * w + math.max(0, x - r)];
+    }
+  }
+  for (var x = 0; x < w; x++) {
+    var s = 0.0;
+    for (var k = -r; k <= r; k++) {
+      s += tmp[k.clamp(0, h - 1) * w + x];
+    }
+    for (var y = 0; y < h; y++) {
+      out[y * w + x] = s / d;
+      s += tmp[math.min(h - 1, y + r + 1) * w + x] - tmp[math.max(0, y - r) * w + x];
+    }
+  }
+  return out;
+}

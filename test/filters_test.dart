@@ -146,4 +146,56 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('霧面電影').hitTestable(), findsOneWidget, reason: '選中的濾鏡還在畫面上');
   });
+
+  group('底片處理', () {
+    // 64×64 dark grey with a white 8×8 light in the middle.
+    const w = 64, h = 64;
+    Uint8List scene() {
+      final p = Uint8List(w * h * 4);
+      for (var y = 0; y < h; y++) {
+        for (var x = 0; x < w; x++) {
+          final i = (y * w + x) * 4;
+          final light = x >= 28 && x < 36 && y >= 28 && y < 36;
+          p[i] = p[i + 1] = p[i + 2] = light ? 255 : 40;
+          p[i + 3] = 255;
+        }
+      }
+      return p;
+    }
+
+    test('高光光暈：亮點旁邊泛橙紅，遠處不變', () {
+      final src = scene(), out = Uint8List.fromList(src);
+      finishFilm(out, src, w, h, halation: .8);
+      int at(int x, int y, int c) => out[(y * w + x) * 4 + c];
+      expect(at(38, 32, 0), greaterThan(60), reason: '旁邊變亮');
+      expect(at(38, 32, 0), greaterThan(at(38, 32, 2) + 15), reason: '偏紅橙');
+      expect(at(2, 2, 0), lessThan(46), reason: '遠處不受影響');
+    });
+
+    test('動態顆粒：中間調最明顯，純黑幾乎沒有', () {
+      double spread(int v) {
+        final p = Uint8List(w * h * 4);
+        for (var i = 0; i < p.length; i += 4) {
+          p[i] = p[i + 1] = p[i + 2] = v;
+          p[i + 3] = 255;
+        }
+        finishFilm(p, Uint8List.fromList(p), w, h, grain: .5);
+        var d = 0.0;
+        for (var i = 0; i < p.length; i += 4) {
+          d += (p[i] - v).abs();
+        }
+        return d / (w * h);
+      }
+
+      expect(spread(128), greaterThan(spread(6) * 2.5));
+      expect(spread(128), greaterThan(spread(250) * 2.5));
+    });
+
+    test('柔化：邊緣變柔，但整體亮度不變', () {
+      final src = scene(), out = Uint8List.fromList(src);
+      finishFilm(out, src, w, h, soften: 1);
+      expect(out[(32 * w + 27) * 4], greaterThan(40), reason: '亮點邊緣往外柔開');
+      expect(out[(32 * w + 32) * 4], greaterThan(200), reason: '亮點本身還是亮的');
+    });
+  });
 }
