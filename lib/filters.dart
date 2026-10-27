@@ -1,56 +1,21 @@
+import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-/// A 4 × 5 colour matrix (as [ColorFilter.matrix] takes it).
-typedef _M = List<double>;
+import 'color_grade.dart';
 
-const _M _identity = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
+/// LUT size: 33³ like the .cube files photo apps ship.
+const _lutSize = 33;
 
-/// [a] then [b].
-_M _then(_M a, _M b) {
-  final c = List<double>.filled(20, 0);
-  for (var i = 0; i < 4; i++) {
-    for (var j = 0; j < 5; j++) {
-      var v = 0.0;
-      for (var k = 0; k < 4; k++) {
-        v += b[i * 5 + k] * a[k * 5 + j];
-      }
-      c[i * 5 + j] = v + (j == 4 ? b[i * 5 + 4] : 0);
-    }
-  }
-  return c;
-}
-
-_M _chain(List<_M> steps) => steps.fold(_identity, _then);
-
-/// Saturation: 0 grey, 1 unchanged.
-_M _sat(double s) {
-  const l = [.2126, .7152, .0722];
-  return [
-    for (var i = 0; i < 3; i++) ...[for (var k = 0; k < 3; k++) l[k] * (1 - s) + (i == k ? s : 0), 0, 0],
-    0, 0, 0, 1, 0,
-  ];
-}
-
-_M _contrast(double c) => [c, 0, 0, 0, 128 * (1 - c), 0, c, 0, 0, 128 * (1 - c), 0, 0, c, 0, 128 * (1 - c), 0, 0, 0, 1, 0];
-
-_M _bright(double b) => [1, 0, 0, 0, b, 0, 1, 0, 0, b, 0, 0, 1, 0, b, 0, 0, 0, 1, 0];
-
-/// Channel gains and offsets (0–255).
-_M _tint(double r, double g, double b, [double or = 0, double og = 0, double ob = 0]) =>
-    [r, 0, 0, 0, or, 0, g, 0, 0, og, 0, 0, b, 0, ob, 0, 0, 0, 1, 0];
-
-/// Lift the blacks (matte): black becomes [l], white stays white.
-_M _lift(double l) {
-  final k = 1 - l / 255;
-  return [k, 0, 0, 0, l, 0, k, 0, 0, l, 0, 0, k, 0, l, 0, 0, 0, 1, 0];
-}
-
-/// A photo filter: a colour grade plus optional film effects drawn on top.
+/// A photo filter: a colour grade (curves, HSL, shadows / highlights, split
+/// toning…) plus film effects drawn on top (grain, vignette, flash, light
+/// leak, haze, date stamp).
 class PhotoFilter {
   final String id, name;
-  final List<double> matrix;
+  final Grade grade;
   /// Film grain, 0–1.
   final double grain;
   /// Dark corners, 0–1.
@@ -63,63 +28,195 @@ class PhotoFilter {
   final bool date;
   /// Soft white-pink haze, 0–1.
   final double haze;
-  const PhotoFilter._(this.id, this.name, this.matrix, {this.grain = 0, this.vignette = 0, this.flash = false, this.leak = false, this.date = false, this.haze = 0});
+  const PhotoFilter._(this.id, this.name, this.grade, {this.grain = 0, this.vignette = 0, this.flash = false, this.leak = false, this.date = false, this.haze = 0});
 
   bool get isNone => id == 'none';
 
-  ColorFilter get colorFilter => ColorFilter.matrix(matrix);
+  static final _luts = <String, Float32List>{};
+  static final _matrices = <String, List<double>>{};
+
+  /// The grade as a lookup table (built once).
+  Float32List get lut => _luts[id] ??= grade.lut(_lutSize);
+
+  /// The closest colour matrix, for the live camera viewfinder.
+  List<double> get matrix => _matrices[id] ??= fitMatrix(lut, _lutSize);
+
+  ColorFilter get previewFilter => ColorFilter.matrix(matrix);
 }
 
+const _skin = Hsl(sat: -.12, lum: .12);
+
 final photoFilters = <PhotoFilter>[
-  const PhotoFilter._('none', '原圖', _identity),
-  // Teal shadows, orange highlights; strong complementary colour.
-  PhotoFilter._('teal_orange', '青橙', _chain([_sat(1.1), _tint(1.15, 1.02, .86, -14, 4, 22), _contrast(1.12)]), vignette: .2),
-  // Ink black and charcoal grey, a hint of tea green in the highlights.
-  PhotoFilter._('dark_tea', '黑茶', _chain([_sat(.28), _contrast(1.2), _bright(-16), _tint(.96, 1.01, 1, 0, 2, 4)]), grain: .2),
-  // Fine, natural warm film with grain.
-  PhotoFilter._('warm_film', '暖底片', _chain([_sat(.95), _tint(1.06, 1, .9, 6, 2, -4), _contrast(1.05), _lift(12)]), grain: .5, vignette: .25),
-  // Cool, grey, low saturation.
-  PhotoFilter._('cool_grey', '冷淡灰', _chain([_sat(.7), _tint(.96, 1, 1.05, -2, 2, 8), _lift(20), _contrast(.95), _bright(4)]), grain: .25),
-  // Warm brown, old wood.
-  PhotoFilter._('vintage_brown', '復古棕', _chain([_sat(.78), _tint(1.08, 1, .86, 10, 4, -6), _lift(18), _contrast(1.02)]), grain: .3, vignette: .2),
-  // Y2K digicam: clear, slightly blue-green.
-  PhotoFilter._('y2k_clear', '千禧通透', _chain([_sat(1.12), _tint(.98, 1.03, 1.04, -4, 4, 6), _bright(14), _contrast(1.06)]), grain: .35),
-  // Cool blue, crisp, direct flash with dark corners.
-  PhotoFilter._('flash_blue', '冷豔閃光', _chain([_sat(1.15), _tint(.92, 1, 1.12), _contrast(1.2), _bright(6)]), vignette: .55, flash: true),
-  // Clean, bright, washed of muddy colours.
-  PhotoFilter._('picnic', '清透野餐', _chain([_sat(1.18), _bright(16), _contrast(1.04), _tint(1, 1.02, 1.03)])),
-  // Soft pink haze.
-  PhotoFilter._('romance', '浪漫柔霧', _chain([_sat(.9), _tint(1.06, .98, 1, 10, 0, 6), _contrast(.88), _bright(10)]), haze: .14),
-  // 1998 disposable: high contrast, red channel, light leak and date stamp.
-  PhotoFilter._('leak', '漏光老照片', _chain([_sat(1.05), _contrast(1.25), _tint(1.12, .96, .9, 4, -2, -8)]), grain: .45, vignette: .35, leak: true, date: true),
-  // Modern vintage: matte blacks, muted colour.
-  PhotoFilter._('matte', '霧面電影', _chain([_sat(.82), _lift(26), _tint(1.03, 1, .96)]), grain: .2),
+  const PhotoFilter._('none', '原圖', Grade.none),
+  // Cinematic teal & orange: teal shadows, orange highlights; greens pushed to
+  // teal, skin kept clean; highlights held, shadows opened.
+  const PhotoFilter._('teal_orange', '青橙', Grade(
+    contrast: .25, highlights: -.35, shadows: .3,
+    curve: [(0, .04), (.25, .22), (.75, .8), (1, .97)],
+    hsl: {Hue.orange: Hsl(sat: -.05, lum: .08), Hue.yellow: Hsl(hue: -10, sat: -.25), Hue.green: Hsl(hue: 45, sat: -.35), Hue.aqua: Hsl(sat: .15), Hue.blue: Hsl(hue: -15, sat: .1, lum: -.1)},
+    shadowTone: (-.06, .02, .07), highlightTone: (.06, .02, -.05),
+  ), vignette: .18),
+  // Dark tea: ink blacks, charcoal greys, a cold tea-green sheen in the
+  // highlights, almost no colour; highlights matte instead of white.
+  const PhotoFilter._('dark_tea', '黑茶', Grade(
+    exposure: -.15, contrast: .3, highlights: -.4, saturation: .3,
+    curve: [(0, .06), (.3, .24), (.7, .7), (1, .9)],
+    hsl: {Hue.orange: Hsl(sat: .3), Hue.green: Hsl(sat: -.5), Hue.blue: Hsl(sat: -.4)},
+    shadowTone: (-.015, .015, .025), highlightTone: (-.01, .03, .015),
+  ), grain: .25),
+  // Fine warm film: faded blacks, warm mids, blue lifted in the shadows,
+  // yellowed greens, soft highlights, grain.
+  const PhotoFilter._('warm_film', '暖底片', Grade(
+    temp: .3, highlights: -.25, shadows: .15,
+    curve: [(0, .06), (.5, .52), (1, .96)],
+    red: [(0, .02), (.5, .53), (1, 1)], blue: [(0, .08), (.5, .48), (1, .9)],
+    hsl: {Hue.orange: _skin, Hue.green: Hsl(hue: -15, sat: -.25), Hue.blue: Hsl(hue: -20, sat: -.15)},
+  ), grain: .5, vignette: .2),
+  // Cool, grey, airy: lifted blacks, low saturation, cool shadows.
+  const PhotoFilter._('cool_grey', '冷淡灰', Grade(
+    temp: -.3, highlights: -.2, shadows: .2, saturation: .72,
+    curve: [(0, .12), (.5, .5), (1, .93)],
+    hsl: {Hue.orange: Hsl(sat: -.15, lum: .1), Hue.green: Hsl(sat: -.4), Hue.blue: Hsl(hue: -10, sat: -.2)},
+    shadowTone: (-.01, 0, .03),
+  ), grain: .25),
+  // Vintage brown: warm, faded, brown-yellow greens, muted blues.
+  const PhotoFilter._('vintage_brown', '復古棕', Grade(
+    temp: .45, tint: .1, saturation: .8,
+    curve: [(0, .1), (.5, .52), (1, .9)],
+    red: [(0, .04), (1, 1)], blue: [(0, .06), (1, .86)],
+    hsl: {Hue.green: Hsl(hue: -25, sat: -.4), Hue.blue: Hsl(sat: -.4), Hue.orange: Hsl(lum: .05)},
+    highlightTone: (.05, .02, -.04),
+  ), grain: .35, vignette: .22),
+  // Y2K digicam: bright, clear, cyan-leaning greens and blues, bright skin.
+  const PhotoFilter._('y2k_clear', '千禧通透', Grade(
+    exposure: .1, temp: -.15, contrast: .15, highlights: -.3, saturation: 1.08,
+    curve: [(0, .02), (.5, .56), (1, 1)],
+    hsl: {Hue.orange: _skin, Hue.green: Hsl(hue: 20), Hue.aqua: Hsl(sat: .2), Hue.blue: Hsl(hue: -12, sat: .15)},
+  ), grain: .3),
+  // Cool flash: crisp, cold blues, porcelain skin, direct flash and corners.
+  const PhotoFilter._('flash_blue', '冷豔閃光', Grade(
+    exposure: 0, temp: -.35, contrast: .3, highlights: -.2,
+    curve: [(0, 0), (.25, .2), (.75, .82), (1, 1)],
+    hsl: {Hue.orange: Hsl(sat: -.2, lum: .15), Hue.red: Hsl(sat: -.1), Hue.blue: Hsl(hue: -8, sat: .25)},
+    shadowTone: (-.03, 0, .06),
+  ), vignette: .5, flash: true, grain: .2),
+  // Clear picnic: bright and clean; muddy yellows tamed, fresh greens.
+  const PhotoFilter._('picnic', '清透野餐', Grade(
+    exposure: .12, shadows: .3, highlights: -.35, contrast: .05, saturation: 1.05, vibrance: .15,
+    curve: [(0, .03), (.5, .55), (1, 1)],
+    hsl: {Hue.orange: Hsl(sat: -.08, lum: .1), Hue.yellow: Hsl(sat: -.15), Hue.green: Hsl(hue: 18, sat: -.1), Hue.blue: Hsl(hue: -10, sat: .1)},
+  )),
+  // Soft romance: pink haze, low contrast, glowing skin.
+  const PhotoFilter._('romance', '浪漫柔霧', Grade(
+    temp: .1, tint: .3, exposure: .15,
+    curve: [(0, .1), (.5, .55), (1, .95)],
+    hsl: {Hue.orange: Hsl(sat: -.1, lum: .12), Hue.magenta: Hsl(sat: .1), Hue.green: Hsl(sat: -.3)},
+    highlightTone: (.04, 0, .03),
+  ), haze: .12, grain: .15),
+  // 1998 disposable: hard contrast, cross-processed channels, red light leak,
+  // date stamp.
+  const PhotoFilter._('leak', '漏光老照片', Grade(
+    temp: .12, contrast: .4, saturation: 1.05,
+    red: [(0, .05), (.5, .53), (1, 1)], green: [(0, .02), (.5, .48), (1, .95)], blue: [(0, .1), (.5, .45), (1, .85)],
+    hsl: {Hue.orange: Hsl(sat: .05)},
+  ), grain: .5, vignette: .35, leak: true, date: true),
+  // Modern vintage, matte: no pure black or white, muted colour.
+  const PhotoFilter._('matte', '霧面電影', Grade(
+    temp: .05, highlights: -.3, shadows: .1, saturation: .85,
+    curve: [(0, .14), (.2, .22), (.8, .82), (1, .92)],
+    hsl: {Hue.green: Hsl(hue: -15, sat: -.3), Hue.orange: Hsl(sat: -.1, lum: .05), Hue.blue: Hsl(hue: -10, sat: -.2)},
+    shadowTone: (-.02, .01, .03), highlightTone: (.03, .02, -.01),
+  ), grain: .25, vignette: .15),
 ];
 
 PhotoFilter filterById(String? id) => photoFilters.firstWhere((f) => f.id == id, orElse: () => photoFilters.first);
 
-/// [child] (a photo) graded with [filter], with its film effects on top.
-class FilterLayer extends StatelessWidget {
+/// [base] graded with [filter]'s full colour grade (its lookup table, on a
+/// background thread), at most [maxSide] pixels on the long side. Film effects
+/// are drawn separately by [FilterEffects].
+@immutable
+class FilteredImage extends ImageProvider<FilteredImage> {
+  final ImageProvider base;
+  final PhotoFilter filter;
+  final int maxSide;
+  const FilteredImage(this.base, this.filter, {this.maxSide = 2048});
+
+  @override
+  Future<FilteredImage> obtainKey(ImageConfiguration configuration) => SynchronousFuture(this);
+
+  @override
+  ImageStreamCompleter loadImage(FilteredImage key, ImageDecoderCallback decode) => OneFrameImageStreamCompleter(_load());
+
+  Future<ImageInfo> _load() async {
+    final src = await _resolve(base);
+    final s = math.min(1.0, maxSide / math.max(src.width, src.height));
+    final w = math.max(1, (src.width * s).round()), h = math.max(1, (src.height * s).round());
+    final rec = ui.PictureRecorder();
+    ui.Canvas(rec).drawImageRect(
+      src, Rect.fromLTWH(0, 0, src.width.toDouble(), src.height.toDouble()), Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()),
+      Paint()..filterQuality = FilterQuality.medium,
+    );
+    src.dispose();
+    final small = await rec.endRecording().toImage(w, h);
+    final data = await small.toByteData(format: ui.ImageByteFormat.rawStraightRgba);
+    small.dispose();
+    final graded = await compute(_gradeJob, (rgba: data!.buffer.asUint8List(), lut: filter.lut));
+    final c = Completer<ui.Image>();
+    ui.decodeImageFromPixels(graded, w, h, ui.PixelFormat.rgba8888, c.complete);
+    return ImageInfo(image: await c.future);
+  }
+
+  static Future<ui.Image> _resolve(ImageProvider provider) {
+    final c = Completer<ui.Image>();
+    final stream = provider.resolve(ImageConfiguration.empty);
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener((info, _) {
+      stream.removeListener(listener);
+      c.complete(info.image.clone());
+      info.dispose();
+    }, onError: (e, st) {
+      stream.removeListener(listener);
+      c.completeError(e, st);
+    });
+    stream.addListener(listener);
+    return c.future;
+  }
+
+  @override
+  bool operator ==(Object other) => other is FilteredImage && other.base == base && other.filter.id == filter.id && other.maxSide == maxSide;
+
+  @override
+  int get hashCode => Object.hash(base, filter.id, maxSide);
+}
+
+Uint8List _gradeJob(({Uint8List rgba, Float32List lut}) a) => applyLut(a.rgba, a.lut, _lutSize);
+
+/// [image] with [filter] applied exactly: the graded photo plus film effects.
+ImageProvider filtered(ImageProvider image, PhotoFilter? filter, {int maxSide = 2048}) =>
+    filter == null || filter.isNone ? image : FilteredImage(image, filter, maxSide: maxSide);
+
+/// Film effects of [filter] over [child] (which is already graded).
+class FilterEffects extends StatelessWidget {
   final PhotoFilter filter;
   final Widget child;
-  const FilterLayer({super.key, required this.filter, required this.child});
+  const FilterEffects({super.key, required this.filter, required this.child});
 
   @override
   Widget build(BuildContext context) {
-    if (filter.isNone) return child;
     final f = filter;
     final effects = f.grain > 0 || f.vignette > 0 || f.flash || f.leak || f.date || f.haze > 0;
+    if (!effects) return child;
     return Stack(fit: StackFit.passthrough, children: [
-      ColorFiltered(colorFilter: f.colorFilter, child: child),
-      if (effects) Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: LayoutBuilder(
+      child,
+      Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: LayoutBuilder(
         builder: (context, c) => Stack(fit: StackFit.expand, children: [
           if (f.haze > 0) ColoredBox(color: const Color(0xFFFFE6EE).withValues(alpha: f.haze)),
           if (f.flash)
-            const DecoratedBox(decoration: BoxDecoration(gradient: RadialGradient(radius: .7, colors: [Color(0x33FFFFFF), Color(0x00FFFFFF)]))),
+            const DecoratedBox(decoration: BoxDecoration(gradient: RadialGradient(radius: .7, colors: [Color(0x26FFFFFF), Color(0x00FFFFFF)]))),
           if (f.leak)
             const DecoratedBox(decoration: BoxDecoration(gradient: RadialGradient(
               center: Alignment(-1.1, -.4), radius: 1.1,
-              colors: [Color(0x99FF6A1A), Color(0x44FF3B2F), Color(0x00FF3B2F)], stops: [0, .35, 1],
+              colors: [Color(0x80FF6A1A), Color(0x33FF3B2F), Color(0x00FF3B2F)], stops: [0, .35, 1],
             ))),
           if (f.vignette > 0)
             DecoratedBox(decoration: BoxDecoration(gradient: RadialGradient(
@@ -133,6 +230,19 @@ class FilterLayer extends StatelessWidget {
   }
 }
 
+/// A live picture (the camera viewfinder) with [filter] approximated by a
+/// colour matrix, plus its film effects.
+class FilterLayer extends StatelessWidget {
+  final PhotoFilter filter;
+  final Widget child;
+  const FilterLayer({super.key, required this.filter, required this.child});
+
+  @override
+  Widget build(BuildContext context) => filter.isNone
+      ? child
+      : FilterEffects(filter: filter, child: ColorFiltered(colorFilter: filter.previewFilter, child: child));
+}
+
 class _GrainPainter extends CustomPainter {
   final double amount;
   const _GrainPainter(this.amount);
@@ -141,12 +251,12 @@ class _GrainPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // Fixed seed: the grain doesn't crawl when the picture repaints.
     final rnd = math.Random(42);
-    final n = (size.width * size.height / 22 * amount).round();
-    final light = Paint()..color = Colors.white.withValues(alpha: .10 * amount + .04);
-    final dark = Paint()..color = Colors.black.withValues(alpha: .12 * amount + .04);
+    final n = (size.width * size.height / 18 * amount).round();
+    final light = Paint()..color = Colors.white.withValues(alpha: .07 * amount + .03);
+    final dark = Paint()..color = Colors.black.withValues(alpha: .09 * amount + .03);
     for (var i = 0; i < n; i++) {
       final p = Offset(rnd.nextDouble() * size.width, rnd.nextDouble() * size.height);
-      canvas.drawCircle(p, .45 + rnd.nextDouble() * .5, i.isEven ? light : dark);
+      canvas.drawCircle(p, .35 + rnd.nextDouble() * .45, i.isEven ? light : dark);
     }
   }
 

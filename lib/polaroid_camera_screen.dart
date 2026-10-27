@@ -404,7 +404,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       left: camLeft, top: camTop, width: cw, height: ch,
       child: IgnorePointer(
         ignoring: _stage != _Stage.aiming,
-        child: Opacity(opacity: 1 - .82 * l, child: _CameraBody(body: _body, lens: ColorFiltered(colorFilter: _filter.colorFilter, child: _viewfinder()), onShutter: _shoot)),
+        child: Opacity(opacity: 1 - .82 * l, child: _CameraBody(body: _body, lens: ColorFiltered(colorFilter: _filter.previewFilter, child: _viewfinder()), onShutter: _shoot)),
       ),
     );
     // A big viewfinder above the camera, the shape of the print's window, so

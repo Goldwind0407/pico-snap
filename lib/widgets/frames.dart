@@ -40,10 +40,10 @@ class _FittedPhotoState extends State<FittedPhoto> {
     Widget photo = ClipRect(child: Transform.scale(
       scale: fit.scale,
       alignment: fit.align,
-      child: Image(image: widget.image, fit: BoxFit.cover, alignment: fit.align, gaplessPlayback: true, width: c.maxWidth, height: c.maxHeight),
+      child: Image(image: filtered(widget.image, widget.filter), fit: BoxFit.cover, alignment: fit.align, gaplessPlayback: true, width: c.maxWidth, height: c.maxHeight),
     ));
     final filter = widget.filter;
-    if (filter != null) photo = SizedBox(width: c.maxWidth, height: c.maxHeight, child: FilterLayer(filter: filter, child: photo));
+    if (filter != null) photo = SizedBox(width: c.maxWidth, height: c.maxHeight, child: FilterEffects(filter: filter, child: photo));
     final onChanged = widget.onChanged;
     final aspect = widget.aspect;
     if (onChanged == null || aspect == null) return photo;

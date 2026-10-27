@@ -763,7 +763,7 @@ class _EditorScreenState extends State<EditorScreen> {
                 width: 64, height: 64,
                 decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: on ? coral : Colors.transparent, width: 2.5)),
                 padding: const EdgeInsets.all(2),
-                child: ClipRRect(borderRadius: BorderRadius.circular(9), child: FilterLayer(filter: f, child: Image(image: image, fit: BoxFit.cover, width: 60, height: 60, gaplessPlayback: true))),
+                child: ClipRRect(borderRadius: BorderRadius.circular(9), child: FilterEffects(filter: f, child: Image(image: filtered(image, f, maxSide: 180), fit: BoxFit.cover, width: 60, height: 60, gaplessPlayback: true))),
               ),
               const SizedBox(height: 4),
               Text(f.name, style: TextStyle(fontSize: 11, color: on ? ink : muted, fontWeight: on ? FontWeight.w900 : FontWeight.w600)),
