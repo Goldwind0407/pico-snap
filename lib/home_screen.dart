@@ -7,8 +7,16 @@ import 'models.dart';
 import 'theme.dart';
 import 'widgets/frames.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  /// 0 = 首頁, 1 = 我的.
+  int _tab = 0;
 
   void _open(BuildContext context, EditorMode mode, [int template = 0]) => Navigator.push(
     context, MaterialPageRoute(builder: (_) => EditorScreen(mode: mode, template: template)),
@@ -17,10 +25,26 @@ class HomeScreen extends StatelessWidget {
   Widget _pad(Widget child) => Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: child);
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: cream,
-    extendBody: true,
-    body: SafeArea(bottom: false, child: ListView(padding: const EdgeInsets.fromLTRB(0, 10, 0, 120), children: [
+  Widget build(BuildContext context) => PopScope(
+    // Back on the「我的」tab goes to 首頁 first.
+    canPop: _tab == 0,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) setState(() => _tab = 0);
+    },
+    child: Scaffold(
+      backgroundColor: cream,
+      extendBody: true,
+      body: IndexedStack(index: _tab, children: [_home(context), const LibraryScreen(embedded: true)]),
+      bottomNavigationBar: _BottomBar(
+        tab: _tab,
+        onCamera: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolaroidCameraScreen())),
+        onSoon: (label) => showSoonToast(context, label),
+        onTab: (t) => setState(() => _tab = t),
+      ),
+    ),
+  );
+
+  Widget _home(BuildContext context) => SafeArea(bottom: false, child: ListView(padding: const EdgeInsets.fromLTRB(0, 10, 0, 120), children: [
       _pad(_Header(onGallery: () => showSoonToast(context, '作品集'))),
       const SizedBox(height: 22),
       _pad(_HeroCard(onStart: () => _open(context, EditorMode.fourCut))),
@@ -53,13 +77,7 @@ class HomeScreen extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (_, i) => _StyleCard(index: i, onTap: () => _open(context, EditorMode.fourCut, i)),
       )),
-    ])),
-    bottomNavigationBar: _BottomBar(
-      onCamera: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolaroidCameraScreen())),
-      onSoon: (label) => showSoonToast(context, label),
-      onMine: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
-    ),
-  );
+    ]));
 }
 
 class _Header extends StatelessWidget {
@@ -258,10 +276,11 @@ class _StyleCard extends StatelessWidget {
 }
 
 class _BottomBar extends StatelessWidget {
+  final int tab;
   final VoidCallback onCamera;
   final ValueChanged<String> onSoon;
-  final VoidCallback onMine;
-  const _BottomBar({required this.onCamera, required this.onSoon, required this.onMine});
+  final ValueChanged<int> onTab;
+  const _BottomBar({required this.tab, required this.onCamera, required this.onSoon, required this.onTab});
 
   @override
   Widget build(BuildContext context) => SizedBox(
@@ -274,11 +293,11 @@ class _BottomBar extends StatelessWidget {
           boxShadow: [BoxShadow(color: ink.withValues(alpha: .08), blurRadius: 18, offset: const Offset(0, -4))],
         ),
         child: SafeArea(top: false, child: Row(children: [
-          const Expanded(child: _NavItem(icon: Icons.home_rounded, label: '首頁', selected: true)),
+          Expanded(child: _NavItem(icon: tab == 0 ? Icons.home_rounded : Icons.home_outlined, label: '首頁', selected: tab == 0, onTap: () => onTab(0))),
           Expanded(child: _NavItem(icon: Icons.menu_book_outlined, label: '日記', onTap: () => onSoon('日記'))),
           const SizedBox(width: 72),
           Expanded(child: _NavItem(icon: Icons.shopping_bag_outlined, label: '商店', onTap: () => onSoon('商店'))),
-          Expanded(child: _NavItem(icon: Icons.person_outline_rounded, label: '我的', onTap: onMine)),
+          Expanded(child: _NavItem(icon: tab == 1 ? Icons.person_rounded : Icons.person_outline_rounded, label: '我的', selected: tab == 1, onTap: () => onTab(1))),
         ])),
       )),
       Positioned(top: 0, left: 0, right: 0, child: Center(child: GestureDetector(

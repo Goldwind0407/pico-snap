@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/polaroid_camera_screen.dart';
-import 'package:pico_snap/widgets/frames.dart';
+import 'package:pico_snap/widgets/instant_print.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 Future<Uint8List> _photo() async {
@@ -81,7 +81,7 @@ void main() {
     final editor = t.widget<EditorScreen>(find.byType(EditorScreen));
     expect(editor.photos, hasLength(1));
     expect(editor.captions, ['cheese!']);
-    expect(find.byType(PolaroidCard), findsNWidgets(4));
+    expect(find.byType(InstantPrint), findsNWidgets(4), reason: '拼貼也是同一種底片');
     expect(find.text('cheese!'), findsOneWidget);
   });
 

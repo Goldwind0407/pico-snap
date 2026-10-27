@@ -14,6 +14,7 @@ import 'services/photo_save_service.dart';
 import 'services/timelapse_recorder.dart';
 import 'theme.dart';
 import 'widgets/frames.dart';
+import 'widgets/instant_print.dart';
 import 'widgets/sticker_item.dart';
 
 enum _Tool {
@@ -24,7 +25,9 @@ enum _Tool {
   text(Icons.title_rounded, '文字'),
   brush(Icons.brush_outlined, '畫筆'),
   cutout(Icons.content_cut_rounded, '去背'),
-  filter(Icons.filter_vintage_outlined, '濾鏡');
+  filter(Icons.filter_vintage_outlined, '濾鏡'),
+  /// Adjusting the selected photo; opened by tapping a photo, not a tab.
+  photo(Icons.photo_outlined, '照片');
 
   /// Tools that are only placeholders for now.
   bool get comingSoon => this == brush || this == filter;
@@ -48,10 +51,12 @@ const _tapes = [
 class EditorScreen extends StatefulWidget {
   final EditorMode mode;
   final int template;
-  /// Photos (and Polaroid captions) to start with, e.g. from the instant camera.
+  /// Photos (and Polaroid captions and film) to start with, e.g. from the
+  /// instant camera.
   final List<Uint8List> photos;
   final List<String> captions;
-  const EditorScreen({super.key, this.mode = EditorMode.fourCut, this.template = 0, this.photos = const [], this.captions = const []});
+  final List<FilmStock> films;
+  const EditorScreen({super.key, this.mode = EditorMode.fourCut, this.template = 0, this.photos = const [], this.captions = const [], this.films = const []});
 
   @override
   State<EditorScreen> createState() => _EditorScreenState();
@@ -67,6 +72,11 @@ class _EditorScreenState extends State<EditorScreen> {
   late final List<ImageProvider?> _photos = List<ImageProvider?>.filled(_cells, null);
   /// Original files of [_photos], for cutting out.
   late final List<Uint8List?> _photoBytes = List<Uint8List?>.filled(_cells, null);
+  /// How each photo sits in its cell, and its width / height (for moving it).
+  late final List<PhotoFit> _fits = List<PhotoFit>.filled(_cells, const PhotoFit());
+  late final List<double?> _aspects = List<double?>.filled(_cells, null);
+  /// Polaroid mode: white or black film per print.
+  late final List<FilmStock> _films = [for (var i = 0; i < 4; i++) i < widget.films.length ? widget.films[i] : FilmStock.white];
   /// Sticker mode: the cut-out subject (PNG with a white die-cut border).
   Uint8List? _subject;
   /// While saving: hide hints, selection outlines and sticker handles.
@@ -127,6 +137,7 @@ class _EditorScreenState extends State<EditorScreen> {
     for (var i = 0; i < widget.photos.length && i < _cells; i++) {
       _photoBytes[i] = widget.photos[i];
       _photos[i] = MemoryImage(widget.photos[i]);
+      _measure(i);
     }
     for (var i = 0; i < widget.captions.length && i < _polaroidCaptions.length; i++) {
       _polaroidCaptions[i] = widget.captions[i];
@@ -140,22 +151,50 @@ class _EditorScreenState extends State<EditorScreen> {
     super.dispose();
   }
 
+  /// Size of photo [i] as it is shown (EXIF orientation applied).
+  void _measure(int i) {
+    final image = _photos[i];
+    if (image == null) return;
+    final stream = image.resolve(ImageConfiguration.empty);
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener((info, _) {
+      stream.removeListener(listener);
+      if (mounted && _photos[i] == image) setState(() => _aspects[i] = info.image.width / info.image.height);
+    }, onError: (_, __) => stream.removeListener(listener));
+    stream.addListener(listener);
+  }
+
+  void _removePhoto() => setState(() {
+    final i = _selectedCell;
+    _photos[i] = null;
+    _photoBytes[i] = null;
+    _fits[i] = const PhotoFit();
+    _aspects[i] = null;
+    if (widget.mode == EditorMode.sticker) _subject = null;
+    _edited = true;
+    _tool = _tools.first;
+  });
+
   Future<void> _pickPhoto([int? index]) async {
     final i = index ?? _selectedCell;
     final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 95);
     if (file == null) return;
     final bytes = await file.readAsBytes();
     if (!mounted) return;
+    if (widget.mode != EditorMode.sticker) _tool = _Tool.photo;
     setState(() {
       _edited = true;
       _photos[i] = MemoryImage(bytes);
       _photoBytes[i] = bytes;
+      _fits[i] = const PhotoFit();
+      _aspects[i] = null;
       if (widget.mode == EditorMode.sticker) {
         // New photo: the old cut-out no longer matches; offer to cut this one.
         _subject = null;
         _tool = _Tool.cutout;
       }
     });
+    _measure(i);
   }
 
   /// Sticker mode: cut the subject out of the photo.
@@ -270,9 +309,18 @@ class _EditorScreenState extends State<EditorScreen> {
       _selectedCell = i;
       _selectedSticker = null;
       _textCtrl.text = _text;
+      if (_photos[i] != null) _tool = _Tool.photo;
     });
-    _pickPhoto(i);
+    if (_photos[i] == null) _pickPhoto(i);
   }
+
+  /// The cell whose photo can be dragged and pinched right now.
+  int? get _adjusting => !_capturing && _tool == _Tool.photo && _photos[_selectedCell] != null ? _selectedCell : null;
+
+  void _setFit(int i, PhotoFit fit) => setState(() {
+    _fits[i] = fit;
+    _edited = true;
+  });
 
   void _selectTool(_Tool tool) {
     if (tool.comingSoon) return showSoonToast(context, tool.label);
@@ -390,6 +438,7 @@ class _EditorScreenState extends State<EditorScreen> {
     EditorMode.fourCut => FittedBox(child: PhotoStrip(
       template: allStripTemplates[_template], photos: _photos, caption: _stripCaption,
       placeholder: _capturing ? null : const AddPhotoHint(scale: 1.4), selected: _capturing ? null : _selectedCell, onTapCell: _tapCell,
+      fits: _fits, aspects: _aspects, adjusting: _adjusting, onFit: _setFit,
     )),
     EditorMode.polaroid => _polaroidArtwork(size),
     EditorMode.sticker => _stickerArtwork(),
@@ -397,7 +446,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Widget _polaroidArtwork(Size size) {
     final w = min(size.width * .37, size.height * .26);
-    final h = w * PolaroidCard.height / PolaroidCard.width;
+    final h = w * InstantPrint.height / InstantPrint.width;
     // Draw the selected print last so it sits on top.
     final order = [for (var i = 0; i < 4; i++) if (i != _selectedCell) i, _selectedCell];
     Widget doodle(double x, double y, Widget child) => Positioned(left: x * size.width, top: y * size.height, child: child);
@@ -415,10 +464,26 @@ class _EditorScreenState extends State<EditorScreen> {
         for (final i in order)
           Positioned(
             left: _scatter[i].$1.dx * size.width - w / 2, top: _scatter[i].$1.dy * size.height - h / 2, width: w, height: h,
-            child: Transform.rotate(angle: _scatter[i].$2, child: FittedBox(child: PolaroidCard(
-              image: _photos[i], caption: _polaroidCaptions[i], color: const [blush, lilac, butter, sky][i],
-              placeholder: _capturing ? null : const AddPhotoHint(scale: 1.3), tape: _tapes[i], tapeRight: i.isOdd,
-              selected: !_capturing && _selectedCell == i, onTap: () => _tapCell(i),
+            child: Transform.rotate(angle: _scatter[i].$2, child: FittedBox(child: SizedBox(
+              width: InstantPrint.width, height: InstantPrint.height,
+              child: Stack(clipBehavior: Clip.none, children: [
+                Positioned.fill(child: DecoratedBox(
+                  decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .16), blurRadius: 10, offset: const Offset(0, 4))]),
+                  child: InstantPrint(
+                    image: _photos[i], film: _films[i], caption: _polaroidCaptions[i],
+                    placeholder: _capturing ? null : const AddPhotoHint(scale: 1.3),
+                    selected: !_capturing && _selectedCell == i, onTap: () => _tapCell(i),
+                    onCaption: () => setState(() {
+                      _selectedCell = i;
+                      _tool = _Tool.text;
+                      _textCtrl.text = _polaroidCaptions[i];
+                    }),
+                    fit: _fits[i], aspect: _aspects[i], onFit: _adjusting == i ? (f) => _setFit(i, f) : null,
+                  ),
+                )),
+                Positioned(top: -4, left: i.isOdd ? null : -22, right: i.isOdd ? -22 : null,
+                  child: WashiTape(width: 64, height: 22, angle: i.isOdd ? .75 : -.75, colors: _tapes[i])),
+              ]),
             ))),
           ),
       ]),
@@ -448,7 +513,10 @@ class _EditorScreenState extends State<EditorScreen> {
         ))),
         Positioned.fill(child: FractionallySizedBox(widthFactor: .76, heightFactor: .70, child: ClipPath(
           clipper: const BlobClipper(phase: 1.3),
-          child: PhotoSlot(image: _photos[0], color: const Color(0xFFFFF6F2), outlineWidth: 0, placeholder: _capturing ? null : const AddPhotoHint(scale: 1.3), onTap: () => _tapCell(0)),
+          child: PhotoSlot(
+            image: _photos[0], color: const Color(0xFFFFF6F2), outlineWidth: 0, placeholder: _capturing ? null : const AddPhotoHint(scale: 1.3), onTap: () => _tapCell(0),
+            fit: _fits[0], aspect: _aspects[0], onFit: _adjusting == 0 ? (f) => _setFit(0, f) : null,
+          ),
         ))),
       ],
       if (_bubble.isNotEmpty)
@@ -471,6 +539,7 @@ class _EditorScreenState extends State<EditorScreen> {
         _Tool.pattern => _patternTool(),
         _Tool.sticker => _stickerTool(),
         _Tool.cutout => _cutoutTool(),
+        _Tool.photo => _photoTool(),
         _Tool.text || _Tool.brush || _Tool.filter => _textTool(),
       }),
       Container(
@@ -507,11 +576,11 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   Widget _layoutTool() => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
+    padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('比例', style: TextStyle(fontSize: 17, color: ink, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 8),
-      Container(
+      Row(children: [
+      const SizedBox(width: 44, child: Text('比例', style: TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800))),
+      Expanded(child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(color: cream, borderRadius: BorderRadius.circular(16), border: Border.all(color: line, width: 1.3)),
         child: Row(children: [
@@ -523,24 +592,52 @@ class _EditorScreenState extends State<EditorScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 9),
                 decoration: BoxDecoration(color: _format == i ? blush : Colors.transparent, borderRadius: BorderRadius.circular(12)),
                 child: Text(formats[i].$1, textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 15, color: ink, fontWeight: _format == i ? FontWeight.w900 : FontWeight.w600)),
+                  style: TextStyle(fontSize: 14, color: ink, fontWeight: _format == i ? FontWeight.w900 : FontWeight.w600)),
               ),
             )),
         ]),
-      ),
-      const SizedBox(height: 14),
+      )),
+      ]),
+      const SizedBox(height: 10),
       Row(children: [
-        const Text('背景', style: TextStyle(fontSize: 17, color: ink, fontWeight: FontWeight.w800)),
-        const Spacer(),
+        const SizedBox(width: 44, child: Text('背景', style: TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800))),
         for (var i = 0; i < backdrops.length; i++)
           Padding(
-            padding: const EdgeInsets.only(left: 12),
+            padding: const EdgeInsets.only(right: 10),
             child: GestureDetector(
               onTap: () => setState(() => _backdrop = i),
               child: Container(
-                width: 40, height: 40, padding: const EdgeInsets.all(3),
+                width: 36, height: 36, padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: _backdrop == i ? outline.withValues(alpha: .6) : Colors.transparent, width: 2)),
                 child: Container(decoration: BoxDecoration(color: backdrops[i].$2, shape: BoxShape.circle, border: Border.all(color: line, width: 1.3))),
+              ),
+            ),
+          ),
+      ]),
+      const SizedBox(height: 10),
+      Row(children: [
+        const SizedBox(width: 44, child: Text('底片', style: TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800))),
+        for (final f in FilmStock.values)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => setState(() {
+                for (var i = 0; i < _films.length; i++) {
+                  _films[i] = f;
+                }
+                _edited = true;
+              }),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: _films.every((x) => x == f) ? blush : cream, borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _films.every((x) => x == f) ? blushLine : line),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(width: 11, height: 13, decoration: BoxDecoration(color: f.swatch, borderRadius: BorderRadius.circular(2), border: Border.all(color: line))),
+                  const SizedBox(width: 6),
+                  Text(f.label, style: TextStyle(fontSize: 13, color: ink, fontWeight: _films.every((x) => x == f) ? FontWeight.w900 : FontWeight.w600)),
+                ]),
               ),
             ),
           ),
@@ -618,6 +715,35 @@ class _EditorScreenState extends State<EditorScreen> {
         ),
       )),
     ]);
+  }
+
+  Widget _photoTool() {
+    Widget button(IconData icon, String label, VoidCallback onTap, {bool danger = false}) => Expanded(child: OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: danger ? const Color(0xFFB4483C) : ink, backgroundColor: cream,
+        side: const BorderSide(color: line, width: 1.3), padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    ));
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(widget.mode == EditorMode.sticker ? '照片' : '第 ${_selectedCell + 1} 張照片', style: const TextStyle(fontSize: 17, color: ink, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text('在照片上拖曳可以移動，兩指可以放大縮小', style: TextStyle(fontSize: 12, color: muted.withValues(alpha: .95), fontWeight: FontWeight.w600)),
+        const Spacer(),
+        Row(children: [
+          button(Icons.swap_horiz_rounded, '換照片', () => _pickPhoto()),
+          const SizedBox(width: 8),
+          button(Icons.center_focus_strong_outlined, '置中', () => _setFit(_selectedCell, const PhotoFit())),
+          const SizedBox(width: 8),
+          button(Icons.delete_outline_rounded, '移除', _removePhoto, danger: true),
+        ]),
+      ]),
+    );
   }
 
   Widget _cutoutTool() {

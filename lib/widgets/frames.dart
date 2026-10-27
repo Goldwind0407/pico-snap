@@ -5,6 +5,69 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../theme.dart';
 
+/// How a photo sits in its cell: zoom (1 = just covers the cell) and which
+/// part is in view (like [Image.alignment]). Independent of the cell's size,
+/// so it survives switching templates.
+class PhotoFit {
+  final double scale;
+  final Alignment align;
+  const PhotoFit([this.scale = 1, this.align = Alignment.center]);
+}
+
+/// A photo that covers its cell. With [onChanged] set, drag to move it and
+/// pinch to zoom; it always keeps the cell covered.
+class FittedPhoto extends StatefulWidget {
+  final ImageProvider image;
+  final PhotoFit fit;
+  /// Width / height of the photo; needed to move it, unknown for assets.
+  final double? aspect;
+  final ValueChanged<PhotoFit>? onChanged;
+  const FittedPhoto({super.key, required this.image, this.fit = const PhotoFit(), this.aspect, this.onChanged});
+
+  @override
+  State<FittedPhoto> createState() => _FittedPhotoState();
+}
+
+class _FittedPhotoState extends State<FittedPhoto> {
+  PhotoFit _start = const PhotoFit();
+  Offset _focal = Offset.zero;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, c) {
+    final fit = widget.fit;
+    Widget photo = ClipRect(child: Transform.scale(
+      scale: fit.scale,
+      alignment: fit.align,
+      child: Image(image: widget.image, fit: BoxFit.cover, alignment: fit.align, gaplessPlayback: true, width: c.maxWidth, height: c.maxHeight),
+    ));
+    final onChanged = widget.onChanged;
+    final aspect = widget.aspect;
+    if (onChanged == null || aspect == null) return photo;
+    final cw = c.maxWidth, ch = c.maxHeight;
+    // Size of the photo when it just covers the cell.
+    final cover = aspect > cw / ch ? Size(ch * aspect, ch) : Size(cw, cw / aspect);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onScaleStart: (d) {
+        _start = widget.fit;
+        _focal = d.localFocalPoint;
+      },
+      onScaleUpdate: (d) {
+        final k = (_start.scale * d.scale).clamp(1.0, 4.0);
+        final delta = d.localFocalPoint - _focal;
+        // The photo's left edge is at (cw - w) * (align + 1) / 2, so moving it
+        // by delta changes align by -2 * delta / (w - cw).
+        double move(double a, double over, double dd) => over <= .5 ? a : (a - 2 * dd / over).clamp(-1.0, 1.0);
+        onChanged(PhotoFit(k, Alignment(
+          move(_start.align.x, cover.width * k - cw, delta.dx),
+          move(_start.align.y, cover.height * k - ch, delta.dy),
+        )));
+      },
+      child: photo,
+    );
+  });
+}
+
 class PhotoSlot extends StatelessWidget {
   final ImageProvider? image;
   final Color color;
@@ -12,9 +75,12 @@ class PhotoSlot extends StatelessWidget {
   final bool selected;
   final double radius, outlineWidth;
   final VoidCallback? onTap;
+  final PhotoFit fit;
+  final double? aspect;
+  final ValueChanged<PhotoFit>? onFit;
   const PhotoSlot({
     super.key, this.image, required this.color, this.placeholder, this.selected = false,
-    this.radius = 3, this.outlineWidth = 1.4, this.onTap,
+    this.radius = 3, this.outlineWidth = 1.4, this.onTap, this.fit = const PhotoFit(), this.aspect, this.onFit,
   });
 
   @override
@@ -29,7 +95,7 @@ class PhotoSlot extends StatelessWidget {
         ? BoxDecoration(borderRadius: BorderRadius.circular(radius), border: Border.all(color: coral, width: 3.5))
         : null,
       child: image != null
-        ? Image(image: image!, fit: BoxFit.cover, gaplessPlayback: true)
+        ? FittedPhoto(image: image!, fit: fit, aspect: aspect, onChanged: onFit)
         : Center(child: placeholder ?? const SizedBox.shrink()),
     );
     return onTap == null ? slot : GestureDetector(onTap: onTap, child: slot);
@@ -59,10 +125,27 @@ class PhotoStrip extends StatelessWidget {
   final Widget? captionWidget;
   final int? selected;
   final ValueChanged<int>? onTapCell;
+  /// Per-cell framing and photo aspect ratios; [onFit] makes cell [adjusting]
+  /// draggable.
+  final List<PhotoFit> fits;
+  final List<double?> aspects;
+  final int? adjusting;
+  final void Function(int cell, PhotoFit fit)? onFit;
   const PhotoStrip({
     super.key, required this.template, this.photos = const [], this.placeholder,
     this.caption, this.captionWidget, this.selected, this.onTapCell,
+    this.fits = const [], this.aspects = const [], this.adjusting, this.onFit,
   });
+
+  Widget? _photo(int i) {
+    if (i >= photos.length || photos[i] == null) return null;
+    return FittedPhoto(
+      image: photos[i]!,
+      fit: i < fits.length ? fits[i] : const PhotoFit(),
+      aspect: i < aspects.length ? aspects[i] : null,
+      onChanged: adjusting == i && onFit != null ? (f) => onFit!(i, f) : null,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +168,7 @@ class PhotoStrip extends StatelessWidget {
             for (var i = 0; i < 4; i++) ...[
               SizedBox(height: 128, width: double.infinity, child: _StripCell(
                 template: t,
-                image: i < photos.length ? photos[i] : null,
+                photo: _photo(i),
                 placeholder: placeholder,
                 selected: selected == i,
                 onTap: onTapCell == null ? null : () => onTapCell!(i),
@@ -117,9 +200,7 @@ class PhotoStrip extends StatelessWidget {
       for (var i = 0; i < art.cells.length; i++)
         Positioned.fromRect(rect: px(art.cells[i]), child: GestureDetector(
           onTap: onTapCell == null ? null : () => onTapCell!(i),
-          child: ColoredBox(color: template.cell, child: SizedBox.expand(child: i < photos.length && photos[i] != null
-            ? Image(image: photos[i]!, fit: BoxFit.cover, gaplessPlayback: true)
-            : Center(child: placeholder ?? const SizedBox.shrink()))),
+          child: ColoredBox(color: template.cell, child: SizedBox.expand(child: _photo(i) ?? Center(child: placeholder ?? const SizedBox.shrink()))),
         )),
       // The illustration sits on top so its decorations overlap the photos.
       Positioned.fill(child: IgnorePointer(child: Image.asset(art.asset, fit: BoxFit.fill, filterQuality: FilterQuality.medium))),
@@ -168,19 +249,17 @@ const _grayscale = ColorFilter.matrix([
 
 class _StripCell extends StatelessWidget {
   final StripTemplate template;
-  final ImageProvider? image;
+  final Widget? photo;
   final Widget? placeholder;
   final bool selected;
   final VoidCallback? onTap;
-  const _StripCell({required this.template, this.image, this.placeholder, this.selected = false, this.onTap});
+  const _StripCell({required this.template, this.photo, this.placeholder, this.selected = false, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final clipper = CellClipper(template.cellShape);
-    Widget content = image != null
-      ? Image(image: image!, fit: BoxFit.cover, gaplessPlayback: true)
-      : Center(child: placeholder ?? const SizedBox.shrink());
-    if (template.mono && image != null) content = ColorFiltered(colorFilter: _grayscale, child: content);
+    Widget content = photo ?? Center(child: placeholder ?? const SizedBox.shrink());
+    if (template.mono && photo != null) content = ColorFiltered(colorFilter: _grayscale, child: content);
     final strokeWidth = selected ? 3.5 : (template.outline ? 1.4 : 0.0);
     return GestureDetector(
       onTap: onTap,

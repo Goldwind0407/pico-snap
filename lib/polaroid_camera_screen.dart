@@ -12,11 +12,11 @@ import 'editor_screen.dart';
 import 'models.dart';
 import 'services/photo_save_service.dart';
 import 'theme.dart';
+import 'widgets/instant_print.dart';
 
-/// Geometry of assets/instant/camera_front.png, as fractions of its width
-/// (x, radius) and height (y), measured from the photo.
+/// Geometry of the camera photos (all the same model), as fractions of the
+/// photo's width (x, radius) and height (y), measured on the cream one.
 abstract final class _Cam {
-  static const aspect = .99083;
   static const lens = Offset(.62773, .62523), lensR = .21455;
   static const slot = Offset(.58201, .02097);
   static const shutter = Offset(.19709, .39279), shutterR = .07143;
@@ -25,10 +25,19 @@ abstract final class _Cam {
   static const film = .42;
 }
 
-/// Geometry of assets/instant/film.png.
-abstract final class _Film {
-  static const aspect = .85058;
-  static const window = Rect.fromLTWH(.07148, .08732, .85399, .71087);
+/// Camera body colours: the photo, its width / height, and the colour of our
+/// name printed where the maker's logo was.
+enum _Body {
+  cream('assets/instant/camera_front.png', .99083, Color(0xFF55504A), Color(0xFFF2E9D6)),
+  blue('assets/instant/camera_blue.png', 1.0016, Color(0xFF3F5566), Color(0xFFBBD4E0)),
+  pink('assets/instant/camera_pink.png', 1.0048, Color(0xFF7A4A45), Color(0xFFEFBBB4)),
+  mint('assets/instant/camera_mint.png', .9937, Color(0xFF3F5245), Color(0xFFB4C4B3)),
+  black('assets/instant/camera_black.png', .9921, Color(0xFFE6E6EA), Color(0xFF43464D));
+
+  final String asset;
+  final double aspect;
+  final Color text, swatch;
+  const _Body(this.asset, this.aspect, this.text, this.swatch);
 }
 
 enum _Stage { aiming, ejecting, developing, done }
@@ -37,13 +46,16 @@ const _controlsHeight = 150.0;
 
 class _Print {
   final Uint8List bytes;
+  final ImageProvider image;
+  final FilmStock film;
   String caption;
   bool saved = false;
-  _Print(this.bytes, this.caption);
+  _Print(this.bytes, this.film, this.caption) : image = MemoryImage(bytes);
 }
 
 /// 拍立得相機：取景在鏡頭裡，按下快門後相片從上方的出片口慢慢吐出來，
-/// 拿到前面之後從一片深色慢慢顯影。拍好的相片可以存到相簿，或放進拍立得拼貼。
+/// 拿到前面之後從淡灰藍的空白慢慢顯影。可以換機身顏色、白底片或黑底片；
+/// 拍好的相片可以存到相簿，或放進拍立得拼貼。
 class PolaroidCameraScreen extends StatefulWidget {
   const PolaroidCameraScreen({super.key, this.pickPhoto, this.motion});
 
@@ -95,6 +107,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   final _prints = <_Print>[];
   bool _saving = false;
   final _printKey = GlobalKey();
+  _Body _body = _Body.cream;
+  FilmStock _film = FilmStock.white;
 
   @override
   void initState() {
@@ -202,7 +216,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
 
   /// The print comes out of the slot, is taken to the front and develops.
   Future<void> _printOut(Uint8List bytes) async {
-    final print = _Print(bytes, _today());
+    final print = _Print(bytes, _film, _today());
     setState(() {
       _current = print;
       _stage = _Stage.ejecting;
@@ -288,6 +302,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       mode: EditorMode.polaroid,
       photos: [for (final p in last) p.bytes],
       captions: [for (final p in last) p.caption],
+      films: [for (final p in last) p.film],
     )));
   }
 
@@ -349,10 +364,10 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   }
 
   Widget _stageView(Size size) {
-    final cw = [size.width * .86, size.height * .6, 380.0].reduce(min);
-    final ch = cw / _Cam.aspect;
+    final cw = [size.width * .8, size.height * .5, 360.0].reduce(min);
+    final ch = cw / _body.aspect;
     final camLeft = (size.width - cw) / 2, camTop = size.height - ch - 4;
-    final pw = cw * _Cam.film, ph = pw / _Film.aspect;
+    final pw = cw * _Cam.film, ph = pw / FilmStock.aspect;
     final slotX = camLeft + _Cam.slot.dx * cw, slotY = camTop + _Cam.slot.dy * ch + 10;
     // Coming out of the slot; the tail stays in the slot like the real thing.
     final e = _eject.value;
@@ -361,8 +376,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     final jitter = moving ? sin(e * 900) * .6 : 0.0;
     final ejected = Rect.fromLTWH(slotX - pw / 2 + jitter, slotY - out * ph * .9, pw, ph);
     // Taken to the front to watch it develop.
-    final rw = min(size.width * .72, (size.height - 16) * .92 * _Film.aspect);
-    final rh = rw / _Film.aspect;
+    final rw = min(size.width * .72, (size.height - 16) * .92 * FilmStock.aspect);
+    final rh = rw / FilmStock.aspect;
     final review = Rect.fromLTWH((size.width - rw) / 2, max(8.0, (size.height - rh) / 2 - 4), rw, rh);
     final l = Curves.easeInOutCubic.transform(_lift.value);
     final rect = Rect.lerp(ejected, review, l)!;
@@ -375,7 +390,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         child: FittedBox(child: DecoratedBox(
           decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .1 + .15 * l), blurRadius: 8 + 14 * l, offset: Offset(0, 3 + 7 * l))]),
           child: RepaintBoundary(key: _printKey, child: InstantPrint(
-            bytes: print.bytes, develop: _develop.value, caption: print.caption,
+            image: print.image, film: print.film, develop: _develop.value, caption: print.caption,
             onCaption: _stage == _Stage.done ? _editCaption : null,
           )),
         )),
@@ -385,17 +400,29 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       left: camLeft, top: camTop, width: cw, height: ch,
       child: IgnorePointer(
         ignoring: _stage != _Stage.aiming,
-        child: Opacity(opacity: 1 - .82 * l, child: _CameraBody(lens: _viewfinder(), onShutter: _shoot)),
+        child: Opacity(opacity: 1 - .82 * l, child: _CameraBody(body: _body, lens: _viewfinder(), onShutter: _shoot)),
       ),
+    );
+    // A big viewfinder above the camera, the shape of the print's window, so
+    // you see exactly what will be printed. Fades while the motor spins up.
+    final win = _film.window;
+    final winAspect = win.width * FilmStock.aspect / win.height;
+    final vh = min(camTop - 28, size.width * .66 / winAspect);
+    final vw = vh * winAspect;
+    final finderOpacity = _stage == _Stage.aiming ? 1.0 : (1 - e / _emergeStart).clamp(0.0, 1.0);
+    final finder = vh < 60 || finderOpacity == 0 ? null : Positioned(
+      left: (size.width - vw) / 2, top: max(6.0, (camTop - vh) / 2 - 4), width: vw, height: vh,
+      child: IgnorePointer(child: Opacity(opacity: finderOpacity, child: _Finder(
+        error: _cameraError,
+        child: _camera?.value.isInitialized == true ? _viewfinder() : null,
+      ))),
     );
     // Behind the camera while it comes out of the slot, in front once taken out.
     return Stack(clipBehavior: Clip.none, children: [
+      if (finder != null) finder,
       if (printView != null && l < .5) printView,
       camera,
       if (printView != null && l >= .5) printView,
-      if (_cameraError != null && _stage == _Stage.aiming)
-        Positioned(left: 24, right: 24, top: max(0.0, camTop - 64), child: Text(_cameraError!, textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 13, height: 1.5, color: muted, fontWeight: FontWeight.w700))),
     ]);
   }
 
@@ -412,19 +439,58 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     return FittedBox(fit: BoxFit.cover, child: SizedBox(width: s.height, height: s.width, child: CameraPreview(camera)));
   }
 
-  Widget _bottom() => switch (_stage) {
-    _Stage.aiming => Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-      _Tray(prints: _prints, onTap: _collage),
+  /// Body colour and film stock.
+  Widget _options() => SizedBox(height: 34, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+    for (final b in _Body.values)
       GestureDetector(
-        onTap: _shoot,
+        onTap: () => setState(() => _body = b),
         child: Container(
-          width: 78, height: 78,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white, boxShadow: [BoxShadow(color: coral.withValues(alpha: .35), blurRadius: 16, offset: const Offset(0, 6))]),
-          padding: const EdgeInsets.all(6),
-          child: Container(decoration: const BoxDecoration(shape: BoxShape.circle, color: coral), child: const Icon(Icons.camera_rounded, color: Colors.white, size: 32)),
+          width: 26, height: 26, margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: b.swatch, shape: BoxShape.circle,
+            border: Border.all(color: _body == b ? coral : Colors.white, width: _body == b ? 3 : 2),
+            boxShadow: [BoxShadow(color: ink.withValues(alpha: .18), blurRadius: 3)],
+          ),
         ),
       ),
-      _SideButton(icon: Icons.photo_library_outlined, label: '從相簿', onTap: _fromGallery),
+    Container(width: 1, height: 20, margin: const EdgeInsets.symmetric(horizontal: 10), color: line),
+    for (final f in FilmStock.values)
+      GestureDetector(
+        onTap: () => setState(() => _film = f),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: _film == f ? blush : Colors.white, borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _film == f ? blushLine : line),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 10, height: 12, decoration: BoxDecoration(color: f.swatch, borderRadius: BorderRadius.circular(2), border: Border.all(color: line))),
+            const SizedBox(width: 5),
+            Text(f.label, style: TextStyle(fontSize: 12, color: ink, fontWeight: _film == f ? FontWeight.w900 : FontWeight.w600)),
+          ]),
+        ),
+      ),
+  ]));
+
+  Widget _controls() => Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+    _Tray(prints: _prints, onTap: _collage),
+    GestureDetector(
+      onTap: _shoot,
+      child: Container(
+        width: 78, height: 78,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white, boxShadow: [BoxShadow(color: coral.withValues(alpha: .35), blurRadius: 16, offset: const Offset(0, 6))]),
+        padding: const EdgeInsets.all(6),
+        child: Container(decoration: const BoxDecoration(shape: BoxShape.circle, color: coral), child: const Icon(Icons.camera_rounded, color: Colors.white, size: 32)),
+      ),
+    ),
+    _SideButton(icon: Icons.photo_library_outlined, label: '從相簿', onTap: _fromGallery),
+  ]);
+
+  Widget _bottom() => switch (_stage) {
+    _Stage.aiming => Column(children: [
+      _options(),
+      Expanded(child: _controls()),
     ]),
     _Stage.ejecting => const Center(child: Text('出片中…', style: TextStyle(fontSize: 15, color: muted, fontWeight: FontWeight.w800))),
     _Stage.developing => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -435,7 +501,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     _Stage.done => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Text('點白邊可以寫字', style: hand(20, color: muted)),
+        Text('點相片下方可以寫字', style: hand(20, color: muted)),
         const SizedBox(height: 10),
         Row(children: [
           Expanded(child: OutlinedButton.icon(
@@ -453,61 +519,13 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   };
 }
 
-/// How instax film develops at [t] (0–1): a flat pale grey-blue blank, then
-/// a faint, warm, low-contrast picture that gains colour and contrast.
-@visibleForTesting
-ColorFilter developFilter(double t) {
-  t = t.clamp(0.0, 1.0);
-  const blank = <double>[0, 0, 0, 0, 196, 0, 0, 0, 0, 202, 0, 0, 0, 0, 206, 0, 0, 0, 1, 0];
-  final s = Curves.easeIn.transform(t);
-  final sat = s, contrast = .5 + .5 * s, warm = 22 * (1 - s);
-  const lum = [.2126, .7152, .0722];
-  List<double> row(int i, double offset) {
-    final r = [for (final l in lum) l * (1 - sat)];
-    r[i] += sat;
-    return [for (final v in r) contrast * v, 0, 128 * (1 - contrast) + offset];
-  }
-
-  final photo = [...row(0, warm), ...row(1, warm * .4), ...row(2, -warm * .6), 0, 0, 0, 1, 0];
-  // The picture appears during the first three quarters.
-  final k = Curves.easeInOut.transform((t / .75).clamp(0.0, 1.0));
-  return ColorFilter.matrix([for (var i = 0; i < 20; i++) blank[i] + (photo[i] - blank[i]) * k]);
-}
-
-/// An instax print (assets/instant/film.png) with the photo in its window and
-/// a handwritten caption on the wide bottom border. Design size 160 wide.
-class InstantPrint extends StatelessWidget {
-  static const width = 160.0, height = width / _Film.aspect;
-  final Uint8List bytes;
-  final double develop;
-  final String caption;
-  final VoidCallback? onCaption;
-  const InstantPrint({super.key, required this.bytes, required this.develop, required this.caption, this.onCaption});
-
-  @override
-  Widget build(BuildContext context) {
-    final w = Rect.fromLTWH(_Film.window.left * width, _Film.window.top * height, _Film.window.width * width, _Film.window.height * height);
-    return SizedBox(width: width, height: height, child: Stack(children: [
-      Positioned.fill(child: Image.asset('assets/instant/film.png', fit: BoxFit.fill, filterQuality: FilterQuality.medium)),
-      Positioned.fromRect(rect: w, child: ClipRect(child: ColorFiltered(
-        colorFilter: developFilter(develop),
-        child: Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true),
-      ))),
-      Positioned(left: 8, right: 8, top: w.bottom + 2, bottom: 4, child: GestureDetector(
-        onTap: onCaption,
-        behavior: HitTestBehavior.opaque,
-        child: Center(child: Text(caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: hand(24))),
-      )),
-    ]));
-  }
-}
-
-/// The instant camera (assets/instant/camera_front.png) with the live picture
-/// in its lens, our own name where the maker's logo was, and a working shutter.
+/// The instant camera photo with the live picture in its lens, our own name
+/// where the maker's logo was, and a working shutter.
 class _CameraBody extends StatelessWidget {
+  final _Body body;
   final Widget lens;
   final VoidCallback onShutter;
-  const _CameraBody({required this.lens, required this.onShutter});
+  const _CameraBody({required this.body, required this.lens, required this.onShutter});
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, c) {
@@ -518,7 +536,7 @@ class _CameraBody extends StatelessWidget {
     final sc = Offset(_Cam.shutter.dx * w, _Cam.shutter.dy * h);
     final logo = Rect.fromLTWH(_Cam.logo.left * w, _Cam.logo.top * h, _Cam.logo.width * w, _Cam.logo.height * h);
     return Stack(clipBehavior: Clip.none, children: [
-      Positioned.fill(child: Image.asset('assets/instant/camera_front.png', fit: BoxFit.fill, filterQuality: FilterQuality.medium)),
+      Positioned.fill(child: Image.asset(body.asset, fit: BoxFit.fill, filterQuality: FilterQuality.medium, gaplessPlayback: true)),
       Positioned.fromRect(rect: Rect.fromCircle(center: lc, radius: r), child: ClipOval(child: Stack(fit: StackFit.expand, children: [
         lens,
         // Glass: a highlight and a dark rim.
@@ -528,9 +546,9 @@ class _CameraBody extends StatelessWidget {
         ))),
       ]))),
       Positioned.fromRect(rect: logo, child: FittedBox(child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        const Text('PICO SNAP', style: TextStyle(fontSize: 40, height: 1, letterSpacing: 1.5, color: Color(0xFF55504A), fontWeight: FontWeight.w900)),
+        Text('PICO SNAP', style: TextStyle(fontSize: 40, height: 1, letterSpacing: 1.5, color: body.text, fontWeight: FontWeight.w900)),
         const SizedBox(height: 6),
-        Text('Instant Camera', style: TextStyle(fontSize: 20, height: 1, color: const Color(0xFF55504A).withValues(alpha: .9), fontWeight: FontWeight.w700)),
+        Text('Instant Camera', style: TextStyle(fontSize: 20, height: 1, color: body.text.withValues(alpha: .9), fontWeight: FontWeight.w700)),
       ]))),
       // The red shutter button on the body works too.
       Positioned.fromRect(rect: Rect.fromCircle(center: sc, radius: sr), child: GestureDetector(
@@ -540,6 +558,57 @@ class _CameraBody extends StatelessWidget {
       )),
     ]);
   });
+}
+
+/// The big viewfinder: the live picture with framing corners, or why there is none.
+class _Finder extends StatelessWidget {
+  final Widget? child;
+  final String? error;
+  const _Finder({this.child, this.error});
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: const Color(0xFF26282E), borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: Colors.white, width: 4),
+      boxShadow: [BoxShadow(color: ink.withValues(alpha: .16), blurRadius: 14, offset: const Offset(0, 6))],
+    ),
+    child: ClipRRect(borderRadius: BorderRadius.circular(14), child: Stack(fit: StackFit.expand, children: [
+      if (child != null) child!
+      else Center(child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(error != null ? Icons.no_photography_outlined : Icons.camera_alt_outlined, color: Colors.white38, size: 34),
+          if (error != null) ...[
+            const SizedBox(height: 10),
+            Text(error!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, height: 1.5, color: Colors.white70, fontWeight: FontWeight.w700)),
+          ],
+        ]),
+      )),
+      const CustomPaint(painter: _CornersPainter()),
+    ])),
+  );
+}
+
+class _CornersPainter extends CustomPainter {
+  const _CornersPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = Colors.white.withValues(alpha: .85)
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    const m = 14.0, l = 22.0;
+    for (final (x, y, dx, dy) in [(m, m, 1.0, 1.0), (size.width - m, m, -1.0, 1.0), (m, size.height - m, 1.0, -1.0), (size.width - m, size.height - m, -1.0, -1.0)]) {
+      canvas.drawLine(Offset(x, y), Offset(x + dx * l, y), p);
+      canvas.drawLine(Offset(x, y), Offset(x, y + dy * l), p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CornersPainter oldDelegate) => false;
 }
 
 /// Writes on the print's white strip. Owns its controller so it lives as long
@@ -564,7 +633,7 @@ class _CaptionDialogState extends State<_CaptionDialog> {
   @override
   Widget build(BuildContext context) => AlertDialog(
     backgroundColor: cream,
-    title: const Text('在白邊寫字', style: TextStyle(fontSize: 18, color: ink, fontWeight: FontWeight.w900)),
+    title: const Text('在相片下方寫字', style: TextStyle(fontSize: 18, color: ink, fontWeight: FontWeight.w900)),
     content: TextField(
       controller: _ctrl, autofocus: true, maxLength: 16, style: hand(26),
       decoration: const InputDecoration(hintText: 'say something ♡'),
@@ -594,7 +663,7 @@ class _Tray extends StatelessWidget {
           for (final (i, p) in prints.reversed.take(3).toList().reversed.indexed)
             Positioned.fill(child: Transform.rotate(
               angle: (i - 1) * .12,
-              child: FittedBox(child: InstantPrint(bytes: p.bytes, develop: 1, caption: '')),
+              child: FittedBox(child: InstantPrint(image: p.image, film: p.film, caption: '')),
             )),
         if (prints.isNotEmpty)
           Positioned(right: -6, top: -6, child: Container(

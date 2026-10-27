@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'cutout/cutout_page.dart';
+import 'editor_screen.dart';
 import 'models.dart';
 import 'services/my_library.dart';
 import 'template_maker_screen.dart';
@@ -10,7 +11,9 @@ import 'widgets/frames.dart';
 
 /// 「我的素材」：新增、刪除自己的貼紙和模板。編輯作品時只能使用，不能在那裡改。
 class LibraryScreen extends StatefulWidget {
-  const LibraryScreen({super.key});
+  /// Shown as the home page's「我的」tab: no back arrow, room for the tab bar.
+  final bool embedded;
+  const LibraryScreen({super.key, this.embedded = false});
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -34,6 +37,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
   }
 
+  /// Open the four-cut editor with the user's template number [i].
+  void _useTemplate(int i) => Navigator.push(context, MaterialPageRoute(
+    builder: (_) => EditorScreen(template: stripTemplates.length + i),
+  ));
+
   Future<void> _deleteTemplate(String id) async {
     if (await confirmDelete(context, '刪除這個模板？', '已經存到相簿的作品不受影響。')) MyLibrary.removeTemplate(id);
   }
@@ -45,7 +53,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
       Padding(
         padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
         child: Row(children: [
-          IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
+          if (widget.embedded) const SizedBox(width: 12, height: 48)
+          else IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
           const Text('我的素材', style: TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900)),
         ]),
       ),
@@ -72,7 +81,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       Padding(
         padding: const EdgeInsets.fromLTRB(22, 8, 22, 4),
         child: Text(
-          _tab == 0 ? '把照片去背做成貼紙，編輯作品時在貼紙的「📷 我的」裡使用。' : '設計自己的四格模板，編輯四格拍貼時在模板的「我的」裡使用。',
+          _tab == 0 ? '把照片去背做成貼紙，編輯作品時在貼紙的「📷 我的」裡使用。' : '設計自己的四格模板，點一下就能直接用，編輯四格拍貼時也能在模板的「我的」裡找到。',
           style: const TextStyle(fontSize: 12, height: 1.4, color: muted, fontWeight: FontWeight.w600),
         ),
       ),
@@ -83,9 +92,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
     ])),
   );
 
+  EdgeInsets get _gridPadding => EdgeInsets.fromLTRB(20, 8, 20, widget.embedded ? 130 : 24);
+
   Widget _stickers() => GridView.count(
     crossAxisCount: 3, mainAxisSpacing: 12, crossAxisSpacing: 12,
-    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+    padding: _gridPadding,
     children: [
       _AddTile(icon: Icons.add_photo_alternate_outlined, label: '照片去背', onTap: _newSticker),
       for (final id in customStickers.keys.toList().reversed)
@@ -95,11 +106,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   Widget _templates() => GridView.count(
     crossAxisCount: 3, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: .5,
-    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+    padding: _gridPadding,
     children: [
       _AddTile(icon: Icons.dashboard_customize_outlined, label: '新增模板', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TemplateMakerScreen()))),
-      for (final t in customTemplates.reversed)
-        _ItemTile(onDelete: () => _deleteTemplate(t.id), child: Padding(
+      for (final (i, t) in customTemplates.indexed.toList().reversed)
+        _ItemTile(onDelete: () => _deleteTemplate(t.id), onTap: () => _useTemplate(i), child: Padding(
           padding: const EdgeInsets.all(10),
           child: FittedBox(child: PhotoStrip(template: t.template, photos: samplePhotos)),
         )),
@@ -133,13 +144,17 @@ class _AddTile extends StatelessWidget {
 class _ItemTile extends StatelessWidget {
   final Widget child;
   final VoidCallback onDelete;
-  const _ItemTile({required this.child, required this.onDelete});
+  final VoidCallback? onTap;
+  const _ItemTile({required this.child, required this.onDelete, this.onTap});
 
   @override
   Widget build(BuildContext context) => Stack(children: [
-    Positioned.fill(child: Container(
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: line)),
-      child: Center(child: child),
+    Positioned.fill(child: GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: line)),
+        child: Center(child: child),
+      ),
     )),
     Positioned(right: 4, top: 4, child: GestureDetector(
       onTap: onDelete,
