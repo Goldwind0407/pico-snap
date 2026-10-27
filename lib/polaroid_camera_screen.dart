@@ -38,6 +38,7 @@ const _controlsHeight = 150.0;
 class _Print {
   final Uint8List bytes;
   String caption;
+  bool saved = false;
   _Print(this.bytes, this.caption);
 }
 
@@ -266,7 +267,10 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     if (_develop.value < 1) await _develop.animateTo(1, duration: const Duration(milliseconds: 400));
     final error = await PhotoSaveService.saveBoundary(_printKey, longSide: 2000);
     if (!mounted) return;
-    setState(() => _saving = false);
+    setState(() {
+      _saving = false;
+      if (error == null) _current?.saved = true;
+    });
     showMessage(context, error ?? '已存到相簿 ♡', error: error != null, above: _controlsHeight);
   }
 
@@ -278,7 +282,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   }
 
   void _collage() {
-    if (_prints.isEmpty) return;
+    if (_prints.isEmpty) return showMessage(context, '先拍一張，再做成拼貼', above: _controlsHeight);
     final last = _prints.length > 4 ? _prints.sublist(_prints.length - 4) : _prints;
     Navigator.push(context, MaterialPageRoute(builder: (_) => EditorScreen(
       mode: EditorMode.polaroid,
@@ -287,8 +291,21 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     )));
   }
 
+  /// Prints that would be lost by leaving: unsaved ones, or one coming out.
+  bool get _unsaved => _stage == _Stage.ejecting || _stage == _Stage.developing || _prints.any((p) => !p.saved);
+
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => PopScope(
+    canPop: !_unsaved,
+    onPopInvokedWithResult: (didPop, _) async {
+      if (didPop) return;
+      final navigator = Navigator.of(context);
+      if (await confirmLeave(context, '拍好的相片還沒存到相簿，離開就會不見喔。', stay: '留下來')) navigator.pop();
+    },
+    child: _page(),
+  );
+
+  Widget _page() => Scaffold(
     backgroundColor: cream,
     body: Stack(children: [
       SafeArea(child: Column(children: [
@@ -313,7 +330,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   Widget _topBar() => Padding(
     padding: const EdgeInsets.fromLTRB(8, 8, 12, 0),
     child: Row(children: [
-      IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
+      IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
       const Expanded(child: Text('Instant Camera', style: TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
       if (_cameras.length > 1)
         IconButton(onPressed: _stage == _Stage.aiming ? _flipCamera : null, icon: const Icon(Icons.cameraswitch_outlined), color: ink, disabledColor: line),

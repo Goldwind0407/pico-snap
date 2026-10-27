@@ -100,8 +100,51 @@ void main() {
     expect(rgba[3], 0, reason: '角落透明');
   });
 
-  testWidgets('儲存：沒有相簿外掛時顯示錯誤訊息，不會當掉', (tester) async {
+  testWidgets('儲存：還沒放照片時不讓存', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: EditorScreen(mode: EditorMode.polaroid)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('儲存'));
+    await tester.pump();
+    expect(find.text('先放一張照片再儲存喔'), findsOneWidget);
+    expect(find.text('同時存「製作過程」縮時影片'), findsNothing);
+  });
+
+  testWidgets('編輯過還沒存：按返回會先問；沒編輯就直接離開', (tester) async {
+    final photo = (await tester.runAsync(_circlePhoto))!;
+    await tester.pumpWidget(MaterialApp(home: Builder(builder: (context) => Scaffold(body: Center(child: ElevatedButton(
+      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditorScreen(mode: EditorMode.polaroid))),
+      child: const Text('open'),
+    ))))));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    // 沒編輯：直接離開
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.pumpAndSettle();
+    expect(find.byType(EditorScreen), findsNothing);
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('文字'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.pump();
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('要離開嗎？'), findsOneWidget);
+    await tester.tap(find.text('繼續編輯'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EditorScreen), findsOneWidget, reason: '選繼續編輯就留下來');
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('離開'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EditorScreen), findsNothing);
+    expect(photo, isNotEmpty);
+  });
+
+  testWidgets('儲存：沒有相簿外掛時顯示錯誤訊息，不會當掉', (tester) async {
+    final photo = (await tester.runAsync(_circlePhoto))!;
+    await tester.pumpWidget(MaterialApp(home: EditorScreen(mode: EditorMode.polaroid, photos: [photo])));
     await tester.pumpAndSettle();
     await tester.tap(find.text('儲存'));
     await tester.pumpAndSettle();

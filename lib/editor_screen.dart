@@ -71,6 +71,8 @@ class _EditorScreenState extends State<EditorScreen> {
   Uint8List? _subject;
   /// While saving: hide hints, selection outlines and sticker handles.
   bool _capturing = false, _saving = false;
+  /// Something was changed since opening or the last save.
+  bool _edited = false;
   /// Records the editing for the timelapse video.
   final _recorder = TimelapseRecorder();
   bool _withVideo = true;
@@ -111,6 +113,7 @@ class _EditorScreenState extends State<EditorScreen> {
   };
 
   void _setText(String value) => setState(() {
+    _edited = true;
     switch (widget.mode) {
       case EditorMode.fourCut: _stripCaption = value;
       case EditorMode.polaroid: _polaroidCaptions[_selectedCell] = value;
@@ -144,6 +147,7 @@ class _EditorScreenState extends State<EditorScreen> {
     final bytes = await file.readAsBytes();
     if (!mounted) return;
     setState(() {
+      _edited = true;
       _photos[i] = MemoryImage(bytes);
       _photoBytes[i] = bytes;
       if (widget.mode == EditorMode.sticker) {
@@ -159,7 +163,12 @@ class _EditorScreenState extends State<EditorScreen> {
     final bytes = _photoBytes[0];
     if (bytes == null) return _pickPhoto(0);
     final png = await CutoutPage.open(context, bytes, recorder: _recorder);
-    if (png != null && mounted) setState(() => _subject = png);
+    if (png != null && mounted) {
+      setState(() {
+        _subject = png;
+        _edited = true;
+      });
+    }
   }
 
   /// One timelapse frame: the canvas as it looks now (handles and all).
@@ -172,6 +181,9 @@ class _EditorScreenState extends State<EditorScreen> {
   /// Ask whether to save the timelapse too, then save.
   Future<void> _askSave() async {
     if (_saving) return;
+    if (_photos.every((p) => p == null) && _subject == null) {
+      return showMessage(context, '先放一張照片再儲存喔');
+    }
     final canVideo = _recorder.frameCount >= 3;
     final go = await showModalBottomSheet<bool>(
       context: context,
@@ -243,6 +255,7 @@ class _EditorScreenState extends State<EditorScreen> {
     setState(() {
       _saving = false;
       _capturing = false;
+      if (error == null) _edited = false;
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(error ?? saved),
@@ -270,6 +283,7 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _remember() {
+    _edited = true;
     _history.add(List.of(_stickers));
     if (_history.length > 30) _history.removeAt(0);
   }
@@ -295,16 +309,28 @@ class _EditorScreenState extends State<EditorScreen> {
     return _scaffold();
   }
 
-  Widget _scaffold() => Scaffold(
+  Widget _scaffold() => PopScope(
+    canPop: !_edited,
+    onPopInvokedWithResult: (didPop, _) async {
+      if (didPop) return;
+      final navigator = Navigator.of(context);
+      if (await confirmLeave(context, '還沒儲存的作品會不見喔。')) navigator.pop();
+    },
+    child: _page(),
+  );
+
+  Widget _page() => Scaffold(
     backgroundColor: cream,
     body: SafeArea(bottom: false, child: Column(children: [
       _topBar(),
       Expanded(child: Stack(children: [
-        // Hand-drawn doodles scattered around the artwork.
-        const Positioned(right: 54, top: 30, child: Sparkle(size: 22)),
-        const Positioned(left: 40, bottom: 70, child: Sparkle(size: 24, fill: Color(0xFFF7D77C))),
-        const Positioned(left: 64, bottom: 52, child: Sparkle(size: 13)),
-        const Positioned(left: 58, bottom: 96, child: DoodleHeart(size: 13, color: Color(0xFFE8C6F0))),
+        // Hand-drawn doodles beside the narrow strip (wider canvases cover them).
+        if (widget.mode == EditorMode.fourCut) ...const [
+          Positioned(right: 54, top: 30, child: Sparkle(size: 22)),
+          Positioned(left: 40, bottom: 70, child: Sparkle(size: 24, fill: Color(0xFFF7D77C))),
+          Positioned(left: 64, bottom: 52, child: Sparkle(size: 13)),
+          Positioned(left: 58, bottom: 96, child: DoodleHeart(size: 13, color: Color(0xFFE8C6F0))),
+        ],
         Positioned.fill(child: Padding(padding: const EdgeInsets.fromLTRB(28, 12, 28, 16), child: _canvas())),
         Positioned(right: 18, bottom: 16, child: _RoundButton(icon: Icons.undo_rounded, onTap: _history.isEmpty ? null : _undo)),
       ])),
@@ -315,7 +341,7 @@ class _EditorScreenState extends State<EditorScreen> {
   Widget _topBar() => Padding(
     padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
     child: Row(children: [
-      IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
+      IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
       Expanded(child: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
       if (widget.mode == EditorMode.fourCut) ...[
         _TopButton(label: '匯入', onTap: () => _pickPhoto()),

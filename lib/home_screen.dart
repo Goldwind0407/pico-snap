@@ -55,7 +55,7 @@ class HomeScreen extends StatelessWidget {
       )),
     ])),
     bottomNavigationBar: _BottomBar(
-      onCamera: () => _open(context, EditorMode.fourCut),
+      onCamera: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolaroidCameraScreen())),
       onSoon: (label) => showSoonToast(context, label),
       onMine: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen())),
     ),

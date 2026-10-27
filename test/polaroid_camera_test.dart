@@ -35,6 +35,10 @@ void main() {
       await t.pump();
     }
     expect(find.textContaining('從相簿選照片'), findsOneWidget);
+    await t.tap(find.text('做成拼貼'));
+    await t.pump();
+    expect(find.text('先拍一張，再做成拼貼'), findsOneWidget);
+    await t.pump(const Duration(seconds: 5));
 
     await t.tap(find.text('從相簿'));
     await t.pump();

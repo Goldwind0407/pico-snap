@@ -22,7 +22,7 @@ TextStyle hand(double size, {Color color = ink}) =>
     TextStyle(fontFamily: 'Caveat', fontSize: size, color: color, fontWeight: FontWeight.w600, height: 1.1);
 
 void showSoonToast(BuildContext context, String feature) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-  content: Text('$feature：介面原型，功能之後再接入'),
+  content: Text('$feature：即將推出，敬請期待 ♡'),
   behavior: SnackBarBehavior.floating,
   backgroundColor: ink,
   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -53,3 +53,19 @@ void showMessage(BuildContext context, String text, {bool error = false, double 
   backgroundColor: error ? const Color(0xFFB4483C) : ink,
   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
 ));
+
+/// Asks before leaving a page with unsaved work; true when the user leaves.
+Future<bool> confirmLeave(BuildContext context, String message, {String stay = '繼續編輯'}) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: cream,
+        title: const Text('要離開嗎？', style: TextStyle(fontSize: 18, color: ink, fontWeight: FontWeight.w900)),
+        content: Text(message, style: const TextStyle(color: ink)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(stay, style: const TextStyle(color: ink, fontWeight: FontWeight.w800))),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('離開', style: TextStyle(color: coral, fontWeight: FontWeight.w800))),
+        ],
+      ),
+    ) ==
+    true;
