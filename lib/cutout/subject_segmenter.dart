@@ -53,6 +53,111 @@ class SubjectSegmenter {
     if (fg == null || fg.length != width * height) return null;
     return compute(_pickJob, (fg: fg, w: width, h: height, x: x, y: y));
   }
+
+  /// 照片裡每個主體分開的遮罩（0~255，寬×高），大的在前。
+  /// AI 不能用回 null；可以用但什麼都沒找到回空清單。
+  static Future<List<Uint8List>?> subjects(Uint8List rgba, int width, int height) async {
+    if (_gaveUp) return null;
+    final List<Object?>? raw;
+    try {
+      raw = await _channel.invokeMethod<List<Object?>>('subjects', {
+        'rgba': rgba,
+        'width': width,
+        'height': height,
+      }).timeout(const Duration(seconds: 12));
+    } on TimeoutException catch (e) {
+      _gaveUp = true;
+      debugPrint('[SEGMENT] 主體分割逾時,這次開 App 都改用 GrabCut: $e');
+      return null;
+    } catch (e) {
+      debugPrint('[SEGMENT] 主體分割不能用,改用 GrabCut: $e');
+      return null;
+    }
+    if (raw == null) return null;
+    final parts = [
+      for (final r in raw.cast<Map<Object?, Object?>>())
+        (x: r['x']! as int, y: r['y']! as int, w: r['w']! as int, h: r['h']! as int, mask: r['mask']! as Uint8List),
+    ];
+    return compute(_placeJob, (parts: parts, w: width, h: height));
+  }
+}
+
+List<Uint8List> _placeJob(({List<({int x, int y, int w, int h, Uint8List mask})> parts, int w, int h}) a) =>
+    placeSubjects(a.parts, a.w, a.h);
+
+/// 每個主體的框內遮罩放回整張照片大小；太小的（雜點）丟掉，大的排前面。
+@visibleForTesting
+List<Uint8List> placeSubjects(List<({int x, int y, int w, int h, Uint8List mask})> parts, int w, int h) {
+  final out = <(int, Uint8List)>[];
+  for (final p in parts) {
+    if (p.mask.length != p.w * p.h) continue;
+    final full = Uint8List(w * h);
+    var area = 0;
+    for (var y = 0; y < p.h; y++) {
+      final fy = p.y + y;
+      if (fy < 0 || fy >= h) continue;
+      for (var x = 0; x < p.w; x++) {
+        final fx = p.x + x;
+        if (fx < 0 || fx >= w) continue;
+        final v = p.mask[y * p.w + x];
+        full[fy * w + fx] = v;
+        if (v > 127) area++;
+      }
+    }
+    if (area > w * h * .003) out.add((area, full));
+  }
+  out.sort((a, b) => b.$1.compareTo(a.$1));
+  return [for (final (_, m) in out) m];
+}
+
+/// 一張前景遮罩拆成連在一起的幾塊（手動去背、或 AI 只給整張前景時用）。
+List<Uint8List> splitSubjects(Uint8List fg, int w, int h) {
+  final n = w * h;
+  final id = Int32List(n)..fillRange(0, n, -1);
+  final groups = <List<int>>[];
+  final stack = <int>[];
+  for (var s = 0; s < n; s++) {
+    if (fg[s] < 128 || id[s] >= 0) continue;
+    final c = groups.length;
+    final members = <int>[];
+    id[s] = c;
+    stack.add(s);
+    while (stack.isNotEmpty) {
+      final p = stack.removeLast();
+      members.add(p);
+      final px = p % w, py = p ~/ w;
+      void visit(int q) {
+        if (fg[q] >= 128 && id[q] < 0) {
+          id[q] = c;
+          stack.add(q);
+        }
+      }
+
+      if (px > 0) visit(p - 1);
+      if (px < w - 1) visit(p + 1);
+      if (py > 0) visit(p - w);
+      if (py < h - 1) visit(p + w);
+    }
+    groups.add(members);
+  }
+  groups.sort((a, b) => b.length.compareTo(a.length));
+  final out = <Uint8List>[];
+  for (final g in groups) {
+    if (g.length < n * .003) break;
+    final m = Uint8List(n);
+    for (final i in g) {
+      m[i] = fg[i];
+    }
+    // 邊緣半透明的那一圈（信心不到一半）也留著
+    for (final i in g) {
+      final px = i % w, py = i ~/ w;
+      for (final q in [if (px > 0) i - 1, if (px < w - 1) i + 1, if (py > 0) i - w, if (py < h - 1) i + w]) {
+        if (id[q] < 0 && fg[q] > 0) m[q] = fg[q];
+      }
+    }
+    out.add(m);
+  }
+  return out;
 }
 
 Uint8List? _pickJob(({Uint8List fg, int w, int h, int? x, int? y}) a) =>

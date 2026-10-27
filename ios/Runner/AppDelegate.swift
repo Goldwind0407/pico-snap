@@ -40,7 +40,7 @@ enum SubjectSegmenter {
       name: "picosnap/subject", binaryMessenger: messenger)
     Self.channel = channel
     channel.setMethodCallHandler { call, result in
-      guard call.method == "foreground",
+      guard call.method == "foreground" || call.method == "subjects",
         let args = call.arguments as? [String: Any],
         let rgba = args["rgba"] as? FlutterStandardTypedData,
         let width = args["width"] as? Int,
@@ -50,11 +50,63 @@ enum SubjectSegmenter {
         return
       }
       DispatchQueue.global(qos: .userInitiated).async {
+        if call.method == "subjects" {
+          // 每個主體一張和照片一樣大的遮罩(Dart 那邊當作 x=0,y=0 的整張框)
+          let masks = subjects(rgba: data(rgba), width: width, height: height)
+          DispatchQueue.main.async {
+            result(masks.map { list in
+              list.map { m -> [String: Any] in
+                ["x": 0, "y": 0, "w": width, "h": height, "mask": FlutterStandardTypedData(bytes: m)]
+              }
+            })
+          }
+          return
+        }
         let mask = foreground(rgba: rgba.data, width: width, height: height)
         DispatchQueue.main.async {
           result(mask.map { FlutterStandardTypedData(bytes: $0) })
         }
       }
+    }
+  }
+
+  static func data(_ d: FlutterStandardTypedData) -> Data { d.data }
+
+  static func cgImage(rgba: Data, width: Int, height: Int) -> CGImage? {
+    guard rgba.count == width * height * 4,
+      let provider = CGDataProvider(data: rgba as CFData)
+    else { return nil }
+    return CGImage(
+      width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+      bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+      bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
+      provider: provider, decode: nil, shouldInterpolate: false,
+      intent: .defaultIntent)
+  }
+
+  /// 每個主體分開的遮罩。iOS 17 以上用主體去背的每個實例;iOS 15、16 只有
+  /// 人像分割,整個前景當成一個主體。拿不到回 nil。
+  static func subjects(rgba: Data, width: Int, height: Int) -> [Data]? {
+    guard let image = cgImage(rgba: rgba, width: width, height: height) else { return nil }
+    let handler = VNImageRequestHandler(cgImage: image, options: [:])
+    do {
+      if #available(iOS 17.0, *) {
+        let request = VNGenerateForegroundInstanceMaskRequest()
+        try handler.perform([request])
+        guard let observation = request.results?.first else { return [] }
+        var out: [Data] = []
+        for instance in observation.allInstances {
+          let buffer = try observation.generateScaledMaskForImage(
+            forInstances: IndexSet(integer: instance), from: handler)
+          if let m = resample(buffer, width: width, height: height) { out.append(m) }
+        }
+        return out
+      } else {
+        guard let m = foreground(rgba: rgba, width: width, height: height) else { return [] }
+        return [m]
+      }
+    } catch {
+      return nil
     }
   }
 

@@ -76,7 +76,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600)); // page transition
 
     // 解碼、GrabCut 都在背景跑：等到狀態列說改用了手動去背
-    for (var i = 0; i < 200 && find.textContaining('改用手動去背').evaluate().isEmpty; i++) {
+    for (var i = 0; i < 200 && find.textContaining('AI 這次認不出來').evaluate().isEmpty; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
       await tester.pump();
     }
