@@ -9,6 +9,7 @@ import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'cutout/cutout_page.dart';
+import 'filters.dart';
 import 'models.dart';
 import 'services/photo_save_service.dart';
 import 'services/timelapse_recorder.dart';
@@ -30,7 +31,7 @@ enum _Tool {
   photo(Icons.photo_outlined, '照片');
 
   /// Tools that are only placeholders for now.
-  bool get comingSoon => this == brush || this == filter;
+  bool get comingSoon => this == brush;
 
   final IconData icon;
   final String label;
@@ -56,7 +57,8 @@ class EditorScreen extends StatefulWidget {
   final List<Uint8List> photos;
   final List<String> captions;
   final List<FilmStock> films;
-  const EditorScreen({super.key, this.mode = EditorMode.fourCut, this.template = 0, this.photos = const [], this.captions = const [], this.films = const []});
+  final List<PhotoFilter> filters;
+  const EditorScreen({super.key, this.mode = EditorMode.fourCut, this.template = 0, this.photos = const [], this.captions = const [], this.films = const [], this.filters = const []});
 
   @override
   State<EditorScreen> createState() => _EditorScreenState();
@@ -77,6 +79,8 @@ class _EditorScreenState extends State<EditorScreen> {
   late final List<double?> _aspects = List<double?>.filled(_cells, null);
   /// Polaroid mode: white or black film per print.
   late final List<FilmStock> _films = [for (var i = 0; i < 4; i++) i < widget.films.length ? widget.films[i] : FilmStock.white];
+  /// Filter per photo (photos only; frames and stickers aren't filtered).
+  late final List<PhotoFilter> _filters = [for (var i = 0; i < _cells; i++) i < widget.filters.length ? widget.filters[i] : photoFilters.first];
   /// Sticker mode: the cut-out subject (PNG with a white die-cut border).
   Uint8List? _subject;
   /// While saving: hide hints, selection outlines and sticker handles.
@@ -438,7 +442,7 @@ class _EditorScreenState extends State<EditorScreen> {
     EditorMode.fourCut => FittedBox(child: PhotoStrip(
       template: allStripTemplates[_template], photos: _photos, caption: _stripCaption,
       placeholder: _capturing ? null : const AddPhotoHint(scale: 1.4), selected: _capturing ? null : _selectedCell, onTapCell: _tapCell,
-      fits: _fits, aspects: _aspects, adjusting: _adjusting, onFit: _setFit,
+      fits: _fits, aspects: _aspects, adjusting: _adjusting, onFit: _setFit, filters: _filters,
     )),
     EditorMode.polaroid => _polaroidArtwork(size),
     EditorMode.sticker => _stickerArtwork(),
@@ -478,7 +482,7 @@ class _EditorScreenState extends State<EditorScreen> {
                       _tool = _Tool.text;
                       _textCtrl.text = _polaroidCaptions[i];
                     }),
-                    fit: _fits[i], aspect: _aspects[i], onFit: _adjusting == i ? (f) => _setFit(i, f) : null,
+                    fit: _fits[i], aspect: _aspects[i], onFit: _adjusting == i ? (f) => _setFit(i, f) : null, filter: _filters[i],
                   ),
                 )),
                 Positioned(top: -4, left: i.isOdd ? null : -22, right: i.isOdd ? -22 : null,
@@ -540,7 +544,8 @@ class _EditorScreenState extends State<EditorScreen> {
         _Tool.sticker => _stickerTool(),
         _Tool.cutout => _cutoutTool(),
         _Tool.photo => _photoTool(),
-        _Tool.text || _Tool.brush || _Tool.filter => _textTool(),
+        _Tool.filter => _filterTool(),
+        _Tool.text || _Tool.brush => _textTool(),
       }),
       Container(
         decoration: BoxDecoration(
@@ -713,6 +718,58 @@ class _EditorScreenState extends State<EditorScreen> {
             child: StickerVisual(pack[k]),
           ),
         ),
+      )),
+    ]);
+  }
+
+  void _setFilter(PhotoFilter f, {bool all = false}) => setState(() {
+    for (var i = 0; i < _filters.length; i++) {
+      if (all || i == _selectedCell) _filters[i] = f;
+    }
+    _edited = true;
+  });
+
+  Widget _filterTool() {
+    final cell = _selectedCell.clamp(0, _cells - 1);
+    final ImageProvider image = _photos[cell] ?? _photos.firstWhere((p) => p != null, orElse: () => null) ?? samplePhotos.first;
+    final current = _filters[cell];
+    final allSame = _filters.every((f) => f.id == current.id);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 10, 12, 0),
+        child: Row(children: [
+          Expanded(child: Text(_cells > 1 ? '第 ${cell + 1} 張照片的濾鏡' : '照片濾鏡',
+            style: const TextStyle(fontSize: 13, color: ink, fontWeight: FontWeight.w800))),
+          if (_cells > 1)
+            TextButton(
+              onPressed: allSame ? null : () => _setFilter(current, all: true),
+              style: TextButton.styleFrom(foregroundColor: coral, visualDensity: VisualDensity.compact),
+              child: Text(allSame ? '已套用到全部' : '套用到全部照片', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+            ),
+        ]),
+      ),
+      Expanded(child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+        itemCount: photoFilters.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final f = photoFilters[i];
+          final on = f.id == current.id;
+          return GestureDetector(
+            onTap: () => _setFilter(f),
+            child: Column(children: [
+              Container(
+                width: 64, height: 64,
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: on ? coral : Colors.transparent, width: 2.5)),
+                padding: const EdgeInsets.all(2),
+                child: ClipRRect(borderRadius: BorderRadius.circular(9), child: FilterLayer(filter: f, child: Image(image: image, fit: BoxFit.cover, width: 60, height: 60, gaplessPlayback: true))),
+              ),
+              const SizedBox(height: 4),
+              Text(f.name, style: TextStyle(fontSize: 11, color: on ? ink : muted, fontWeight: on ? FontWeight.w900 : FontWeight.w600)),
+            ]),
+          );
+        },
       )),
     ]);
   }

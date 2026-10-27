@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../filters.dart';
 import '../models.dart';
 import '../theme.dart';
 
@@ -22,7 +23,8 @@ class FittedPhoto extends StatefulWidget {
   /// Width / height of the photo; needed to move it, unknown for assets.
   final double? aspect;
   final ValueChanged<PhotoFit>? onChanged;
-  const FittedPhoto({super.key, required this.image, this.fit = const PhotoFit(), this.aspect, this.onChanged});
+  final PhotoFilter? filter;
+  const FittedPhoto({super.key, required this.image, this.fit = const PhotoFit(), this.aspect, this.onChanged, this.filter});
 
   @override
   State<FittedPhoto> createState() => _FittedPhotoState();
@@ -40,6 +42,8 @@ class _FittedPhotoState extends State<FittedPhoto> {
       alignment: fit.align,
       child: Image(image: widget.image, fit: BoxFit.cover, alignment: fit.align, gaplessPlayback: true, width: c.maxWidth, height: c.maxHeight),
     ));
+    final filter = widget.filter;
+    if (filter != null) photo = SizedBox(width: c.maxWidth, height: c.maxHeight, child: FilterLayer(filter: filter, child: photo));
     final onChanged = widget.onChanged;
     final aspect = widget.aspect;
     if (onChanged == null || aspect == null) return photo;
@@ -78,9 +82,10 @@ class PhotoSlot extends StatelessWidget {
   final PhotoFit fit;
   final double? aspect;
   final ValueChanged<PhotoFit>? onFit;
+  final PhotoFilter? filter;
   const PhotoSlot({
     super.key, this.image, required this.color, this.placeholder, this.selected = false,
-    this.radius = 3, this.outlineWidth = 1.4, this.onTap, this.fit = const PhotoFit(), this.aspect, this.onFit,
+    this.radius = 3, this.outlineWidth = 1.4, this.onTap, this.fit = const PhotoFit(), this.aspect, this.onFit, this.filter,
   });
 
   @override
@@ -95,7 +100,7 @@ class PhotoSlot extends StatelessWidget {
         ? BoxDecoration(borderRadius: BorderRadius.circular(radius), border: Border.all(color: coral, width: 3.5))
         : null,
       child: image != null
-        ? FittedPhoto(image: image!, fit: fit, aspect: aspect, onChanged: onFit)
+        ? FittedPhoto(image: image!, fit: fit, aspect: aspect, onChanged: onFit, filter: filter)
         : Center(child: placeholder ?? const SizedBox.shrink()),
     );
     return onTap == null ? slot : GestureDetector(onTap: onTap, child: slot);
@@ -131,10 +136,11 @@ class PhotoStrip extends StatelessWidget {
   final List<double?> aspects;
   final int? adjusting;
   final void Function(int cell, PhotoFit fit)? onFit;
+  final List<PhotoFilter> filters;
   const PhotoStrip({
     super.key, required this.template, this.photos = const [], this.placeholder,
     this.caption, this.captionWidget, this.selected, this.onTapCell,
-    this.fits = const [], this.aspects = const [], this.adjusting, this.onFit,
+    this.fits = const [], this.aspects = const [], this.adjusting, this.onFit, this.filters = const [],
   });
 
   Widget? _photo(int i) {
@@ -144,6 +150,7 @@ class PhotoStrip extends StatelessWidget {
       fit: i < fits.length ? fits[i] : const PhotoFit(),
       aspect: i < aspects.length ? aspects[i] : null,
       onChanged: adjusting == i && onFit != null ? (f) => onFit!(i, f) : null,
+      filter: i < filters.length ? filters[i] : null,
     );
   }
 

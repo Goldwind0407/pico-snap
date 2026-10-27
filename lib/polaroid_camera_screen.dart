@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 import 'editor_screen.dart';
+import 'filters.dart';
 import 'models.dart';
 import 'services/photo_save_service.dart';
 import 'theme.dart';
@@ -42,15 +43,16 @@ enum _Body {
 
 enum _Stage { aiming, ejecting, developing, done }
 
-const _controlsHeight = 150.0;
+const _controlsHeight = 196.0;
 
 class _Print {
   final Uint8List bytes;
   final ImageProvider image;
   final FilmStock film;
+  final PhotoFilter filter;
   String caption;
   bool saved = false;
-  _Print(this.bytes, this.film, this.caption) : image = MemoryImage(bytes);
+  _Print(this.bytes, this.film, this.filter, this.caption) : image = MemoryImage(bytes);
 }
 
 /// 拍立得相機：取景在鏡頭裡，按下快門後相片從上方的出片口慢慢吐出來，
@@ -109,6 +111,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   final _printKey = GlobalKey();
   _Body _body = _Body.cream;
   FilmStock _film = FilmStock.white;
+  PhotoFilter _filter = photoFilters.first;
 
   @override
   void initState() {
@@ -216,7 +219,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
 
   /// The print comes out of the slot, is taken to the front and develops.
   Future<void> _printOut(Uint8List bytes) async {
-    final print = _Print(bytes, _film, _today());
+    final print = _Print(bytes, _film, _filter, _today());
     setState(() {
       _current = print;
       _stage = _Stage.ejecting;
@@ -303,6 +306,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       photos: [for (final p in last) p.bytes],
       captions: [for (final p in last) p.caption],
       films: [for (final p in last) p.film],
+      filters: [for (final p in last) p.filter],
     )));
   }
 
@@ -390,7 +394,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         child: FittedBox(child: DecoratedBox(
           decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .1 + .15 * l), blurRadius: 8 + 14 * l, offset: Offset(0, 3 + 7 * l))]),
           child: RepaintBoundary(key: _printKey, child: InstantPrint(
-            image: print.image, film: print.film, develop: _develop.value, caption: print.caption,
+            image: print.image, film: print.film, filter: print.filter, develop: _develop.value, caption: print.caption,
             onCaption: _stage == _Stage.done ? _editCaption : null,
           )),
         )),
@@ -400,7 +404,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       left: camLeft, top: camTop, width: cw, height: ch,
       child: IgnorePointer(
         ignoring: _stage != _Stage.aiming,
-        child: Opacity(opacity: 1 - .82 * l, child: _CameraBody(body: _body, lens: _viewfinder(), onShutter: _shoot)),
+        child: Opacity(opacity: 1 - .82 * l, child: _CameraBody(body: _body, lens: ColorFiltered(colorFilter: _filter.colorFilter, child: _viewfinder()), onShutter: _shoot)),
       ),
     );
     // A big viewfinder above the camera, the shape of the print's window, so
@@ -414,7 +418,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       left: (size.width - vw) / 2, top: max(6.0, (camTop - vh) / 2 - 4), width: vw, height: vh,
       child: IgnorePointer(child: Opacity(opacity: finderOpacity, child: _Finder(
         error: _cameraError,
-        child: _camera?.value.isInitialized == true ? _viewfinder() : null,
+        child: _camera?.value.isInitialized == true ? FilterLayer(filter: _filter, child: SizedBox.expand(child: _viewfinder())) : null,
       ))),
     );
     // Behind the camera while it comes out of the slot, in front once taken out.
@@ -440,6 +444,31 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   }
 
   /// Body colour and film stock.
+  /// Filter chips; the viewfinder shows the chosen one live.
+  Widget _filterRow() => SizedBox(height: 32, child: ListView.separated(
+    scrollDirection: Axis.horizontal,
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    itemCount: photoFilters.length,
+    separatorBuilder: (_, __) => const SizedBox(width: 6),
+    itemBuilder: (_, i) {
+      final f = photoFilters[i];
+      final on = f.id == _filter.id;
+      return GestureDetector(
+        onTap: () => setState(() => _filter = f),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: on ? ink : Colors.white, borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: on ? ink : line),
+          ),
+          child: Text(f.name, style: TextStyle(fontSize: 12, color: on ? Colors.white : ink, fontWeight: on ? FontWeight.w900 : FontWeight.w600)),
+        ),
+      );
+    },
+  ));
+
   Widget _options() => SizedBox(height: 34, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
     for (final b in _Body.values)
       GestureDetector(
@@ -490,6 +519,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   Widget _bottom() => switch (_stage) {
     _Stage.aiming => Column(children: [
       _options(),
+      const SizedBox(height: 6),
+      _filterRow(),
       Expanded(child: _controls()),
     ]),
     _Stage.ejecting => const Center(child: Text('出片中…', style: TextStyle(fontSize: 15, color: muted, fontWeight: FontWeight.w800))),
@@ -663,7 +694,7 @@ class _Tray extends StatelessWidget {
           for (final (i, p) in prints.reversed.take(3).toList().reversed.indexed)
             Positioned.fill(child: Transform.rotate(
               angle: (i - 1) * .12,
-              child: FittedBox(child: InstantPrint(image: p.image, film: p.film, caption: '')),
+              child: FittedBox(child: InstantPrint(image: p.image, film: p.film, filter: p.filter, caption: '')),
             )),
         if (prints.isNotEmpty)
           Positioned(right: -6, top: -6, child: Container(

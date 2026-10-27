@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../filters.dart';
 import '../theme.dart';
 import 'frames.dart';
 
@@ -56,9 +57,10 @@ class InstantPrint extends StatelessWidget {
   final PhotoFit fit;
   final double? aspect;
   final ValueChanged<PhotoFit>? onFit;
+  final PhotoFilter? filter;
   const InstantPrint({
     super.key, this.image, this.film = FilmStock.white, this.develop = 1, required this.caption,
-    this.onCaption, this.onTap, this.placeholder, this.selected = false, this.fit = const PhotoFit(), this.aspect, this.onFit,
+    this.onCaption, this.onTap, this.placeholder, this.selected = false, this.fit = const PhotoFit(), this.aspect, this.onFit, this.filter,
   });
 
   @override
@@ -66,7 +68,7 @@ class InstantPrint extends StatelessWidget {
     final w = Rect.fromLTWH(film.window.left * width, film.window.top * height, film.window.width * width, film.window.height * height);
     Widget window = image == null
       ? ColoredBox(color: film == FilmStock.black ? const Color(0xFF2E2E31) : const Color(0xFFF1EDE8), child: Center(child: placeholder))
-      : FittedPhoto(image: image!, fit: fit, aspect: aspect, onChanged: onFit);
+      : FittedPhoto(image: image!, fit: fit, aspect: aspect, onChanged: onFit, filter: filter);
     if (image != null && develop < 1) window = ColorFiltered(colorFilter: developFilter(develop), child: window);
     return SizedBox(width: width, height: height, child: Stack(children: [
       Positioned.fill(child: Image.asset(film.asset, fit: BoxFit.fill, filterQuality: FilterQuality.medium)),
