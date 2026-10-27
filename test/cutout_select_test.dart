@@ -97,10 +97,10 @@ void main() {
       await t.pump();
     }
     expect(find.byIcon(Icons.check_rounded), findsOneWidget);
-    expect(find.text('2'), findsNWidgets(2), reason: '沒選的顯示編號（另一個是步驟 2）');
+    expect(find.text('2'), findsOneWidget, reason: '沒選的顯示編號');
 
-    // 直接到預覽，選「無」白邊再做成貼紙
-    await t.tap(find.text('預覽'));
+    // 外框：選「無」白邊再完成
+    await t.tap(find.text('外框'));
     for (var i = 0; i < 40; i++) {
       await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
       await t.pump();
@@ -110,7 +110,7 @@ void main() {
       await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
       await t.pump();
     }
-    await t.tap(find.text('做成貼紙'));
+    await t.tap(find.text('完成'));
     for (var i = 0; i < 200 && result == null; i++) {
       await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
       await t.pump();
@@ -167,5 +167,42 @@ void main() {
       await t.pump();
     }
     expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+  });
+
+  testWidgets('外框：做成愛心貼紙，大小是正方形', (t) async {
+    t.view.physicalSize = const Size(390, 844);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final photo = (await t.runAsync(_photo))!;
+    Uint8List? result;
+    await t.pumpWidget(MaterialApp(home: Builder(builder: (context) => Scaffold(body: Center(child: ElevatedButton(
+      onPressed: () async => result = await CutoutPage.open(context, photo),
+      child: const Text('open'),
+    ))))));
+    await t.tap(find.text('open'));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 600));
+    for (var i = 0; i < 200 && find.textContaining('AI 這次認不出來').evaluate().isEmpty; i++) {
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+      await t.pump();
+    }
+    await t.tap(find.text('外框'));
+    await t.pump();
+    await t.tap(find.text('愛心'));
+    await t.pump();
+    await t.tap(find.text('無'));
+    await t.pump();
+    await t.tap(find.text('完成'));
+    for (var i = 0; i < 200 && result == null; i++) {
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+      await t.pump();
+    }
+    await t.pump(const Duration(milliseconds: 600));
+    expect(result, isNotNull);
+    final codec = (await t.runAsync(() => ui.instantiateImageCodec(result!)))!;
+    final img = (await t.runAsync(codec.getNextFrame))!.image;
+    // 200 寬的照片 → 200×200 的愛心，裁掉周圍透明後接近正方形
+    expect(img.width, inInclusiveRange(150, 202));
+    expect((img.width - img.height).abs(), lessThan(40));
   });
 }
