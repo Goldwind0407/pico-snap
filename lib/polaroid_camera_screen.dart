@@ -112,6 +112,9 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   _Body _body = _Body.cream;
   FilmStock _film = FilmStock.white;
   PhotoFilter _filter = photoFilters.first;
+  /// The filter row is rebuilt after each shot; it starts where it was left.
+  double _filterOffset = 0;
+  ScrollController? _filterScroll;
 
   @override
   void initState() {
@@ -129,6 +132,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     _develop.dispose();
     _flash.dispose();
     _wiggle.dispose();
+    _filterScroll?.dispose();
     _motion?.cancel();
     super.dispose();
   }
@@ -220,6 +224,10 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   /// The print comes out of the slot, is taken to the front and develops.
   Future<void> _printOut(Uint8List bytes) async {
     final print = _Print(bytes, _film, _filter, _today());
+    // The row goes away while printing; a new controller picks up the offset.
+    final old = _filterScroll;
+    _filterScroll = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) => old?.dispose());
     setState(() {
       _current = print;
       _stage = _Stage.ejecting;
@@ -444,8 +452,18 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   }
 
   /// Body colour and film stock.
+  ScrollController _filterController() {
+    final existing = _filterScroll;
+    if (existing != null) return existing;
+    // keepScrollOffset off: PageStorage would put back a stale offset.
+    final c = ScrollController(initialScrollOffset: _filterOffset, keepScrollOffset: false);
+    c.addListener(() => _filterOffset = c.offset);
+    return _filterScroll = c;
+  }
+
   /// Filter chips; the viewfinder shows the chosen one live.
   Widget _filterRow() => SizedBox(height: 32, child: ListView.separated(
+    controller: _filterController(),
     scrollDirection: Axis.horizontal,
     padding: const EdgeInsets.symmetric(horizontal: 16),
     itemCount: photoFilters.length,

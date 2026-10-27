@@ -125,4 +125,25 @@ void main() {
     await t.pumpAndSettle();
     expect(t.widget<EditorScreen>(find.byType(EditorScreen)).filters.single.id, 'y2k_clear');
   });
+
+  testWidgets('相機：拍完一張回來，濾鏡列停在原本的位置', (t) async {
+    t.view.physicalSize = const Size(390, 844);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final photo = (await t.runAsync(_photo))!;
+    await t.pumpWidget(MaterialApp(home: PolaroidCameraScreen(pickPhoto: () async => photo, motion: const Stream.empty())));
+    await t.pump();
+    final row = find.byWidget(t.widget(find.ancestor(of: find.text('原圖'), matching: find.byType(Scrollable)).first));
+    await t.scrollUntilVisible(find.text('霧面電影'), 200, scrollable: row);
+    await t.tap(find.text('霧面電影'));
+    await t.pump();
+    await t.tap(find.text('從相簿'));
+    await t.pump();
+    await t.pump(const Duration(seconds: 3));
+    await t.tap(find.byType(InstantPrint));
+    await t.pumpAndSettle();
+    await t.tap(find.text('再拍一張'));
+    await t.pumpAndSettle();
+    expect(find.text('霧面電影').hitTestable(), findsOneWidget, reason: '選中的濾鏡還在畫面上');
+  });
 }
