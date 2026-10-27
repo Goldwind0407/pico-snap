@@ -64,27 +64,55 @@ void main() {
     await t.tap(find.text('新增模板'));
     await t.pumpAndSettle();
     expect(find.byType(TemplateMakerScreen), findsOneWidget);
-    for (final label in ['貓掌', '雲朵', '大標題']) {
-      await t.ensureVisible(find.text(label));
-      await t.tap(find.text(label));
+    Future<void> tab(String label) async {
+      await t.tap(find.descendant(of: find.byType(TemplateMakerScreen), matching: find.text(label)).last);
       await t.pumpAndSettle();
     }
+    await tab('圖案');
+    await tab('貓掌');
+    await tab('照片格');
+    await tab('雲朵');
+    await tab('文字');
+    await tab('大標題');
     await t.enterText(find.byType(TextField), 'BEST DAY');
-    final mine = find.byWidgetPredicate((w) => w is StickerVisual && w.sticker == sticker);
-    await t.ensureVisible(mine);
-    await t.tap(mine);
+    await tab('貼紙');
+    await t.ensureVisible(find.text('📷 我的'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('📷 我的'));
+    await t.pumpAndSettle();
+    await t.tap(find.byWidgetPredicate((w) => w is StickerVisual && w.sticker == sticker).last);
+    await t.pumpAndSettle();
+    // 貼紙直接在預覽上：拖一下、翻轉
+    expect(find.byType(StickerItem), findsOneWidget);
+    await t.drag(find.byType(StickerItem), const Offset(20, 30));
+    await t.pumpAndSettle();
+    await t.tap(find.byIcon(Icons.flip_rounded));
     await t.pumpAndSettle();
     await t.tap(find.text('儲存'));
     await t.pumpAndSettle();
 
     expect(customTemplates, hasLength(1));
     final c = customTemplates.single;
-    expect([c.pattern, c.cellShape, c.footer, c.caption, c.stickers], [FramePattern.paws, CellShape.cloud, FooterStyle.title, 'BEST DAY', [sticker]]);
+    expect([c.pattern, c.cellShape, c.footer, c.caption], [FramePattern.paws, CellShape.cloud, FooterStyle.title, 'BEST DAY']);
+    expect(c.stickers.single.sticker, sticker);
+    expect(c.stickers.single.flipped, isTrue);
+    expect(c.template.decos.single.flipped, isTrue, reason: '印在模板上也是翻轉的');
     // 存檔格式來回一次不變
     expect(CustomTemplate.fromJson(c.toJson()).toJson(), c.toJson());
 
     expect(find.byType(TemplateMakerScreen), findsNothing);
     expect(find.byType(PhotoStrip), findsOneWidget);
+
+    // 按 ✎ 修改：改成條紋，存回同一個模板
+    await t.tap(find.byIcon(Icons.edit_outlined));
+    await t.pumpAndSettle();
+    expect(find.text('修改模板'), findsOneWidget);
+    await tab('圖案');
+    await tab('條紋');
+    await t.tap(find.text('儲存'));
+    await t.pumpAndSettle();
+    expect(customTemplates.single.pattern, FramePattern.stripes);
+    expect(customTemplates.single.id, c.id);
     await t.tap(find.byIcon(Icons.close_rounded));
     await t.pumpAndSettle();
     await t.tap(find.text('刪除'));
@@ -110,6 +138,8 @@ void main() {
     // 貼紙：「我的」只能貼，沒有新增、刪除
     await t.tap(find.text('貼紙').last);
     await t.pumpAndSettle();
+    await t.ensureVisible(find.text('📷 我的'));
+    await t.pumpAndSettle();
     await t.tap(find.text('📷 我的'));
     await t.pumpAndSettle();
     expect(find.text('照片去背'), findsNothing);
@@ -123,8 +153,20 @@ void main() {
     await phone(t, const EditorScreen());
     await t.tap(find.text('貼紙').last);
     await t.pumpAndSettle();
+    await t.ensureVisible(find.text('📷 我的'));
+    await t.pumpAndSettle();
     await t.tap(find.text('📷 我的'));
     await t.pumpAndSettle();
     expect(find.textContaining('到首頁的「我的」'), findsOneWidget);
+  });
+
+  test('舊格式的模板（固定位置的貼紙）還讀得到', () {
+    final old = CustomTemplate.fromJson({
+      'id': 'x', 'caption': 'hi', 'frame': 0xFFF9CACB, 'frame2': null,
+      'pattern': 'dots', 'cellShape': 'square', 'footer': 'caption', 'stickers': ['assets/stickers/bunny.png'],
+    });
+    expect(old.stickers.single.sticker, 'assets/stickers/bunny.png');
+    expect((old.template.decos.single.center - const Offset(26, 26)).distance, lessThan(.001));
+    expect(old.template.decos.single.size, closeTo(40, .01));
   });
 }

@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -34,9 +35,9 @@ class Deco {
   final String content;
   final Offset center;
   final double size, angle;
-  final bool bubble;
-  const Deco(this.content, this.center, {this.size = 44, this.angle = 0}) : bubble = false;
-  const Deco.bubble(this.content, this.center, {this.size = 15, this.angle = 0}) : bubble = true;
+  final bool bubble, flipped;
+  const Deco(this.content, this.center, {this.size = 44, this.angle = 0, this.flipped = false}) : bubble = false;
+  const Deco.bubble(this.content, this.center, {this.size = 15, this.angle = 0}) : bubble = true, flipped = false;
 }
 
 /// A finished template illustration (generated with Gemini) whose photo
@@ -253,15 +254,43 @@ class CustomTemplate {
   final FramePattern pattern;
   final CellShape cellShape;
   final FooterStyle footer;
-  /// Up to [decoSpots].length sticker ids printed on the frame.
-  final List<String> stickers;
+  /// Stickers printed on the strip, placed like stickers on a canvas
+  /// ([StickerData.center] normalised over the 200 × 620 strip).
+  final List<StickerData> stickers;
   const CustomTemplate({
     required this.id, this.caption = '', required this.frame, this.frame2, this.pattern = FramePattern.none,
     this.cellShape = CellShape.square, this.footer = FooterStyle.caption, this.stickers = const [],
   });
 
-  /// Where printed stickers go, in PhotoStrip design units, with their tilt.
-  static const decoSpots = [(Offset(26, 26), -.2), (Offset(176, 300), .15), (Offset(24, 470), -.1)];
+  static const _strip = Size(200, 620);
+
+  /// Sticker size at scale 1 on the strip; the same rule StickerItem uses,
+  /// so stickers print exactly as they were placed.
+  static final stickerBase = max(_strip.shortestSide * .2, _strip.longestSide * .12);
+
+  /// Where the old fixed-spot stickers went (templates saved before stickers
+  /// could be placed freely).
+  static const _oldSpots = [(Offset(26, 26), -.2), (Offset(176, 300), .15), (Offset(24, 470), -.1)];
+
+  /// A starting point copied from a built-in drawn template.
+  factory CustomTemplate.from(StripTemplate t) => CustomTemplate(
+    id: '', caption: t.caption, frame: t.frame, frame2: t.frame2, pattern: t.pattern, cellShape: t.cellShape, footer: t.footer,
+    stickers: [
+      for (final d in t.decos)
+        if (!d.bubble)
+          StickerData(
+            sticker: d.content, center: Offset(d.center.dx / _strip.width, d.center.dy / _strip.height),
+            scale: d.size / stickerBase, rotation: d.angle, flipped: d.flipped,
+          ),
+    ],
+  );
+
+  CustomTemplate copyWith({String? id, String? caption, Color? frame, Color? Function()? frame2, FramePattern? pattern,
+      CellShape? cellShape, FooterStyle? footer, List<StickerData>? stickers}) => CustomTemplate(
+    id: id ?? this.id, caption: caption ?? this.caption, frame: frame ?? this.frame,
+    frame2: frame2 == null ? this.frame2 : frame2(), pattern: pattern ?? this.pattern,
+    cellShape: cellShape ?? this.cellShape, footer: footer ?? this.footer, stickers: stickers ?? this.stickers,
+  );
 
   StripTemplate get template {
     final darkTop = frame.computeLuminance() < .4;
@@ -275,15 +304,20 @@ class CustomTemplate {
       patternColor: darkTop ? Colors.white.withValues(alpha: .35) : Color.lerp(frame, Colors.white, .6)!,
       cellShape: cellShape, footer: footer, outline: !darkTop,
       decos: [
-        for (var i = 0; i < stickers.length && i < decoSpots.length; i++)
-          Deco(stickers[i], decoSpots[i].$1, size: 40, angle: decoSpots[i].$2),
+        for (final s in stickers)
+          Deco(s.sticker, Offset(s.center.dx * _strip.width, s.center.dy * _strip.height),
+            size: stickerBase * s.scale, angle: s.rotation, flipped: s.flipped),
       ],
     );
   }
 
   Map<String, Object?> toJson() => {
     'id': id, 'caption': caption, 'frame': frame.toARGB32(), 'frame2': frame2?.toARGB32(),
-    'pattern': pattern.name, 'cellShape': cellShape.name, 'footer': footer.name, 'stickers': stickers,
+    'pattern': pattern.name, 'cellShape': cellShape.name, 'footer': footer.name,
+    'decos': [
+      for (final s in stickers)
+        {'sticker': s.sticker, 'x': s.center.dx, 'y': s.center.dy, 'scale': s.scale, 'rotation': s.rotation, 'flipped': s.flipped},
+    ],
   };
 
   factory CustomTemplate.fromJson(Map<String, Object?> j) => CustomTemplate(
@@ -294,7 +328,23 @@ class CustomTemplate {
     pattern: FramePattern.values.byName(j['pattern']! as String),
     cellShape: CellShape.values.byName(j['cellShape']! as String),
     footer: FooterStyle.values.byName(j['footer']! as String),
-    stickers: [for (final s in j['stickers'] as List? ?? const []) s as String],
+    stickers: j['decos'] is List
+      ? [
+          for (final d in (j['decos']! as List).cast<Map>())
+            StickerData(
+              sticker: d['sticker'] as String, center: Offset((d['x'] as num).toDouble(), (d['y'] as num).toDouble()),
+              scale: (d['scale'] as num).toDouble(), rotation: (d['rotation'] as num).toDouble(), flipped: d['flipped'] == true,
+            ),
+        ]
+      : [
+          // Saved before free placement: a list of sticker ids in fixed spots.
+          for (final (i, s) in (j['stickers'] as List? ?? const []).indexed)
+            if (i < _oldSpots.length)
+              StickerData(
+                sticker: s as String, center: Offset(_oldSpots[i].$1.dx / _strip.width, _oldSpots[i].$1.dy / _strip.height),
+                scale: 40 / stickerBase, rotation: _oldSpots[i].$2,
+              ),
+        ],
   );
 }
 

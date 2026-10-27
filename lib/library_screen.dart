@@ -42,6 +42,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
     builder: (_) => EditorScreen(template: stripTemplates.length + i),
   ));
 
+  void _editTemplate(CustomTemplate t) => Navigator.push(context, MaterialPageRoute(
+    builder: (_) => TemplateMakerScreen(initial: t),
+  ));
+
   Future<void> _deleteTemplate(String id) async {
     if (await confirmDelete(context, '刪除這個模板？', '已經存到相簿的作品不受影響。')) MyLibrary.removeTemplate(id);
   }
@@ -81,7 +85,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       Padding(
         padding: const EdgeInsets.fromLTRB(22, 8, 22, 4),
         child: Text(
-          _tab == 0 ? '把照片去背做成貼紙，編輯作品時在貼紙的「📷 我的」裡使用。' : '設計自己的四格模板，點一下就能直接用，編輯四格拍貼時也能在模板的「我的」裡找到。',
+          _tab == 0 ? '把照片去背做成貼紙，編輯作品時在貼紙的「📷 我的」裡使用。' : '設計自己的四格模板，點一下就能直接用，按 ✎ 可以修改。',
           style: const TextStyle(fontSize: 12, height: 1.4, color: muted, fontWeight: FontWeight.w600),
         ),
       ),
@@ -110,7 +114,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     children: [
       _AddTile(icon: Icons.dashboard_customize_outlined, label: '新增模板', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TemplateMakerScreen()))),
       for (final (i, t) in customTemplates.indexed.toList().reversed)
-        _ItemTile(onDelete: () => _deleteTemplate(t.id), onTap: () => _useTemplate(i), child: Padding(
+        _ItemTile(onDelete: () => _deleteTemplate(t.id), onTap: () => _useTemplate(i), onEdit: () => _editTemplate(t), child: Padding(
           padding: const EdgeInsets.all(10),
           child: FittedBox(child: PhotoStrip(template: t.template, photos: samplePhotos)),
         )),
@@ -144,8 +148,8 @@ class _AddTile extends StatelessWidget {
 class _ItemTile extends StatelessWidget {
   final Widget child;
   final VoidCallback onDelete;
-  final VoidCallback? onTap;
-  const _ItemTile({required this.child, required this.onDelete, this.onTap});
+  final VoidCallback? onTap, onEdit;
+  const _ItemTile({required this.child, required this.onDelete, this.onTap, this.onEdit});
 
   @override
   Widget build(BuildContext context) => Stack(children: [
@@ -156,6 +160,15 @@ class _ItemTile extends StatelessWidget {
         child: Center(child: child),
       ),
     )),
+    if (onEdit != null)
+      Positioned(left: 4, top: 4, child: GestureDetector(
+        onTap: onEdit,
+        child: Container(
+          width: 26, height: 26,
+          decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: line), boxShadow: [BoxShadow(color: ink.withValues(alpha: .15), blurRadius: 3)]),
+          child: const Icon(Icons.edit_outlined, size: 15, color: ink),
+        ),
+      )),
     Positioned(right: 4, top: 4, child: GestureDetector(
       onTap: onDelete,
       child: Container(

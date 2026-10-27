@@ -76,6 +76,14 @@ class MyLibrary {
     _saveTemplates();
   }
 
+  /// Replace the template with the same id (after editing it).
+  static void updateTemplate(CustomTemplate template) {
+    final i = customTemplates.indexWhere((t) => t.id == template.id);
+    if (i < 0) return addTemplate(template);
+    customTemplates[i] = template;
+    _saveTemplates();
+  }
+
   static void removeTemplate(String id) {
     customTemplates.removeWhere((t) => t.id == id);
     _saveTemplates();

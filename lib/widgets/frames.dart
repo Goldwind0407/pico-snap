@@ -186,7 +186,7 @@ class PhotoStrip extends StatelessWidget {
             left: d.center.dx, top: d.center.dy,
             child: FractionalTranslation(translation: const Offset(-.5, -.5), child: IgnorePointer(child: Transform.rotate(
               angle: d.angle,
-              child: d.bubble ? SpeechBubble(d.content, fontSize: d.size * 1.3) : StickerVisual(d.content, size: d.size),
+              child: d.bubble ? SpeechBubble(d.content, fontSize: d.size * 1.3) : Transform.flip(flipX: d.flipped, child: StickerVisual(d.content, size: d.size)),
             ))),
           ),
       ]),
