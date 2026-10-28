@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -116,5 +117,36 @@ void main() {
     }
     await t.pumpAndSettle();
     expect(find.text('存到相簿'), findsOneWidget, reason: '搖完已經顯影好了');
+  });
+
+  group('焦段', () {
+    CameraDescription cam(String name, CameraLensDirection d, [CameraLensType t = CameraLensType.unknown]) =>
+        CameraDescription(name: name, lensDirection: d, sensorOrientation: 90, lensType: t);
+    List<String> labels(List<LensChoice> l) => [for (final c in l) c.label];
+
+    test('iPhone：每顆實體鏡頭各自一個選項，前鏡頭不混進來', () {
+      final cams = [
+        cam('wide', CameraLensDirection.back, CameraLensType.wide),
+        cam('front', CameraLensDirection.front, CameraLensType.wide),
+        cam('tele', CameraLensDirection.back, CameraLensType.telephoto),
+        cam('ultra', CameraLensDirection.back, CameraLensType.ultraWide),
+      ];
+      final l = lensChoices(cams, CameraLensDirection.back);
+      expect(labels(l), ['0.5×', '1×', '長焦']);
+      expect([for (final c in l) c.camera.name], ['ultra', 'wide', 'tele']);
+      expect(l.every((c) => c.zoom == 1), isTrue, reason: '換鏡頭，不是數位放大');
+      expect(mainCamera(cams, CameraLensDirection.back)!.name, 'wide');
+      expect(labels(lensChoices(cams, CameraLensDirection.front)), ['1×']);
+    });
+
+    test('Android：主鏡頭能縮到 1 以下就是超廣角', () {
+      final cams = [cam('0', CameraLensDirection.back), cam('1', CameraLensDirection.front)];
+      final l = lensChoices(cams, CameraLensDirection.back, minZoom: .6);
+      expect(labels(l), ['0.6×', '1×']);
+      expect(l.first.camera.name, '0');
+      expect(l.first.zoom, .6);
+      expect(labels(lensChoices(cams, CameraLensDirection.back)), ['1×'], reason: '沒有超廣角就不顯示');
+      expect(labels(lensChoices(cams, CameraLensDirection.back, minZoom: .5)), ['0.5×', '1×']);
+    });
   });
 }

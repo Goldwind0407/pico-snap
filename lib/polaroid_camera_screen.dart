@@ -10,6 +10,7 @@ import 'package:sensors_plus/sensors_plus.dart';
 
 import 'editor_screen.dart';
 import 'filters.dart';
+import 'live_filter.dart';
 import 'models.dart';
 import 'services/photo_save_service.dart';
 import 'theme.dart';
@@ -76,7 +77,10 @@ class PolaroidCameraScreen extends StatefulWidget {
 class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   CameraController? _camera;
   List<CameraDescription> _cameras = [];
-  int _lens = 0;
+  /// The camera in use, and its zoom (below 1 reaches the ultra-wide lens on
+  /// Android); [_minZoom] is how far out it goes.
+  CameraDescription? _device;
+  double _zoom = 1, _minZoom = 1;
   String? _cameraError;
 
   // Motorised: the print comes out at a steady pace.
@@ -155,14 +159,23 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         if (mounted) setState(() => _cameraError = '這台裝置沒有相機，可以從相簿選照片');
         return;
       }
-      final camera = CameraController(_cameras[_lens % _cameras.length], ResolutionPreset.high, enableAudio: false);
+      final device = _device ??= mainCamera(_cameras, CameraLensDirection.back) ?? _cameras.first;
+      final camera = CameraController(device, ResolutionPreset.high, enableAudio: false);
       await camera.initialize();
+      var minZoom = 1.0;
+      try {
+        minZoom = await camera.getMinZoomLevel();
+        if (_zoom != 1) await camera.setZoomLevel(max(_zoom, minZoom));
+      } catch (e) {
+        debugPrint('[CAMERA] zoom: $e');
+      }
       if (!mounted) {
         camera.dispose();
         return;
       }
       setState(() {
         _camera = camera;
+        _minZoom = minZoom;
         _cameraError = null;
       });
     } on CameraException catch (e) {
@@ -176,15 +189,46 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     }
   }
 
+  bool get _canFlip => mainCamera(_cameras, CameraLensDirection.back) != null && mainCamera(_cameras, CameraLensDirection.front) != null;
+
   Future<void> _flipCamera() async {
-    if (_cameras.length < 2 || _stage != _Stage.aiming) return;
+    if (!_canFlip || _stage != _Stage.aiming) return;
+    final back = _device?.lensDirection != CameraLensDirection.front;
+    await _switchTo(mainCamera(_cameras, back ? CameraLensDirection.front : CameraLensDirection.back)!);
+  }
+
+  Future<void> _switchTo(CameraDescription device, [double zoom = 1]) async {
     final old = _camera;
     setState(() {
       _camera = null;
-      _lens++;
+      _device = device;
+      _zoom = zoom;
+      _minZoom = 1;
     });
     await old?.dispose();
     await _openCamera();
+  }
+
+  /// The lenses to choose from for the way the camera is facing.
+  List<LensChoice> get _lenses {
+    final device = _device;
+    return device == null ? const [] : lensChoices(_cameras, device.lensDirection, minZoom: _minZoom);
+  }
+
+  Future<void> _pickLens(LensChoice lens) async {
+    if (_stage != _Stage.aiming) return;
+    HapticFeedback.selectionClick();
+    final camera = _camera;
+    if (lens.camera == _device && camera != null) {
+      setState(() => _zoom = lens.zoom);
+      try {
+        await camera.setZoomLevel(lens.zoom);
+      } catch (e) {
+        debugPrint('[CAMERA] zoom: $e');
+      }
+      return;
+    }
+    await _switchTo(lens.camera, lens.zoom);
   }
 
   Future<void> _shoot() async {
@@ -359,7 +403,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     child: Row(children: [
       IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
       const Expanded(child: Text('Instant Camera', style: TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
-      if (_cameras.length > 1)
+      if (_canFlip)
         IconButton(onPressed: _stage == _Stage.aiming ? _flipCamera : null, icon: const Icon(Icons.cameraswitch_outlined), color: ink, disabledColor: line),
     ]),
   );
@@ -429,9 +473,19 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         child: _camera?.value.isInitialized == true ? FilterLayer(filter: _filter, child: SizedBox.expand(child: _viewfinder())) : null,
       ))),
     );
+    final lenses = _lenses;
+    final lensRow = finder == null || lenses.length < 2 || _camera == null ? null : Positioned(
+      left: (size.width - vw) / 2, width: vw, top: max(6.0, (camTop - vh) / 2 - 4) + vh - 44, height: 34,
+      child: Opacity(opacity: finderOpacity, child: Center(child: _LensPicker(
+        lenses: lenses,
+        selected: lenses.indexWhere((l) => l.camera == _device && (l.zoom - _zoom).abs() < .01),
+        onPick: _stage == _Stage.aiming ? _pickLens : null,
+      ))),
+    );
     // Behind the camera while it comes out of the slot, in front once taken out.
     return Stack(clipBehavior: Clip.none, children: [
       if (finder != null) finder,
+      if (lensRow != null) lensRow,
       if (printView != null && l < .5) printView,
       camera,
       if (printView != null && l >= .5) printView,
@@ -570,6 +624,65 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
 
 /// The instant camera photo with the live picture in its lens, our own name
 /// where the maker's logo was, and a working shutter.
+/// A focal length to shoot at: its own lens (iOS lists each one as a
+/// camera), or the main camera zoomed (Android reaches its ultra-wide by
+/// zooming below 1×). Never a digital crop.
+typedef LensChoice = ({String label, CameraDescription camera, double zoom});
+
+/// The main camera facing [facing]: the standard wide lens.
+CameraDescription? mainCamera(List<CameraDescription> cameras, CameraLensDirection facing) {
+  final mine = cameras.where((c) => c.lensDirection == facing);
+  return mine.where((c) => c.lensType == CameraLensType.wide).firstOrNull ??
+      mine.where((c) => c.lensType != CameraLensType.ultraWide && c.lensType != CameraLensType.telephoto).firstOrNull ??
+      mine.firstOrNull;
+}
+
+/// The lenses to offer for [facing], widest first. [minZoom] is the main
+/// camera's: below 1 it has an ultra-wide behind it.
+List<LensChoice> lensChoices(List<CameraDescription> cameras, CameraLensDirection facing, {double minZoom = 1}) {
+  final main = mainCamera(cameras, facing);
+  if (main == null) return const [];
+  CameraDescription? of(CameraLensType t) => cameras.where((c) => c.lensDirection == facing && c.lensType == t).firstOrNull;
+  final ultra = of(CameraLensType.ultraWide), tele = of(CameraLensType.telephoto);
+  String x(double z) => '${(z * 10).round() / 10}'.replaceAll(RegExp(r'\.0$'), '');
+  return [
+    if (ultra != null) (label: '0.5×', camera: ultra, zoom: 1.0)
+    else if (minZoom < .95) (label: '${x(minZoom)}×', camera: main, zoom: minZoom),
+    (label: '1×', camera: main, zoom: 1.0),
+    if (tele != null) (label: '長焦', camera: tele, zoom: 1.0),
+  ];
+}
+
+/// Focal lengths as a pill over the viewfinder, like a phone camera.
+class _LensPicker extends StatelessWidget {
+  final List<LensChoice> lenses;
+  final int selected;
+  final ValueChanged<LensChoice>? onPick;
+  const _LensPicker({required this.lenses, required this.selected, required this.onPick});
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(color: Colors.black.withValues(alpha: .35), borderRadius: BorderRadius.circular(20)),
+    child: Padding(
+      padding: const EdgeInsets.all(3),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        for (var i = 0; i < lenses.length; i++)
+          GestureDetector(
+            onTap: onPick == null ? null : () => onPick!(lenses[i]),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: i == selected ? Colors.white : Colors.transparent, borderRadius: BorderRadius.circular(14)),
+              child: Text(lenses[i].label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: i == selected ? ink : Colors.white)),
+            ),
+          ),
+      ]),
+    ),
+  );
+}
+
 class _CameraBody extends StatelessWidget {
   final _Body body;
   final Widget lens;

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/color_grade.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/filters.dart';
+import 'package:pico_snap/live_filter.dart';
 import 'package:pico_snap/models.dart';
 import 'package:pico_snap/polaroid_camera_screen.dart';
 import 'package:pico_snap/widgets/instant_print.dart';
@@ -200,5 +201,24 @@ void main() {
       expect(out[(32 * w + 27) * 4], greaterThan(40), reason: '亮點邊緣往外柔開');
       expect(out[(32 * w + 32) * 4], greaterThan(200), reason: '亮點本身還是亮的');
     });
+  });
+
+  test('即時取景的 LUT 貼圖：x = 藍 × 33 + 紅，y = 綠', () {
+    final f = filterById('teal_orange');
+    const n = 33;
+    final px = FilmShader.lutPixels(f.lut, n);
+    expect(px.length, n * n * n * 4);
+    for (final (r, g, b) in [(0, 0, 0), (32, 0, 0), (0, 32, 0), (0, 0, 32), (5, 17, 29), (32, 32, 32)]) {
+      final o = (g * n * n + b * n + r) * 4, s = ((r * n + g) * n + b) * 3;
+      for (var k = 0; k < 3; k++) {
+        expect(px[o + k], (f.lut[s + k] * 255).round().clamp(0, 255), reason: '($r,$g,$b)');
+      }
+    }
+  });
+
+  testWidgets('即時取景：沒有 GPU 濾鏡時退回顏色矩陣，不會壞掉', (t) async {
+    await t.pumpWidget(MaterialApp(home: FilterLayer(filter: filterById('night_cine'), child: const SizedBox.expand(child: ColoredBox(color: Colors.white)))));
+    await t.pump();
+    expect(find.byType(ColorFiltered), findsOneWidget);
   });
 }

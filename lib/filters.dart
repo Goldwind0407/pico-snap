@@ -293,19 +293,6 @@ class FilterEffects extends StatelessWidget {
   }
 }
 
-/// A live picture (the camera viewfinder) with [filter] approximated by a
-/// colour matrix, plus its film effects.
-class FilterLayer extends StatelessWidget {
-  final PhotoFilter filter;
-  final Widget child;
-  const FilterLayer({super.key, required this.filter, required this.child});
-
-  @override
-  Widget build(BuildContext context) => filter.isNone
-      ? child
-      : FilterEffects(filter: filter, grainBaked: false, child: ColorFiltered(colorFilter: filter.previewFilter, child: child));
-}
-
 class _GrainPainter extends CustomPainter {
   final double amount;
   const _GrainPainter(this.amount);
