@@ -52,19 +52,8 @@ class PhotoFilter {
   ColorFilter get previewFilter => ColorFilter.matrix(matrix);
 }
 
-const _skin = Hsl(sat: -.18, lum: .22);
-
 final photoFilters = <PhotoFilter>[
   const PhotoFilter._('none', '原圖', Grade.none),
-  // Korean photo-booth cream peach: bright rosy-white skin, creamy warm-pink
-  // midtones, soft lifted shadows, dreamy peach glow.
-  const PhotoFilter._('peach_cream', '奶油蜜桃', Grade(
-    exposure: .16, temp: .12, tint: .28, contrast: -.08, shadows: .28, highlights: -.2, saturation: .94, vibrance: .18,
-    curve: [(0, .08), (.5, .56), (1, .98)],
-    red: [(0, .06), (.5, .55), (1, 1)], blue: [(0, .05), (.5, .51), (1, .95)],
-    hsl: {Hue.red: Hsl(hue: 6, sat: .08, lum: .16), Hue.orange: Hsl(hue: -6, sat: -.15, lum: .24), Hue.yellow: Hsl(sat: -.3, lum: .15), Hue.green: Hsl(hue: 15, sat: -.35)},
-    shadowTone: (.03, -.01, .02), midTone: (.04, .01, .02), highlightTone: (.05, .02, .03),
-  ), haze: .1, soften: .55, halation: .45, halationColor: (1, .68, .65)),
   // Japanese Fujifilm Pro 400H / Aqua: airy cyan skies, emerald-mint foliage,
   // clean luminous skin, cool-green shadows and warm highlights.
   const PhotoFilter._('fuji_clear', '日系富士', Grade(
@@ -115,23 +104,6 @@ final photoFilters = <PhotoFilter>[
     hsl: {Hue.orange: Hsl(sat: -.18, lum: .16), Hue.yellow: Hsl(sat: -.45), Hue.green: Hsl(hue: 20, sat: -.5), Hue.blue: Hsl(hue: -12, sat: -.15)},
     shadowTone: (-.03, .01, .06), midTone: (-.02, 0, .03), highlightTone: (-.02, .01, .04),
   ), grain: .25, soften: .45),
-  // Vintage 70s caramel brown: rich amber-mocha tones, faded chocolate blacks,
-  // autumn foliage, warm vignette.
-  const PhotoFilter._('vintage_brown', '復古棕', Grade(
-    temp: .52, tint: .14, contrast: .15, saturation: .76,
-    curve: [(0, .11), (.5, .52), (1, .89)],
-    red: [(0, .07), (.5, .56), (1, .98)], green: [(0, .05), (.5, .5), (1, .91)], blue: [(0, .07), (.5, .43), (1, .8)],
-    hsl: {Hue.green: Hsl(hue: -32, sat: -.45), Hue.blue: Hsl(sat: -.45), Hue.orange: Hsl(sat: .05, lum: .08)},
-    shadowTone: (.04, .01, -.03), midTone: (.05, .02, -.04), highlightTone: (.07, .03, -.06),
-  ), grain: .38, vignette: .28, soften: .5, halation: .35),
-  // K-pop cool-clear porcelain: bright translucent skin, crisp cyan-blue
-  // accents, clean highlights without yellow cast.
-  const PhotoFilter._('y2k_clear', '千禧通透', Grade(
-    exposure: .14, temp: -.22, contrast: .18, highlights: -.28, saturation: 1.05,
-    curve: [(0, .02), (.5, .57), (1, 1)],
-    hsl: {Hue.red: Hsl(sat: -.1, lum: .14), Hue.orange: _skin, Hue.yellow: Hsl(sat: -.3, lum: .15), Hue.green: Hsl(hue: 25, sat: -.1), Hue.aqua: Hsl(sat: .28), Hue.blue: Hsl(hue: -14, sat: .2)},
-    shadowTone: (-.02, .01, .04), highlightTone: (-.01, .01, .03),
-  ), grain: .22, soften: .25),
   // Direct cool flash: high-contrast sapphire shadows, porcelain-white skin,
   // strong central flash and dark party corners.
   const PhotoFilter._('flash_blue', '冷豔閃光', Grade(
@@ -154,15 +126,6 @@ final photoFilters = <PhotoFilter>[
     hsl: {Hue.orange: Hsl(sat: -.14, lum: .18), Hue.magenta: Hsl(sat: .2, lum: .08), Hue.purple: Hsl(sat: .18), Hue.green: Hsl(hue: -15, sat: -.4)},
     shadowTone: (.03, -.02, .05), midTone: (.04, -.01, .03), highlightTone: (.06, 0, .05),
   ), haze: .16, grain: .15, soften: .58, halation: .42, halationColor: (1, .52, .68)),
-  // Sunset golden-rose wine: glowing amber-coral highlights, dusky plum-violet
-  // shadows, lush golden-hour halation.
-  const PhotoFilter._('sunset_glow', '落日微醺', Grade(
-    exposure: .08, temp: .38, tint: .32, contrast: .2, shadows: .15, highlights: -.22, saturation: 1.1,
-    curve: [(0, .06), (.3, .28), (.72, .8), (1, .97)],
-    red: [(0, .06), (.5, .57), (1, 1)], blue: [(0, .1), (.5, .47), (1, .88)],
-    hsl: {Hue.red: Hsl(sat: .12, lum: .08), Hue.orange: Hsl(hue: -6, sat: -.06, lum: .14), Hue.yellow: Hsl(hue: -18, sat: .15), Hue.blue: Hsl(hue: 18, sat: .15, lum: -.1)},
-    shadowTone: (.04, -.03, .07), midTone: (.06, .01, -.02), highlightTone: (.09, .03, -.05),
-  ), haze: .08, vignette: .25, grain: .24, soften: .42, halation: .65, halationColor: (1, .45, .22)),
   // 1998 disposable: hard contrast, cross-processed channels, warm-red film
   // burn light leak, retro date stamp.
   const PhotoFilter._('leak', '漏光老照片', Grade(

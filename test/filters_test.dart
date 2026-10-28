@@ -47,15 +47,15 @@ void main() {
   });
 
   test('褪色感：黑色點被拉起來，純黑變成帶灰', () {
-    for (final id in ['cool_grey', 'matte', 'warm_film', 'vintage_brown']) {
+    for (final id in ['cool_grey', 'matte', 'warm_film']) {
       final black = _apply(filterById(id), [0, 0, 0]);
       expect(black.reduce((a, b) => a < b ? a : b), greaterThan(10), reason: id);
     }
   });
 
-  test('膚色通透：奶油蜜桃、日系富士、千禧通透、清透野餐的膚色變亮、不更黃', () {
+  test('膚色通透：日系富士、清透野餐、冷豔閃光的膚色變亮、不更黃', () {
     const skin = [224, 172, 140];
-    for (final id in ['peach_cream', 'fuji_clear', 'y2k_clear', 'picnic', 'flash_blue']) {
+    for (final id in ['fuji_clear', 'picnic', 'flash_blue']) {
       final out = _apply(filterById(id), skin);
       final l0 = skin[0] + skin[1] + skin[2], l1 = out[0] + out[1] + out[2];
       expect(l1, greaterThan(l0), reason: '$id 變亮');
@@ -94,6 +94,8 @@ void main() {
     await t.tap(find.text('濾鏡'));
     await t.pumpAndSettle();
     await t.scrollUntilVisible(find.text('漏光老照片'), 200, scrollable: find.byWidget(t.widget(find.ancestor(of: find.text('原圖'), matching: find.byType(Scrollable)).first)));
+    await t.ensureVisible(find.text('漏光老照片'));
+    await t.pumpAndSettle();
     await t.tap(find.text('漏光老照片'));
     await t.pumpAndSettle();
     List<String?> ids() => [for (final e in find.byType(InstantPrint).evaluate()) (e.widget as InstantPrint).filter?.id];
@@ -111,20 +113,20 @@ void main() {
     final photo = (await t.runAsync(_photo))!;
     await t.pumpWidget(MaterialApp(home: PolaroidCameraScreen(pickPhoto: () async => photo, motion: const Stream.empty())));
     await t.pump();
-    await t.scrollUntilVisible(find.text('千禧通透'), 200, scrollable: find.byWidget(t.widget(find.ancestor(of: find.text('原圖'), matching: find.byType(Scrollable)).first)));
-    await t.tap(find.text('千禧通透'));
+    await t.scrollUntilVisible(find.text('日系富士'), 200, scrollable: find.byWidget(t.widget(find.ancestor(of: find.text('原圖'), matching: find.byType(Scrollable)).first)));
+    await t.tap(find.text('日系富士'));
     await t.pump();
     await t.tap(find.text('從相簿'));
     await t.pump();
     await t.pump(const Duration(seconds: 3));
-    expect(t.widget<InstantPrint>(find.byType(InstantPrint)).filter?.id, 'y2k_clear');
+    expect(t.widget<InstantPrint>(find.byType(InstantPrint)).filter?.id, 'fuji_clear');
     await t.tap(find.byType(InstantPrint));
     await t.pumpAndSettle();
     await t.tap(find.text('再拍一張'));
     await t.pumpAndSettle();
     await t.tap(find.text('做成拼貼'));
     await t.pumpAndSettle();
-    expect(t.widget<EditorScreen>(find.byType(EditorScreen)).filters.single.id, 'y2k_clear');
+    expect(t.widget<EditorScreen>(find.byType(EditorScreen)).filters.single.id, 'fuji_clear');
   });
 
   testWidgets('相機：拍完一張回來，濾鏡列停在原本的位置', (t) async {
