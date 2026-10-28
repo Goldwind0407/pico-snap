@@ -24,18 +24,24 @@ import kotlin.math.roundToInt
  */
 object SubjectSegmenterChannel {
     fun register(messenger: BinaryMessenger, context: Context) {
-        val foreground = SubjectSegmentation.getClient(
-            SubjectSegmenterOptions.Builder()
-                .enableForegroundConfidenceMask()
-                .build()
-        )
-        val subjects = SubjectSegmentation.getClient(
-            SubjectSegmenterOptions.Builder()
-                .enableMultipleSubjects(
-                    SubjectSegmenterOptions.SubjectResultOptions.Builder().enableConfidenceMask().build()
-                )
-                .build()
-        )
+        // 第一次去背才建立：建立時 Play 服務就會載入模型，模型壞掉（模擬器上遇過）
+        // 會讓整個 App 在開啟時就閃退，延後的話至少只影響去背。
+        val foreground by lazy {
+            SubjectSegmentation.getClient(
+                SubjectSegmenterOptions.Builder()
+                    .enableForegroundConfidenceMask()
+                    .build()
+            )
+        }
+        val subjects by lazy {
+            SubjectSegmentation.getClient(
+                SubjectSegmenterOptions.Builder()
+                    .enableMultipleSubjects(
+                        SubjectSegmenterOptions.SubjectResultOptions.Builder().enableConfidenceMask().build()
+                    )
+                    .build()
+            )
+        }
         MethodChannel(messenger, "picosnap/subject").setMethodCallHandler { call, result ->
             if (call.method != "foreground" && call.method != "subjects") {
                 result.notImplemented()
