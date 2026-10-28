@@ -17,14 +17,18 @@ import 'services/timelapse_recorder.dart';
 import 'theme.dart';
 import 'widgets/frames.dart';
 
-/// Width / height of photo window [i] of [t].
-double cellAspect(StripTemplate t, int i) {
+/// Photo window [i] of [t], in PhotoStrip design units.
+Rect cellRect(StripTemplate t, int i) {
   final art = t.art;
-  // Drawn strips: 200 wide with 12 padding each side, cells 128 high.
-  if (art == null) return 176 / 128;
+  // Drawn strips: 200 wide, 12 padding each side, cells 128 high, 10 apart,
+  // starting 14 from the top.
+  if (art == null) return Rect.fromLTWH(12, 14 + i * 138.0, 176, 128);
   final s = t.designSize, r = art.cells[i];
-  return r.width * s.width / (r.height * s.height);
+  return Rect.fromLTWH(r.left * s.width, r.top * s.height, r.width * s.width, r.height * s.height);
 }
+
+/// Width / height of photo window [i] of [t].
+double cellAspect(StripTemplate t, int i) => cellRect(t, i).size.aspectRatio;
 
 /// How many photos [t] takes.
 int shotCount(StripTemplate t) => t.art?.cells.length ?? 4;
@@ -539,21 +543,19 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
 
   // Steps 2–4: the countdown and the photos one by one.
   Widget _shootingView() {
-    final i = min(_takes.length, _shots - 1);
     final frozen = _frozen;
+    // While the photo just taken is held, stay on its window.
+    final i = frozen != null ? _takes.length - 1 : min(_takes.length, _shots - 1);
     return Column(children: [
       _topBar('第 ${i + 1} / $_shots 張', actions: [
         if (_canFlip && widget.shoot == null)
           IconButton(onPressed: _flipCamera, icon: const Icon(Icons.cameraswitch_outlined), color: ink),
       ]),
       Expanded(child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Center(child: AspectRatio(aspectRatio: cellAspect(_t, i), child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(fit: StackFit.expand, children: [
-            RepaintBoundary(key: _finderKey, child: _preview()),
-            if (frozen != null) Transform.flip(flipX: frozen.mirror, child: Image.memory(frozen.bytes, fit: BoxFit.cover, gaplessPlayback: true)),
-            if (_count != null) Center(child: AnimatedBuilder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Center(child: Stack(alignment: Alignment.center, children: [
+            _framedFinder(i, live: frozen == null),
+            if (_count != null) AnimatedBuilder(
               animation: _pop,
               builder: (context, _) {
                 final t = Curves.easeOutBack.transform(_pop.value.clamp(0.0, 1.0));
@@ -562,9 +564,8 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
                   shadows: [Shadow(color: ink.withValues(alpha: .45), blurRadius: 16)],
                 )));
               },
-            )),
-          ]),
-        ))),
+            ),
+        ])),
       )),
       SizedBox(height: 74, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         for (var k = 0; k < _shots; k++)
@@ -593,6 +594,39 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
       if (_cameraError != null)
         Padding(padding: const EdgeInsets.only(bottom: 16), child: OutlinedButton(onPressed: _fromAlbum, child: const Text('從相簿選照片'))),
     ]);
+  }
+
+  /// The template zoomed in on window [i]: the camera ([live]) or the photo
+  /// just taken in it, the frame's drawings on and around it, the photos
+  /// already taken in the others. So you can pose with the decorations.
+  Widget _framedFinder(int i, {required bool live}) {
+    final design = _t.designSize, cell = cellRect(_t, i);
+    final m = cell.shortestSide * .18;
+    final view = Rect.fromLTRB(
+      max(0, cell.left - m), max(0, cell.top - m), min(design.width, cell.right + m), min(design.height, cell.bottom + m),
+    );
+    Widget still(({Uint8List bytes, bool mirror}) p) => SizedBox.expand(child: Transform.flip(
+      flipX: p.mirror,
+      child: Image.memory(p.bytes, fit: BoxFit.cover, gaplessPlayback: true, cacheWidth: 900),
+    ));
+    final cells = <int, Widget>{
+      for (var k = 0; k < _takes.length; k++) k: still(_takes[k]),
+      if (live) i: SizedBox.expand(child: RepaintBoundary(key: _finderKey, child: _preview())),
+    };
+    return AspectRatio(
+      aspectRatio: view.size.aspectRatio,
+      child: DecoratedBox(
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), boxShadow: [BoxShadow(color: ink.withValues(alpha: .14), blurRadius: 16, offset: const Offset(0, 6))]),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: FittedBox(child: SizedBox.fromSize(size: view.size, child: ClipRect(child: OverflowBox(
+            alignment: Alignment.topLeft,
+            minWidth: design.width, maxWidth: design.width, minHeight: design.height, maxHeight: design.height,
+            child: Transform.translate(offset: -view.topLeft, child: PhotoStrip(template: _t, live: cells)),
+          )))),
+        ),
+      ),
+    );
   }
 
   Widget _preview() {

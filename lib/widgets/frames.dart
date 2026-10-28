@@ -137,13 +137,17 @@ class PhotoStrip extends StatelessWidget {
   final int? adjusting;
   final void Function(int cell, PhotoFit fit)? onFit;
   final List<PhotoFilter> filters;
+  /// Widgets shown in place of a photo, by cell, e.g. the live camera while
+  /// shooting.
+  final Map<int, Widget> live;
   const PhotoStrip({
     super.key, required this.template, this.photos = const [], this.placeholder,
     this.caption, this.captionWidget, this.selected, this.onTapCell,
-    this.fits = const [], this.aspects = const [], this.adjusting, this.onFit, this.filters = const [],
+    this.fits = const [], this.aspects = const [], this.adjusting, this.onFit, this.filters = const [], this.live = const {},
   });
 
   Widget? _photo(int i) {
+    if (live[i] case final w?) return w;
     if (i >= photos.length || photos[i] == null) return null;
     return FittedPhoto(
       image: photos[i]!,
