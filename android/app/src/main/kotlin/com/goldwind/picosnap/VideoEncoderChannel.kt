@@ -58,7 +58,12 @@ object VideoEncoderChannel {
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
         }
         val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-        val muxer = MediaMuxer(out, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        val muxer = try {
+            MediaMuxer(out, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        } catch (e: Exception) {
+            codec.release() // 輸出檔開不了：編碼器也要還
+            throw e
+        }
         var track = -1
         val info = MediaCodec.BufferInfo()
 
@@ -111,6 +116,9 @@ object VideoEncoderChannel {
                     val bitmap = if (decoded.width == w && decoded.height == h) decoded
                         else Bitmap.createScaledBitmap(decoded, w, h, true)
                     bitmap.getPixels(argb, 0, w, 0, 0, w, h)
+                    // 幾百張畫格：用完馬上還記憶體，不等垃圾回收
+                    if (bitmap !== decoded) bitmap.recycle()
+                    decoded.recycle()
                     loaded = path
                 }
                 val index = nextInput()
@@ -121,10 +129,12 @@ object VideoEncoderChannel {
             codec.queueInputBuffer(nextInput(), 0, 0, frames.size * 1_000_000L / fps, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
             drain(true)
         } finally {
-            codec.stop()
-            codec.release()
-            if (track >= 0) muxer.stop()
-            muxer.release()
+            // 每一步各自收拾：前一步出錯（例如編碼失敗時 stop 也會丟例外）
+            // 不能讓後面的 release 被跳過，也不能蓋掉原本的錯誤
+            runCatching { codec.stop() }
+            runCatching { codec.release() }
+            if (track >= 0) runCatching { muxer.stop() }
+            runCatching { muxer.release() }
         }
     }
 
@@ -146,10 +156,19 @@ object VideoEncoderChannel {
         val vBuf = vPlane.buffer
         for (row in 0 until h / 2) {
             for (col in 0 until w / 2) {
-                val c = argb[(row * 2) * w + col * 2]
-                val r = (c shr 16) and 0xFF
-                val g = (c shr 8) and 0xFF
-                val b = c and 0xFF
+                // 色度取 2×2 的平均，細小的彩色貼紙、文字邊緣才不會鋸齒、跑色
+                var r = 0
+                var g = 0
+                var b = 0
+                for (k in 0 until 4) {
+                    val c = argb[(row * 2 + k / 2) * w + col * 2 + k % 2]
+                    r += (c shr 16) and 0xFF
+                    g += (c shr 8) and 0xFF
+                    b += c and 0xFF
+                }
+                r = (r + 2) shr 2
+                g = (g + 2) shr 2
+                b = (b + 2) shr 2
                 uBuf.put(row * uPlane.rowStride + col * uPlane.pixelStride, (((-38 * r - 74 * g + 112 * b + 128) shr 8) + 128).toByte())
                 vBuf.put(row * vPlane.rowStride + col * vPlane.pixelStride, (((112 * r - 94 * g - 18 * b + 128) shr 8) + 128).toByte())
             }

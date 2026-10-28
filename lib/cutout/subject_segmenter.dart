@@ -20,9 +20,19 @@ class SubjectSegmenter {
 
   static const _channel = MethodChannel('picosnap/subject');
 
-  /// 逾時過一次(模型卡住、沒有 Google Play 服務)就不再試:不然每次長按
-  /// 都要先空等十幾秒才退回 GrabCut。重開 App 會再試。
-  static bool _gaveUp = false;
+  /// 逾時過一次(模型卡住、還在下載、沒有 Google Play 服務)就先停一陣子:
+  /// 不然每次都要先空等十幾秒才退回 GrabCut。之後再自己試一次,模型可能
+  /// 已經下載好了;又逾時就停更久(最多 30 分鐘)。
+  static DateTime _pausedUntil = DateTime(0);
+  static var _pause = const Duration(minutes: 2);
+
+  static bool get _paused => DateTime.now().isBefore(_pausedUntil);
+
+  static void _timedOut(Object e) {
+    _pausedUntil = DateTime.now().add(_pause);
+    debugPrint('[SEGMENT] 主體分割逾時,${_pause.inMinutes} 分鐘內改用 GrabCut: $e');
+    _pause = Duration(minutes: (_pause.inMinutes * 2).clamp(2, 30));
+  }
 
   /// 前景遮罩(0~255,寬×高),只留長按的 ([x], [y]) 那一塊;沒給位置的話
   /// 留下所有夠大的前景。
@@ -33,7 +43,7 @@ class SubjectSegmenter {
     int? x,
     int? y,
   }) async {
-    if (_gaveUp) return null;
+    if (_paused) return null;
     final Uint8List? fg;
     try {
       fg = await _channel.invokeMethod<Uint8List>('foreground', {
@@ -42,8 +52,7 @@ class SubjectSegmenter {
         'height': height,
       }).timeout(const Duration(seconds: 12));
     } on TimeoutException catch (e) {
-      _gaveUp = true;
-      debugPrint('[SEGMENT] 主體分割逾時,這次開 App 都改用 GrabCut: $e');
+      _timedOut(e);
       return null;
     } catch (e) {
       // 沒有原生實作(測試、桌機)、模型還沒下載好
@@ -57,7 +66,7 @@ class SubjectSegmenter {
   /// 照片裡每個主體分開的遮罩（0~255，寬×高），大的在前。
   /// AI 不能用回 null；可以用但什麼都沒找到回空清單。
   static Future<List<Uint8List>?> subjects(Uint8List rgba, int width, int height) async {
-    if (_gaveUp) return null;
+    if (_paused) return null;
     final List<Object?>? raw;
     try {
       raw = await _channel.invokeMethod<List<Object?>>('subjects', {
@@ -66,8 +75,7 @@ class SubjectSegmenter {
         'height': height,
       }).timeout(const Duration(seconds: 12));
     } on TimeoutException catch (e) {
-      _gaveUp = true;
-      debugPrint('[SEGMENT] 主體分割逾時,這次開 App 都改用 GrabCut: $e');
+      _timedOut(e);
       return null;
     } catch (e) {
       debugPrint('[SEGMENT] 主體分割不能用,改用 GrabCut: $e');

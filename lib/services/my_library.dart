@@ -95,12 +95,21 @@ class MyLibrary {
     _write(() => File('${_dir!.path}/templates.json').writeAsString(json));
   }
 
-  static Future<void> _write(Future<void> Function() op) async {
-    if (_dir == null) return;
-    try {
-      await op();
-    } catch (e) {
-      debugPrint('[LIBRARY] 存檔失敗: $e');
-    }
+  /// 最近一次寫進手機有沒有成功。畫面上已經先改好了，失敗的話呼叫的
+  /// 地方要告訴使用者：關掉 App 再打開就不見了。
+  static Future<bool> lastWrite = Future.value(true);
+
+  static void _write(Future<void> Function() op) {
+    lastWrite = () async {
+      // 沒有文件資料夾（網頁版、測試）：本來就只放在記憶體裡
+      if (_dir == null) return true;
+      try {
+        await op();
+        return true;
+      } catch (e) {
+        debugPrint('[LIBRARY] 存檔失敗: $e');
+        return false;
+      }
+    }();
   }
 }

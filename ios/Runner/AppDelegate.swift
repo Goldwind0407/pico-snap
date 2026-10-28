@@ -249,17 +249,27 @@ enum VideoEncoder {
 
     var loaded: String?
     var buffer: CVPixelBuffer?
-    for (i, path) in frames.enumerated() {
-      // 同一張重複出現(最後停住的成品)就不用重新讀
-      if path != loaded {
-        buffer = try pixelBuffer(path: path, width: width, height: height)
-        loaded = path
+    do {
+      for (i, path) in frames.enumerated() {
+        // 同一張重複出現(最後停住的成品)就不用重新讀
+        if path != loaded {
+          buffer = try pixelBuffer(path: path, width: width, height: height)
+          loaded = path
+        }
+        // 寫入失敗(例如空間不足)之後永遠不會 ready:不要一直等
+        while !input.isReadyForMoreMediaData {
+          if writer.status == .failed { throw writer.error ?? EncodeError.append }
+          Thread.sleep(forTimeInterval: 0.005)
+        }
+        let time = CMTime(value: CMTimeValue(i), timescale: CMTimeScale(fps))
+        guard let frame = buffer, adaptor.append(frame, withPresentationTime: time) else {
+          throw writer.error ?? EncodeError.append
+        }
       }
-      while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.005) }
-      let time = CMTime(value: CMTimeValue(i), timescale: CMTimeScale(fps))
-      guard let frame = buffer, adaptor.append(frame, withPresentationTime: time) else {
-        throw writer.error ?? EncodeError.append
-      }
+    } catch {
+      // 收掉寫到一半的影片,呼叫的地方會刪檔
+      writer.cancelWriting()
+      throw error
     }
     input.markAsFinished()
     let done = DispatchSemaphore(value: 0)

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 
@@ -60,6 +61,18 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   List<CameraDescription> _cameras = [];
   CameraDescription? _device;
   String? _cameraError;
+  /// Bumped whenever the camera should be (re)opened or let go, so an
+  /// opening that finishes late closes itself instead of taking over.
+  int _cameraGen = 0;
+  bool _inBackground = false;
+  /// Opening and letting go of the camera run one after another: the
+  /// plugin can't open one while another is still opening or closing
+  /// (tapping flip quickly would break the camera).
+  Future<void> _cameraQueue = Future.value();
+  bool _switching = false;
+
+  Future<void> _serial(Future<void> Function() op) =>
+      _cameraQueue = _cameraQueue.then((_) => op()).catchError((Object e) => debugPrint('[CAMERA] $e'));
 
   /// The photos taken so far as shot; selfies are shown mirrored right away
   /// and the mirrored file is made in the background ([_ready]).
@@ -105,6 +118,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _session++;
+    _cameraGen++;
     _clipTimer?.cancel();
     _camera?.dispose();
     _flash.dispose();
@@ -118,10 +132,14 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // The camera must be released while the app is in the background.
     if (state == AppLifecycleState.inactive) {
-      _camera?.dispose();
-      _camera = null;
-    } else if (state == AppLifecycleState.resumed && _stage == _Stage.shooting && _camera == null && widget.shoot == null) {
-      _openCamera();
+      _inBackground = true;
+      _cameraGen++;
+      _serial(_closeCamera);
+    } else if (state == AppLifecycleState.resumed) {
+      _inBackground = false;
+      _serial(() async {
+        if (_stage == _Stage.shooting && _camera == null && widget.shoot == null && !_inBackground && mounted) await _openCamera();
+      });
     }
   }
 
@@ -136,6 +154,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   }
 
   Future<void> _openCamera() async {
+    final gen = ++_cameraGen;
     try {
       if (_cameras.isEmpty) _cameras = await availableCameras();
       if (_cameras.isEmpty) throw CameraException('none', 'no camera');
@@ -143,7 +162,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
       final device = _device ??= mainCamera(_cameras, CameraLensDirection.front) ?? mainCamera(_cameras, CameraLensDirection.back)!;
       final camera = CameraController(device, ResolutionPreset.veryHigh, enableAudio: false);
       await camera.initialize();
-      if (!mounted || _stage != _Stage.shooting) {
+      if (!mounted || gen != _cameraGen || _inBackground || _stage != _Stage.shooting) {
         camera.dispose();
         return;
       }
@@ -153,7 +172,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
       });
     } catch (e) {
       debugPrint('[BOOTH] camera: $e');
-      if (mounted) {
+      if (mounted && gen == _cameraGen) {
         setState(() => _cameraError = e is CameraException && e.code.contains('AccessDenied') ? '沒有相機權限，可以到設定開啟' : '相機打不開');
       }
     }
@@ -161,26 +180,30 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
 
   /// Takes the preview off the screen first: disposing the camera while its
   /// last frame is still being drawn crashes the Android engine.
-  void _closeCamera() {
+  Future<void> _closeCamera() async {
     final old = _camera;
     if (old == null) return;
     if (mounted) setState(() => _camera = null);
-    Future<void>.delayed(const Duration(milliseconds: 500), old.dispose);
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    await old.dispose();
   }
 
   bool get _canFlip => mainCamera(_cameras, CameraLensDirection.back) != null && mainCamera(_cameras, CameraLensDirection.front) != null;
 
   Future<void> _flipCamera() async {
-    if (!_canFlip) return;
+    if (!_canFlip || _switching) return;
+    _switching = true;
     final front = _device?.lensDirection == CameraLensDirection.front;
-    final old = _camera;
-    setState(() {
-      _camera = null;
-      _device = mainCamera(_cameras, front ? CameraLensDirection.back : CameraLensDirection.front);
-    });
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    await old?.dispose();
-    await _openCamera();
+    setState(() => _device = mainCamera(_cameras, front ? CameraLensDirection.back : CameraLensDirection.front));
+    try {
+      // One camera at a time: some phones can't open front and back together.
+      await _serial(() async {
+        await _closeCamera();
+        if (mounted) await _openCamera();
+      });
+    } finally {
+      _switching = false;
+    }
   }
 
   /// Step 2: into the booth; the countdown starts once the camera is on.
@@ -197,7 +220,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
       _saved = false;
       _cameraError = null;
     });
-    if (widget.shoot == null) await _openCamera();
+    if (widget.shoot == null) await _serial(_openCamera);
     if (!mounted || _stage != _Stage.shooting) return;
     if (_camera == null && widget.shoot == null) return; // the error is on screen
     _shootNext(_session);
@@ -241,7 +264,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
     setState(() => _frozen = null);
     if (_takes.length < _shots) return _shootNext(session);
     // Step 5: done shooting, pick a filter.
-    _closeCamera();
+    _serial(_closeCamera);
     final photos = await Future.wait(_ready);
     if (!_alive(session)) return;
     _photos
@@ -264,7 +287,10 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
     final camera = _camera;
     if (camera == null || !camera.value.isInitialized || camera.value.isTakingPicture) return null;
     try {
-      final bytes = await (await camera.takePicture()).readAsBytes();
+      final file = await camera.takePicture();
+      final bytes = await file.readAsBytes();
+      // The plugin leaves each shot in the cache; we keep the bytes.
+      File(file.path).delete().ignore();
       // The viewfinder is a mirror; the photo matches what you saw.
       return (bytes: bytes, mirror: camera.description.lensDirection == CameraLensDirection.front);
     } catch (e) {
@@ -329,7 +355,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   void _stopShooting() {
     _session++;
     _clipTimer?.cancel();
-    _closeCamera();
+    _serial(_closeCamera);
   }
 
   Future<void> _back() async {

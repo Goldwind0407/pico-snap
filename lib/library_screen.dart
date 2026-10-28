@@ -28,12 +28,21 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final bytes = await file.readAsBytes();
     if (!mounted) return;
     final png = await CutoutPage.open(context, bytes);
-    if (png != null) MyLibrary.addSticker(png);
+    if (png == null) return;
+    MyLibrary.addSticker(png);
+    await _checkWrite();
   }
 
   Future<void> _deleteSticker(String id) async {
     if (await confirmDelete(context, '刪除這張貼紙？', '已經存到相簿的作品不受影響；用到它的模板，那個位置會變空白。')) {
       MyLibrary.removeSticker(id);
+      await _checkWrite();
+    }
+  }
+
+  Future<void> _checkWrite() async {
+    if (!await MyLibrary.lastWrite && mounted) {
+      showMessage(context, '沒有存進手機（空間可能不夠），關掉 App 後這個改動會不見', error: true);
     }
   }
 
@@ -47,7 +56,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
   ));
 
   Future<void> _deleteTemplate(String id) async {
-    if (await confirmDelete(context, '刪除這個模板？', '已經存到相簿的作品不受影響。')) MyLibrary.removeTemplate(id);
+    if (await confirmDelete(context, '刪除這個模板？', '已經存到相簿的作品不受影響。')) {
+      MyLibrary.removeTemplate(id);
+      await _checkWrite();
+    }
   }
 
   @override

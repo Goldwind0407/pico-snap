@@ -237,6 +237,23 @@ zip -qr ~/Desktop/pico_snap-unsigned.ipa Payload
 - Vision 去背和影片編碼寫在 `AppDelegate.swift`（不另開新檔，因為新的 .swift 檔要加進 Xcode 專案檔才會編譯）。iOS 17 以上可以分開切出每個主體；iOS 15、16 只能切人像。模擬器上 Vision 不能用，要用實機測。
 - 已經採用 UIScene（`SceneDelegate.swift`）。iOS 27 起，沒有採用 UIScene 的 App 一打開就會被系統終止。
 
+### Android 正式簽章
+
+release 版要用自己的金鑰簽章才能上架。沒有設定時會用 debug 簽章（建置時會出現警告），只能自己裝來測。
+
+1. 產生金鑰（只做一次，**金鑰和密碼弄丟就再也不能更新同一個 App**，要備份在安全的地方）：
+   ```
+   keytool -genkey -v -keystore ~/pico-snap-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+   ```
+2. 建立 `android/key.properties`（已在 `.gitignore`，不會上傳）：
+   ```
+   storeFile=C:/Users/你/pico-snap-upload.jks
+   storePassword=密碼
+   keyAlias=upload
+   keyPassword=密碼
+   ```
+3. `flutter build appbundle --release` 產生上架用的 AAB。
+
 ### Android 設定重點
 
 - 去背用 Google Play 服務裡的 ML Kit 主體分割；沒有 Google Play 服務的手機會自動改用 GrabCut。

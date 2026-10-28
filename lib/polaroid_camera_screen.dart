@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:camera/camera.dart';
@@ -81,6 +82,23 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   /// Android); [_minZoom] is how far out it goes.
   CameraDescription? _device;
   double _zoom = 1, _minZoom = 1;
+  /// Bumped whenever the camera should be (re)opened or let go, so an
+  /// opening that finishes late (after going to the background, switching
+  /// lenses, leaving) closes itself instead of taking over.
+  int _cameraGen = 0;
+  bool _inBackground = false;
+  bool _picking = false;
+  /// Opening and letting go of the camera run one after another: the
+  /// plugin can't open one while another is still opening or closing
+  /// (tapping flip quickly would break the camera).
+  Future<void> _cameraQueue = Future.value();
+  bool _switching = false;
+
+  Future<void> _serial(Future<void> Function() op) =>
+      _cameraQueue = _cameraQueue.then((_) => op()).catchError((Object e) => debugPrint('[CAMERA] $e'));
+
+  /// Haptic ticks while the film comes out.
+  Timer? _motor;
   String? _cameraError;
 
   // Motorised: the print comes out at a steady pace.
@@ -124,12 +142,14 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _openCamera();
+    _serial(_openCamera);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _cameraGen++;
+    _motor?.cancel();
     _camera?.dispose();
     _eject.dispose();
     _lift.dispose();
@@ -145,14 +165,29 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // The camera must be released while the app is in the background.
     if (state == AppLifecycleState.inactive) {
-      _camera?.dispose();
-      _camera = null;
-    } else if (state == AppLifecycleState.resumed && _camera == null && _cameraError == null) {
-      _openCamera();
+      _inBackground = true;
+      _cameraGen++;
+      _serial(_releaseCamera);
+    } else if (state == AppLifecycleState.resumed) {
+      _inBackground = false;
+      _serial(() async {
+        if (_camera == null && _cameraError == null && !_inBackground && mounted) await _openCamera();
+      });
     }
   }
 
+  /// Takes the preview off the screen first, then lets the camera go:
+  /// disposing it while its last frame is still drawn crashes Android.
+  Future<void> _releaseCamera() async {
+    final old = _camera;
+    if (old == null) return;
+    if (mounted) setState(() => _camera = null);
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    await old.dispose();
+  }
+
   Future<void> _openCamera() async {
+    final gen = ++_cameraGen;
     try {
       if (_cameras.isEmpty) _cameras = await availableCameras();
       if (_cameras.isEmpty) {
@@ -169,7 +204,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       } catch (e) {
         debugPrint('[CAMERA] zoom: $e');
       }
-      if (!mounted) {
+      if (!mounted || gen != _cameraGen || _inBackground) {
         camera.dispose();
         return;
       }
@@ -180,12 +215,12 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       });
     } on CameraException catch (e) {
       debugPrint('[CAMERA] $e');
-      if (mounted) {
+      if (mounted && gen == _cameraGen) {
         setState(() => _cameraError = e.code.contains('AccessDenied') ? '沒有相機權限，可以到設定開啟，或從相簿選照片' : '相機打不開，可以從相簿選照片');
       }
     } catch (e) {
       debugPrint('[CAMERA] $e');
-      if (mounted) setState(() => _cameraError = '相機打不開，可以從相簿選照片');
+      if (mounted && gen == _cameraGen) setState(() => _cameraError = '相機打不開，可以從相簿選照片');
     }
   }
 
@@ -198,15 +233,21 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   }
 
   Future<void> _switchTo(CameraDescription device, [double zoom = 1]) async {
-    final old = _camera;
+    if (_switching) return;
+    _switching = true;
     setState(() {
-      _camera = null;
       _device = device;
       _zoom = zoom;
       _minZoom = 1;
     });
-    await old?.dispose();
-    await _openCamera();
+    try {
+      await _serial(() async {
+        await _releaseCamera();
+        if (mounted) await _openCamera();
+      });
+    } finally {
+      _switching = false;
+    }
   }
 
   /// The lenses to choose from for the way the camera is facing.
@@ -240,6 +281,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     try {
       final file = await camera.takePicture();
       final bytes = await file.readAsBytes();
+      // The plugin leaves each shot in the cache; we keep the bytes.
+      File(file.path).delete().ignore();
       if (mounted) await _printOut(bytes);
     } catch (e) {
       debugPrint('[CAMERA] 拍照失敗: $e');
@@ -248,15 +291,24 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   }
 
   Future<void> _fromGallery() async {
-    if (_stage != _Stage.aiming) return;
-    final Uint8List? bytes;
-    if (widget.pickPhoto != null) {
-      bytes = await widget.pickPhoto!();
-    } else {
-      final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 95);
-      bytes = await file?.readAsBytes();
+    // One picker at a time: a second tap while it opens would start another.
+    if (_stage != _Stage.aiming || _picking) return;
+    _picking = true;
+    Uint8List? bytes;
+    try {
+      if (widget.pickPhoto != null) {
+        bytes = await widget.pickPhoto!();
+      } else {
+        final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 95);
+        bytes = await file?.readAsBytes();
+      }
+    } catch (e) {
+      debugPrint('[CAMERA] 選照片失敗: $e');
+      if (mounted) showMessage(context, '打不開相簿，請再試一次', error: true, above: _controlsHeight);
+    } finally {
+      _picking = false;
     }
-    if (bytes != null && mounted) await _printOut(bytes);
+    if (bytes != null && mounted && _stage == _Stage.aiming) await _printOut(bytes);
   }
 
   String _today() {
@@ -279,12 +331,21 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     _develop.value = 0;
     _lift.value = 0;
     // The motor whirs while the film is moving.
-    final motor = Timer.periodic(const Duration(milliseconds: 120), (_) {
+    _motor?.cancel();
+    _motor = Timer.periodic(const Duration(milliseconds: 120), (_) {
       final e = _eject.value;
       if (e > _emergeStart && e < _emergeEnd) HapticFeedback.selectionClick();
     });
-    await _eject.forward(from: 0);
-    motor.cancel();
+    try {
+      // orCancel: leaving mid-print cancels the ticker; a plain await would
+      // then never return and the motor would tick on forever.
+      await _eject.forward(from: 0).orCancel;
+    } on TickerCanceled {
+      return;
+    } finally {
+      _motor?.cancel();
+      _motor = null;
+    }
     HapticFeedback.lightImpact(); // stops with a little clunk
     if (!mounted) return;
     _prints.add(print);

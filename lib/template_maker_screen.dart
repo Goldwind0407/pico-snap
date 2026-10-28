@@ -71,14 +71,22 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
     _edited = true;
   });
 
-  void _save() {
+  Future<void> _save() async {
     if (_editing) {
       MyLibrary.updateTemplate(_t);
     } else {
       MyLibrary.addTemplate(_t.copyWith(id: MyLibrary.newKey()));
     }
     _edited = false;
+    final messenger = ScaffoldMessenger.of(context);
     Navigator.pop(context);
+    if (!await MyLibrary.lastWrite) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('模板沒有存進手機（空間可能不夠），關掉 App 後會不見'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Color(0xFFB4483C),
+      ));
+    }
   }
 
   void _startFrom(StripTemplate t) {

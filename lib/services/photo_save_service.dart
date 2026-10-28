@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -14,6 +15,7 @@ class PhotoSaveService {
   PhotoSaveService._();
 
   static const _album = 'PICO SNAP';
+  static int _lastStamp = 0;
 
   /// 把 [key] 那個 RepaintBoundary 裡畫的東西存進相簿，最長邊大約
   /// [longSide] 像素。透明的地方補成 [background]，不然相簿裡會變成黑色。
@@ -48,16 +50,22 @@ class PhotoSaveService {
     return saveBytes(data.buffer.asUint8List());
   }
 
+  /// 下一張圖的檔名。每張不同：同名的話有些手機會蓋掉上一張。到毫秒，
+  /// 同一毫秒存兩張就往後加一。
+  @visibleForTesting
+  static String nextName() {
+    _lastStamp = max(_lastStamp + 1, DateTime.now().millisecondsSinceEpoch);
+    final t = DateTime.fromMillisecondsSinceEpoch(_lastStamp);
+    String two(int v) => v.toString().padLeft(2, '0');
+    return 'pico_snap_${t.year}${two(t.month)}${two(t.day)}_${two(t.hour)}${two(t.minute)}${two(t.second)}_${t.millisecond.toString().padLeft(3, '0')}';
+  }
+
   /// 成功回傳 null，失敗回傳可以直接顯示給使用者的訊息。
   static Future<String?> saveBytes(Uint8List bytes) async {
     try {
       final denied = await _ensureAccess();
       if (denied != null) return denied;
-      // 每張不同名字：同名的話有些手機會蓋掉上一張
-      final t = DateTime.now();
-      String two(int v) => v.toString().padLeft(2, '0');
-      final name = 'pico_snap_${t.year}${two(t.month)}${two(t.day)}_${two(t.hour)}${two(t.minute)}${two(t.second)}';
-      await Gal.putImageBytes(bytes, album: _album, name: name);
+      await Gal.putImageBytes(bytes, album: _album, name: nextName());
       return null;
     } on GalException catch (e) {
       return _message(e);

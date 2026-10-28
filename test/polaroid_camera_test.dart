@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/polaroid_camera_screen.dart';
+import 'package:pico_snap/services/photo_save_service.dart';
 import 'package:pico_snap/widgets/instant_print.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
@@ -148,5 +149,59 @@ void main() {
       expect(labels(lensChoices(cams, CameraLensDirection.back)), ['1×'], reason: '沒有超廣角就不顯示');
       expect(labels(lensChoices(cams, CameraLensDirection.back, minZoom: .5)), ['0.5×', '1×']);
     });
+  });
+
+  testWidgets('出片到一半離開：馬達的震動計時器跟著停，不會一直震', (t) async {
+    t.view.physicalSize = const Size(390, 844);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final photo = (await t.runAsync(_photo))!;
+    await t.pumpWidget(MaterialApp(home: PolaroidCameraScreen(pickPhoto: () async => photo, motion: const Stream.empty())));
+    for (var i = 0; i < 40 && find.textContaining('從相簿選照片').evaluate().isEmpty; i++) {
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 25)));
+      await t.pump();
+    }
+    await t.tap(find.text('從相簿'));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 900));
+    expect(find.text('出片中…'), findsOneWidget);
+    // 換掉整個頁面（像按返回離開）
+    await t.pumpWidget(const MaterialApp(home: SizedBox()));
+    await t.pump(const Duration(seconds: 3));
+    // 計時器還在的話，測試結束時 flutter_test 會報「Timer is still pending」
+  });
+
+  testWidgets('從相簿連按兩下只開一次', (t) async {
+    t.view.physicalSize = const Size(390, 844);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final photo = (await t.runAsync(_photo))!;
+    final picked = Completer<Uint8List?>();
+    var opened = 0;
+    await t.pumpWidget(MaterialApp(home: PolaroidCameraScreen(pickPhoto: () {
+      opened++;
+      return picked.future;
+    }, motion: const Stream.empty())));
+    for (var i = 0; i < 40 && find.textContaining('從相簿選照片').evaluate().isEmpty; i++) {
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 25)));
+      await t.pump();
+    }
+    await t.tap(find.text('從相簿'));
+    await t.pump();
+    await t.tap(find.text('從相簿'));
+    await t.pump();
+    expect(opened, 1);
+    picked.complete(photo);
+    await t.pump();
+    await t.pump(const Duration(seconds: 1));
+    expect(find.text('出片中…'), findsOneWidget);
+    await t.pumpWidget(const MaterialApp(home: SizedBox()));
+    await t.pump(const Duration(seconds: 3));
+  });
+
+  test('連續存檔：同一秒存好幾張，檔名都不一樣', () {
+    final names = [for (var i = 0; i < 20; i++) PhotoSaveService.nextName()];
+    expect(names.toSet(), hasLength(20));
+    expect(names.first, startsWith('pico_snap_'));
   });
 }
