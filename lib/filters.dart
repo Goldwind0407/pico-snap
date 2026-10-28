@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'color_grade.dart';
 
 /// LUT size: 33³ like the .cube files photo apps ship.
-const _lutSize = 33;
+const lutSize = 33;
 
 /// A photo filter: a colour grade (curves, HSL, shadows / highlights, split
 /// toning…) plus film effects drawn on top (grain, vignette, flash, light
@@ -33,10 +33,18 @@ class PhotoFilter {
   /// Glow around bright areas (film halation), 0–1, in [halationColor].
   final double halation;
   final (double, double, double) halationColor;
+  /// A ready-made 33³ lookup table (from a .cube file or Hald image) used
+  /// instead of [grade].
+  final Float32List? table;
   const PhotoFilter._(this.id, this.name, this.grade, {
     this.grain = 0, this.vignette = 0, this.flash = false, this.leak = false, this.date = false, this.haze = 0,
     this.soften = 0, this.halation = 0, this.halationColor = (1, .38, .18),
-  });
+  }) : table = null;
+
+  /// A filter from a lookup file; [table] is 33³, blue changing fastest.
+  PhotoFilter.lut(this.id, this.name, Float32List this.table)
+      : grade = Grade.none, grain = 0, vignette = 0, flash = false, leak = false, date = false, haze = 0,
+        soften = 0, halation = 0, halationColor = (1, .38, .18);
 
   bool get isNone => id == 'none';
 
@@ -44,10 +52,10 @@ class PhotoFilter {
   static final _matrices = <String, List<double>>{};
 
   /// The grade as a lookup table (built once).
-  Float32List get lut => _luts[id] ??= grade.lut(_lutSize);
+  Float32List get lut => _luts[id] ??= table ?? grade.lut(lutSize);
 
   /// The closest colour matrix, for the live camera viewfinder.
-  List<double> get matrix => _matrices[id] ??= fitMatrix(lut, _lutSize);
+  List<double> get matrix => _matrices[id] ??= fitMatrix(lut, lutSize);
 
   ColorFilter get previewFilter => ColorFilter.matrix(matrix);
 }
@@ -226,7 +234,7 @@ class FilteredImage extends ImageProvider<FilteredImage> {
 }
 
 Uint8List _gradeJob(({Uint8List rgba, Float32List lut, int w, int h, double soften, double halation, (double, double, double) color, double grain}) a) {
-  final out = applyLut(a.rgba, a.lut, _lutSize);
+  final out = applyLut(a.rgba, a.lut, lutSize);
   finishFilm(out, a.rgba, a.w, a.h, soften: a.soften, halation: a.halation, halationColor: a.color, grain: a.grain);
   return out;
 }

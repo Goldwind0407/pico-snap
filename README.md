@@ -113,6 +113,15 @@
 - 拍立得相機的取景框用 GPU 即時套濾鏡（`shaders/film.frag`）：同一份 3D LUT、柔化、高光光暈、動態顆粒，看到的就是拍出來的樣子；Android、iOS 共用同一支著色器，不用寫原生程式。手機不支援 Impeller 自訂濾鏡時，退回最接近的顏色矩陣預覽。
 - 不做 RAW：手機拍出來或相簿裡的 JPG 已經被處理過，Flutter 相機也拿不到 RAW，所以都是從 JPG 開始調。
 
+### 濾鏡檔（LUT）
+
+可以把現成的調色檔做成濾鏡，放進 `assets/luts/`、重新建置，就會出現在濾鏡列表最後面（取景框即時預覽和存檔顏色一樣）。
+
+- **`.cube`**：DaVinci、Premiere、Photoshop 等匯出的 3D LUT，任何尺寸都可以（會換算成 33³）。
+- **Hald 圖（`.png`）**：把 `design/hald/hald_identity_8.png` 匯入任何修圖 App（Lightroom、Snapseed、醒圖…），套上想要的調色後原尺寸匯出 PNG，放進 `assets/luts/`。那張圖就記下了整個調色。
+- 檔名就是濾鏡的 id；中文名字寫在 `lib/lut_files.dart` 的 `lutNames`，沒寫的用檔案裡的 TITLE 或檔名。
+- **授權**：`assets/luts/` 裡的檔案不進 Git。網路上的免費 LUT 大多只能自己用來調色、**不能放進 App 散布或販售**（例如 RocketStock 的 35 Free LUTs 明文禁止）；要上架的濾鏡只放自己調的，或買了可商用、可內嵌在 App 的授權。
+
 ### 去背
 
 一頁完成，右上角一直有「做出來」的小預覽，點一下放大。下方四個模式：
@@ -172,6 +181,7 @@
 | `lib/models.dart` | 模板、貼紙、格紋、自己的模板等資料 |
 | `lib/filters.dart` | 濾鏡配方與底片效果 |
 | `lib/live_filter.dart`、`shaders/film.frag` | 取景框的 GPU 即時濾鏡 |
+| `lib/lut_files.dart` | 讀 `.cube` 和 Hald 圖做成濾鏡 |
 | `lib/color_grade.dart` | 調色引擎：曲線、HSL、陰影高光、分離色調、3D LUT |
 | `lib/home_screen.dart` | 首頁與底部導覽 |
 | `lib/booth_screen.dart` | 四格拍貼機：選模板、倒數連拍、挑濾鏡、存圖和動態影片 |

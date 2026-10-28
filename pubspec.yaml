@@ -25,6 +25,7 @@ flutter:
     - assets/stickers/
     - assets/templates/
     - assets/instant/
+    - assets/luts/
   fonts:
     - family: Nunito
       fonts:

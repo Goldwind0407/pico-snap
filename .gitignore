@@ -50,3 +50,7 @@ app.*.map.json
 # Raw design material (Gemini outputs) stays local; processed assets live in assets/
 /design/templates/
 /design/mockups/
+
+# 濾鏡檔授權各自不同，留在本機（見 README「濾鏡檔」）
+/assets/luts/*
+!/assets/luts/.gitkeep
