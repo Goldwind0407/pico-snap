@@ -119,7 +119,8 @@
 
 - **`.cube`**：DaVinci、Premiere、Photoshop 等匯出的 3D LUT，任何尺寸都可以（會換算成 33³）。
 - **Hald 圖（`.png`）**：把 `design/hald/hald_identity_8.png` 匯入任何修圖 App（Lightroom、Snapseed、醒圖…），套上想要的調色後原尺寸匯出 PNG，放進 `assets/luts/`。那張圖就記下了整個調色。
-- 檔名就是濾鏡的 id；中文名字寫在 `lib/lut_files.dart` 的 `lutNames`，沒寫的用檔案裡的 TITLE 或檔名。
+- 檔名就是濾鏡的 id；中文名字和要疊上的底片效果（顆粒、暗角、柔化、光暈）寫在 `lib/lut_files.dart` 的 `lutLooks`，沒寫的用檔案裡的 TITLE 或檔名、不加效果。LUT 只管顏色，底片感要靠這些效果。
+- **底片濾鏡**：`film_*.cube` 是從 [RawTherapee Film Simulation Collection](https://rawpedia.rawtherapee.com/)（Pat David、Pavlov Dmitry、Michael Ezra，**CC BY-SA 4.0**）的 Hald 圖換算成 33³ 的。這個授權可以商用、放進 App，但**要在 App 裡標示出處**，換算過的檔案也要維持 CC BY-SA。濾鏡名字用我們自己的，不用 Kodak、Fuji、Polaroid 等商標。
 - **授權**：`assets/luts/` 裡的檔案不進 Git。網路上的免費 LUT 大多只能自己用來調色、**不能放進 App 散布或販售**（例如 RocketStock 的 35 Free LUTs 明文禁止）；要上架的濾鏡只放自己調的，或買了可商用、可內嵌在 App 的授權。
 
 ### 去背

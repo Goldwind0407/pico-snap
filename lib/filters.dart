@@ -42,9 +42,11 @@ class PhotoFilter {
   }) : table = null;
 
   /// A filter from a lookup file; [table] is 33³, blue changing fastest.
-  PhotoFilter.lut(this.id, this.name, Float32List this.table)
-      : grade = Grade.none, grain = 0, vignette = 0, flash = false, leak = false, date = false, haze = 0,
-        soften = 0, halation = 0, halationColor = (1, .38, .18);
+  /// The file only holds colour: film effects come with it from [LutLook].
+  PhotoFilter.lut(this.id, this.name, Float32List this.table, {
+    this.grain = 0, this.vignette = 0, this.flash = false, this.leak = false, this.date = false, this.haze = 0,
+    this.soften = 0, this.halation = 0, this.halationColor = (1, .38, .18),
+  }) : grade = Grade.none;
 
   bool get isNone => id == 'none';
 

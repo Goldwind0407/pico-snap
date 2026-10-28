@@ -12,7 +12,8 @@ import 'filters.dart';
 /// - `.png`：Hald 圖。把 design/hald/ 裡的標準色卡圖丟進任何修圖 App 調色後匯出，
 ///   那張圖就記下了整個調色。
 ///
-/// 檔名就是濾鏡的 id；中文名字寫在 [lutNames]，沒寫的用檔案裡的 TITLE 或檔名。
+/// 檔名就是濾鏡的 id；中文名字和底片效果（顆粒、暗角、光暈…）寫在 [lutLooks]，
+/// 沒寫的用檔案裡的 TITLE 或檔名、不加效果。
 class LutFiles {
   LutFiles._();
 
@@ -49,7 +50,12 @@ class LutFiles {
         final lut = _isCube(path)
             ? await compute(_cube33, await rootBundle.loadString(path, cache: false))
             : await parseHald(await rootBundle.load(path));
-        photoFilters.add(PhotoFilter.lut('lut:$base', lutNames[base] ?? lut.title ?? base, resampleLut(lut.table, lut.size, lutSize)));
+        final look = lutLooks[base];
+        photoFilters.add(PhotoFilter.lut(
+          'lut:$base', look?.name ?? lut.title ?? base, resampleLut(lut.table, lut.size, lutSize),
+          grain: look?.grain ?? 0, vignette: look?.vignette ?? 0, soften: look?.soften ?? 0,
+          halation: look?.halation ?? 0, halationColor: look?.halationColor ?? (1, .38, .18),
+        ));
         changes.value++;
       } catch (e) {
         debugPrint('[LUT] $file 讀取失敗，略過: $e');
@@ -58,21 +64,38 @@ class LutFiles {
   }
 }
 
-/// 濾鏡檔的中文名字（key 是檔名，不含副檔名）。
-const lutNames = {
-  'BlueArchitecture': '藍調建築',
-  'BlueHour': '藍色時刻',
-  'ColdChrome': '冷調鉻黃',
-  'CrispAutumn': '清爽秋日',
-  'DarkAndSomber': '暗調憂鬱',
-  'HardBoost': '強烈鮮豔',
-  'LongBeachMorning': '海灘晨光',
-  'LushGreen': '濃郁綠意',
-  'MagicHour': '魔幻時刻',
-  'NaturalBoost': '自然增豔',
-  'OrangeAndBlue': '橘藍電影',
-  'SoftBlackAndWhite': '柔和黑白',
-  'Waves': '海浪',
+/// A lookup file's name in the app and the film effects drawn with it.
+class LutLook {
+  final String name;
+  final double grain, vignette, soften, halation;
+  final (double, double, double) halationColor;
+  const LutLook(this.name, {this.grain = 0, this.vignette = 0, this.soften = 0, this.halation = 0, this.halationColor = (1, .38, .18)});
+}
+
+/// 濾鏡檔的中文名字和底片效果（key 是檔名，不含副檔名）。
+const lutLooks = {
+  // Film stocks from the RawTherapee Film Simulation Collection (CC BY-SA
+  // 4.0, credit Pat David, Pavlov Dmitry, Michael Ezra). Our own names: the
+  // film brands are trademarks.
+  'film_soft_portrait': LutLook('柔膚人像', grain: .3, soften: .45, halation: .3),
+  'film_warm_portrait': LutLook('暖調人像', grain: .35, vignette: .15, soften: .45, halation: .35),
+  'film_fresh': LutLook('清新日系', grain: .25, soften: .4, halation: .25, halationColor: (.85, .96, 1)),
+  'film_everyday': LutLook('寫實日常', grain: .3, vignette: .12, soften: .35, halation: .2),
+  'film_lilac_instant': LutLook('藍紫拍立得', grain: .3, vignette: .3, soften: .5, halation: .3, halationColor: (.85, .8, 1)),
+  'film_expired_instant': LutLook('過期拍立得', grain: .45, vignette: .35, soften: .55, halation: .4),
+  'BlueArchitecture': LutLook('藍調建築'),
+  'BlueHour': LutLook('藍色時刻'),
+  'ColdChrome': LutLook('冷調鉻黃'),
+  'CrispAutumn': LutLook('清爽秋日'),
+  'DarkAndSomber': LutLook('暗調憂鬱'),
+  'HardBoost': LutLook('強烈鮮豔'),
+  'LongBeachMorning': LutLook('海灘晨光'),
+  'LushGreen': LutLook('濃郁綠意'),
+  'MagicHour': LutLook('魔幻時刻'),
+  'NaturalBoost': LutLook('自然增豔'),
+  'OrangeAndBlue': LutLook('橘藍電影'),
+  'SoftBlackAndWhite': LutLook('柔和黑白'),
+  'Waves': LutLook('海浪'),
 };
 
 /// A LUT as read from a file: [size]³ entries of r, g, b (0–1), blue

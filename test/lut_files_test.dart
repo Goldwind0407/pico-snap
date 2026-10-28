@@ -68,6 +68,17 @@ void main() {
     expect(m[2], closeTo(1, .01), reason: '新的紅色取自藍色');
     expect(m[10], closeTo(1, .01), reason: '新的藍色取自紅色');
   });
+
+  test('底片濾鏡檔帶著自己的名字和底片效果', () {
+    final look = lutLooks['film_warm_portrait']!;
+    expect(look.name, isNot(contains('Portra')), reason: '不用底片品牌的商標當名字');
+    expect(look.grain, greaterThan(0));
+    final f = PhotoFilter.lut('lut:film_warm_portrait', look.name, resampleLut(parseCube(_swapCube()).table, 2, lutSize),
+        grain: look.grain, halation: look.halation);
+    expect(f.grain, look.grain);
+    expect(f.halation, look.halation);
+    expect(f.vignette, 0);
+  });
 }
 
 String _identityCube(int n) {
