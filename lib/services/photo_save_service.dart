@@ -6,6 +6,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:gal/gal.dart';
 
+import 'my_works.dart';
+
 /// 把做好的作品存到手機相簿。
 ///
 /// Flutter 沒有內建寫入系統相簿的 API，一定要靠外掛（這裡用 gal），
@@ -21,10 +23,12 @@ class PhotoSaveService {
   /// [longSide] 像素。透明的地方補成 [background]，不然相簿裡會變成黑色。
   /// 那個東西一定要整個在畫面上，被切掉的部分截不到。
   /// 成功回傳 null，失敗回傳可以直接顯示給使用者的訊息。
+  /// 有 [keep] 的話，存好之後另外收一份縮小版進作品集。
   static Future<String?> saveBoundary(
     GlobalKey key, {
     double longSide = 3000,
     Color background = const Color(0xFFFFFFFF),
+    WorkKind? keep,
   }) async {
     if (kIsWeb) return '網頁版不能存到相簿，請用手機 App';
     final ui.Image shot;
@@ -45,9 +49,38 @@ class PhotoSaveService {
     final flat = await recorder.endRecording().toImage(shot.width, shot.height);
     shot.dispose();
     final data = await flat.toByteData(format: ui.ImageByteFormat.png);
+    if (data == null) {
+      flat.dispose();
+      return '產生圖片失敗，請再試一次';
+    }
+    final error = await saveBytes(data.buffer.asUint8List());
+    if (error == null && keep != null) await _keep(flat, keep);
     flat.dispose();
-    if (data == null) return '產生圖片失敗，請再試一次';
-    return saveBytes(data.buffer.asUint8List());
+    return error;
+  }
+
+  /// 作品集裡的那份：最長邊 [_keepSide]，夠在 App 裡全螢幕看。
+  static const _keepSide = 1400;
+
+  static Future<void> _keep(ui.Image image, WorkKind kind) async {
+    try {
+      final scale = min(1.0, _keepSide / max(image.width, image.height));
+      final w = max(1, (image.width * scale).round()), h = max(1, (image.height * scale).round());
+      final recorder = ui.PictureRecorder();
+      ui.Canvas(recorder).drawImageRect(
+        image,
+        Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+        Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()),
+        Paint()..filterQuality = FilterQuality.medium,
+      );
+      final small = await recorder.endRecording().toImage(w, h);
+      final data = await small.toByteData(format: ui.ImageByteFormat.png);
+      small.dispose();
+      if (data != null) await MyWorks.add(data.buffer.asUint8List(), kind);
+    } catch (e) {
+      // 相簿已經存好了，作品集少一張不影響
+      debugPrint('[SAVE] 收進作品集失敗: $e');
+    }
   }
 
   /// 下一張圖的檔名。每張不同：同名的話有些手機會蓋掉上一張。到毫秒，

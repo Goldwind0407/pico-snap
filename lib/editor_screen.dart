@@ -11,9 +11,11 @@ import 'package:image_picker/image_picker.dart';
 import 'cutout/cutout_page.dart';
 import 'filters.dart';
 import 'models.dart';
+import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
 import 'services/timelapse_recorder.dart';
 import 'theme.dart';
+import 'widgets/doodle.dart';
 import 'widgets/frames.dart';
 import 'widgets/instant_print.dart';
 import 'widgets/sticker_item.dart';
@@ -29,9 +31,6 @@ enum _Tool {
   filter(Icons.filter_vintage_outlined, '濾鏡'),
   /// Adjusting the selected photo; opened by tapping a photo, not a tab.
   photo(Icons.photo_outlined, '照片');
-
-  /// Tools that are only placeholders for now.
-  bool get comingSoon => this == brush;
 
   final IconData icon;
   final String label;
@@ -98,13 +97,22 @@ class _EditorScreenState extends State<EditorScreen> {
   int _pack = 1;
   int _pattern = 0, _backdrop = 1, _format = 3, _selectedCell = 0;
   List<StickerData> _stickers = [];
-  final List<List<StickerData>> _history = [];
+  /// Brush lines, drawn over everything.
+  List<Stroke> _strokes = [];
+  /// Bumped while a line is being drawn, so it repaints as it grows.
+  int _inkVersion = 0;
+  PenStyle _pen = PenStyle.pen;
+  Color _penColor = coral;
+  int _penWidth = 1;
+  /// The eraser already saved an undo step for this swipe.
+  bool _erased = false;
+  final List<(List<StickerData>, List<Stroke>)> _history = [];
   int? _selectedSticker;
   late _Tool _tool = _tools.first;
 
   List<_Tool> get _tools => switch (widget.mode) {
-    EditorMode.fourCut => const [_Tool.template, _Tool.sticker, _Tool.text, _Tool.filter],
-    EditorMode.polaroid => const [_Tool.layout, _Tool.sticker, _Tool.text, _Tool.filter],
+    EditorMode.fourCut => const [_Tool.template, _Tool.sticker, _Tool.text, _Tool.brush, _Tool.filter],
+    EditorMode.polaroid => const [_Tool.layout, _Tool.sticker, _Tool.text, _Tool.brush, _Tool.filter],
     EditorMode.sticker => const [_Tool.sticker, _Tool.pattern, _Tool.text, _Tool.brush, _Tool.cutout],
   };
 
@@ -284,7 +292,11 @@ class _EditorScreenState extends State<EditorScreen> {
     });
     // Let the frame without hints and handles paint before capturing it.
     await WidgetsBinding.instance.endOfFrame;
-    var error = await PhotoSaveService.saveBoundary(_shotKey);
+    var error = await PhotoSaveService.saveBoundary(_shotKey, keep: switch (widget.mode) {
+      EditorMode.fourCut => WorkKind.fourCut,
+      EditorMode.polaroid => WorkKind.collage,
+      EditorMode.sticker => WorkKind.sticker,
+    });
     var saved = '已存到相簿 ♡';
     if (error == null && video) {
       // The clean finished piece ends the video.
@@ -326,19 +338,55 @@ class _EditorScreenState extends State<EditorScreen> {
     _edited = true;
   });
 
-  void _selectTool(_Tool tool) {
-    if (tool.comingSoon) return showSoonToast(context, tool.label);
-    setState(() {
-      _tool = tool;
-      if (tool == _Tool.text) _textCtrl.text = _text;
-    });
-  }
+  void _selectTool(_Tool tool) => setState(() {
+    _tool = tool;
+    if (tool == _Tool.text) _textCtrl.text = _text;
+    if (tool == _Tool.brush) _selectedSticker = null;
+  });
 
   void _remember() {
     _edited = true;
-    _history.add(List.of(_stickers));
+    _history.add((List.of(_stickers), List.of(_strokes)));
     if (_history.length > 30) _history.removeAt(0);
   }
+
+  void _penDown(Offset at, Size size) => setState(() {
+    if (_pen == PenStyle.eraser) {
+      _erased = false;
+      return _erase(at, size);
+    }
+    _remember();
+    _strokes = [..._strokes, Stroke(points: [normalise(at, size)], color: _penColor, width: penWidths[_penWidth], style: _pen)];
+  });
+
+  void _penMove(Offset at, Size size) => setState(() {
+    if (_pen == PenStyle.eraser) return _erase(at, size);
+    if (_strokes.isEmpty) return;
+    final points = _strokes.last.points;
+    final p = normalise(at, size);
+    // Skip points closer than about a pixel; they only make the path heavier.
+    final last = points.last;
+    if (Offset((p.dx - last.dx) * size.width, (p.dy - last.dy) * size.height).distance < 1.5) return;
+    points.add(p);
+    _inkVersion++;
+  });
+
+  /// Wipe out every line the finger touches; one undo step per swipe.
+  void _erase(Offset at, Size size) {
+    final radius = size.width * .03;
+    final kept = [for (final s in _strokes) if (!s.touches(at, radius, size)) s];
+    if (kept.length == _strokes.length) return;
+    if (!_erased) {
+      _remember();
+      _erased = true;
+    }
+    _strokes = kept;
+  }
+
+  void _clearInk() => setState(() {
+    _remember();
+    _strokes = [];
+  });
 
   void _addSticker(String sticker) => setState(() {
     _remember();
@@ -348,7 +396,9 @@ class _EditorScreenState extends State<EditorScreen> {
   });
 
   void _undo() => setState(() {
-    _stickers = _history.removeLast();
+    final (stickers, strokes) = _history.removeLast();
+    _stickers = stickers;
+    _strokes = strokes;
     _selectedSticker = null;
   });
 
@@ -434,6 +484,10 @@ class _EditorScreenState extends State<EditorScreen> {
               _selectedSticker = null;
             }),
           ),
+        // Always there: adding it on the first line would rebuild the input below mid-stroke.
+        Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: DoodlePainter(_strokes, _inkVersion)))),
+        if (_tool == _Tool.brush && !_capturing)
+          Positioned.fill(child: DoodleInput(onStart: _penDown, onMove: _penMove, onEnd: () => _erased = false)),
       ])),
     );
   })));
@@ -545,7 +599,8 @@ class _EditorScreenState extends State<EditorScreen> {
         _Tool.cutout => _cutoutTool(),
         _Tool.photo => _photoTool(),
         _Tool.filter => _filterTool(),
-        _Tool.text || _Tool.brush => _textTool(),
+        _Tool.text => _textTool(),
+        _Tool.brush => _brushTool(),
       }),
       Container(
         decoration: BoxDecoration(
@@ -839,6 +894,83 @@ class _EditorScreenState extends State<EditorScreen> {
               ),
             )),
           ],
+        ]),
+      ]),
+    );
+  }
+
+  Widget _brushTool() {
+    final erasing = _pen == PenStyle.eraser;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          for (final s in PenStyle.values)
+            Expanded(child: Padding(
+              padding: EdgeInsets.only(right: s == PenStyle.values.last ? 0 : 6),
+              child: GestureDetector(
+                onTap: () => setState(() => _pen = s),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  decoration: BoxDecoration(
+                    color: _pen == s ? blush : cream, borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _pen == s ? blushLine : line),
+                  ),
+                  child: Column(children: [
+                    Icon(s.icon, size: 18, color: _pen == s ? ink : muted),
+                    const SizedBox(height: 2),
+                    Text(s.label, style: TextStyle(fontSize: 11, color: ink, fontWeight: _pen == s ? FontWeight.w900 : FontWeight.w600)),
+                  ]),
+                ),
+              ),
+            )),
+        ]),
+        const SizedBox(height: 10),
+        SizedBox(height: 34, child: erasing
+          ? Align(alignment: Alignment.centerLeft, child: Text('在線上抹過去就會擦掉，擦錯了按右下角的復原',
+              style: TextStyle(fontSize: 12, color: muted.withValues(alpha: .95), fontWeight: FontWeight.w600)))
+          : ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: penColors.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final c = penColors[i];
+                final on = c == _penColor;
+                return GestureDetector(
+                  onTap: () => setState(() => _penColor = c),
+                  child: Container(
+                    width: 34, height: 34, padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: on ? coral : Colors.transparent, width: 2.2)),
+                    child: Container(decoration: BoxDecoration(color: c, shape: BoxShape.circle, border: Border.all(color: line, width: 1.3))),
+                  ),
+                );
+              },
+            )),
+        const Spacer(),
+        Row(children: [
+          if (!erasing)
+            for (var i = 0; i < penWidths.length; i++)
+              GestureDetector(
+                onTap: () => setState(() => _penWidth = i),
+                child: Container(
+                  width: 40, height: 34, margin: const EdgeInsets.only(right: 6),
+                  decoration: BoxDecoration(
+                    color: _penWidth == i ? blush : cream, borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _penWidth == i ? blushLine : line),
+                  ),
+                  alignment: Alignment.center,
+                  child: Container(width: 6.0 + i * 6, height: 6.0 + i * 6,
+                    decoration: BoxDecoration(color: _penColor == Colors.white ? muted : _penColor, shape: BoxShape.circle)),
+                ),
+              ),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: _strokes.isEmpty ? null : _clearInk,
+            icon: const Icon(Icons.layers_clear_outlined, size: 18),
+            label: const Text('全部清掉', style: TextStyle(fontWeight: FontWeight.w800)),
+            style: TextButton.styleFrom(foregroundColor: coral),
+          ),
         ]),
       ]),
     );

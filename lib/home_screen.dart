@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'booth_screen.dart';
+import 'diary_screen.dart';
 import 'editor_screen.dart';
+import 'gallery_screen.dart';
 import 'library_screen.dart';
 import 'polaroid_camera_screen.dart';
 import 'models.dart';
@@ -16,7 +18,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  /// 0 = 首頁, 1 = 我的.
+  /// 0 = 首頁, 1 = 我的, 2 = 日記.
   int _tab = 0;
 
   void _open(BuildContext context, EditorMode mode, [int template = 0]) => Navigator.push(
@@ -27,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) => PopScope(
-    // Back on the「我的」tab goes to 首頁 first.
+    // Back on the other tabs goes to 首頁 first.
     canPop: _tab == 0,
     onPopInvokedWithResult: (didPop, _) {
       if (!didPop) setState(() => _tab = 0);
@@ -35,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
     child: Scaffold(
       backgroundColor: cream,
       extendBody: true,
-      body: IndexedStack(index: _tab, children: [_home(context), const LibraryScreen(embedded: true)]),
+      body: IndexedStack(index: _tab, children: [_home(context), const LibraryScreen(embedded: true), const DiaryScreen()]),
       bottomNavigationBar: _BottomBar(
         tab: _tab,
         onCamera: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolaroidCameraScreen())),
@@ -46,7 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 
   Widget _home(BuildContext context) => SafeArea(bottom: false, child: ListView(padding: const EdgeInsets.fromLTRB(0, 10, 0, 120), children: [
-      _pad(_Header(onGallery: () => showSoonToast(context, '作品集'))),
+      _pad(_Header(onGallery: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GalleryScreen())))),
       const SizedBox(height: 22),
       _pad(_HeroCard(onStart: () => _open(context, EditorMode.fourCut))),
       const SizedBox(height: 30),
@@ -102,7 +104,7 @@ class _Header extends StatelessWidget {
       textAlign: TextAlign.center,
       style: TextStyle(fontSize: 26, letterSpacing: .5, fontWeight: FontWeight.w900),
     )),
-    IconButton(onPressed: onGallery, icon: const Icon(Icons.photo_outlined, size: 30, color: ink)),
+    IconButton(onPressed: onGallery, tooltip: '作品集', icon: const Icon(Icons.photo_outlined, size: 30, color: ink)),
   ]);
 }
 
@@ -295,7 +297,7 @@ class _BottomBar extends StatelessWidget {
         ),
         child: SafeArea(top: false, child: Row(children: [
           Expanded(child: _NavItem(icon: tab == 0 ? Icons.home_rounded : Icons.home_outlined, label: '首頁', selected: tab == 0, onTap: () => onTab(0))),
-          Expanded(child: _NavItem(icon: Icons.menu_book_outlined, label: '日記', onTap: () => onSoon('日記'))),
+          Expanded(child: _NavItem(icon: tab == 2 ? Icons.menu_book_rounded : Icons.menu_book_outlined, label: '日記', selected: tab == 2, onTap: () => onTab(2))),
           const SizedBox(width: 72),
           Expanded(child: _NavItem(icon: Icons.shopping_bag_outlined, label: '商店', onTap: () => onSoon('商店'))),
           Expanded(child: _NavItem(icon: tab == 1 ? Icons.person_rounded : Icons.person_outline_rounded, label: '我的', selected: tab == 1, onTap: () => onTab(1))),

@@ -22,6 +22,13 @@ void main() {
       await t.drag(find.byType(ListView).first, const Offset(0, -900));
       await t.pumpAndSettle();
     });
+    testWidgets('diary $s', (t) async {
+      await pump(t, s, const HomeScreen());
+      await t.tap(find.text('日記'));
+      await t.pumpAndSettle();
+      await t.drag(find.byType(ListView).last, const Offset(0, -900));
+      await t.pumpAndSettle();
+    });
     testWidgets('booth $s', (t) async {
       await pump(t, s, const BoothScreen());
       for (final c in stripCategories) {
@@ -32,7 +39,7 @@ void main() {
     for (final m in EditorMode.values) {
       testWidgets('editor $m $s', (t) async {
         await pump(t, s, EditorScreen(mode: m));
-        for (final label in ['模板', '版面', '底紋', '去背', '文字', '貼紙']) {
+        for (final label in ['模板', '版面', '底紋', '去背', '文字', '畫筆', '橡皮擦', '貼紙']) {
           final f = find.text(label);
           if (f.evaluate().isEmpty) continue;
           await t.tap(f.last);

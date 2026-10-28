@@ -13,6 +13,7 @@ import 'editor_screen.dart';
 import 'filters.dart';
 import 'live_filter.dart';
 import 'models.dart';
+import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
 import 'theme.dart';
 import 'widgets/instant_print.dart';
@@ -395,7 +396,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     if (_saving) return;
     setState(() => _saving = true);
     if (_develop.value < 1) await _develop.animateTo(1, duration: const Duration(milliseconds: 400));
-    final error = await PhotoSaveService.saveBoundary(_printKey, longSide: 2000);
+    final error = await PhotoSaveService.saveBoundary(_printKey, longSide: 2000, keep: WorkKind.instant);
     if (!mounted) return;
     setState(() {
       _saving = false;

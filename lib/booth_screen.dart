@@ -13,6 +13,7 @@ import 'editor_screen.dart';
 import 'filters.dart';
 import 'models.dart';
 import 'polaroid_camera_screen.dart' show mainCamera;
+import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
 import 'services/timelapse_recorder.dart';
 import 'theme.dart';
@@ -386,7 +387,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
     if (_saving) return;
     setState(() => _saving = true);
     await WidgetsBinding.instance.endOfFrame;
-    var error = await PhotoSaveService.saveBoundary(_stripKey);
+    var error = await PhotoSaveService.saveBoundary(_stripKey, keep: WorkKind.fourCut);
     var done = '已存到相簿 ♡';
     if (error == null && _withVideo && _canVideo) {
       final path = await _renderVideo();
