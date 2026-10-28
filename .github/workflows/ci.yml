@@ -1,0 +1,23 @@
+# 每次推到 main 或開 PR：靜態檢查加全部自動化測試。
+# 相機、去背 AI、影片編碼要在手機上才會動，這裡測不到，仍要實機測。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.0
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test

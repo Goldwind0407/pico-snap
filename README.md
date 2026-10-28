@@ -191,6 +191,7 @@
 2. `flutter pub get`
 3. `flutter run`（Android 模擬器或手機）
 4. 測試：`flutter test`；靜態檢查：`flutter analyze`
+5. 推到 GitHub 後，GitHub Actions（`.github/workflows/ci.yml`）會自動跑一次靜態檢查和全部測試。
 
 去背的手機內建 AI、相機、存相簿、影片編碼都要在手機或模擬器上才會動；在測試裡會自動改用備案（例如 GrabCut）或顯示錯誤訊息。
 
