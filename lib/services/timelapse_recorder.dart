@@ -18,13 +18,15 @@ import '../theme.dart';
 /// 編碼器做成 MP4。編輯得少、畫格少的時候每格多停一下（最多 [_maxRepeat]
 /// 格），過程至少有 [minProcessSeconds] 秒，不會一閃而過。
 class TimelapseRecorder {
-  TimelapseRecorder({Directory? dir, this.maxFrames = 360}) : _baseDir = dir;
+  TimelapseRecorder({Directory? dir, this.maxFrames = 360, this.subtitle = 'the making of ♡'}) : _baseDir = dir;
 
   static const width = 720, height = 1280, fps = 12, holdSeconds = 2, minProcessSeconds = 4;
   static const _maxRepeat = 6;
   static const _channel = MethodChannel('picosnap/video');
 
   final int maxFrames;
+  /// 影片上方 PICO SNAP 下面那行手寫字。
+  final String subtitle;
   final Directory? _baseDir;
   Directory? _dir;
   bool _noDir = false;
@@ -90,7 +92,7 @@ class TimelapseRecorder {
       art.dispose();
       return null;
     }
-    final frame = await composeFrame(art);
+    final frame = await composeFrame(art, subtitle: subtitle);
     art.dispose();
     final png = await frame.toByteData(format: ui.ImageByteFormat.png);
     frame.dispose();
@@ -99,6 +101,9 @@ class TimelapseRecorder {
     await file.writeAsBytes(png.buffer.asUint8List());
     return file.path;
   }
+
+  /// 直接加一格（不等、不限速），例如拍貼機的即時影片一格一格做好再交進來。
+  Future<void> add(ui.Image art) => _add(art);
 
   Future<void> _add(ui.Image art) async {
     final path = await _write(art, 'f${(_seq++).toString().padLeft(5, '0')}');
@@ -151,12 +156,12 @@ class TimelapseRecorder {
 
 /// 一格影片：奶油色底、上面 PICO SNAP、中間是作品、下面一行手寫字。
 @visibleForTesting
-Future<ui.Image> composeFrame(ui.Image art) {
+Future<ui.Image> composeFrame(ui.Image art, {String subtitle = 'the making of ♡'}) {
   const w = TimelapseRecorder.width * 1.0, h = TimelapseRecorder.height * 1.0;
   final recorder = ui.PictureRecorder();
   final c = ui.Canvas(recorder)..drawRect(const ui.Rect.fromLTWH(0, 0, w, h), ui.Paint()..color = cream);
   _text(c, 'PICO SNAP', 62, ui.TextStyle(color: coral, fontSize: 44, fontFamily: 'Nunito', fontWeight: ui.FontWeight.w900, letterSpacing: 5));
-  _text(c, 'the making of ♡', 122, ui.TextStyle(color: muted, fontSize: 36, fontFamily: 'Caveat', fontWeight: ui.FontWeight.w600));
+  _text(c, subtitle, 122, ui.TextStyle(color: muted, fontSize: 36, fontFamily: 'Caveat', fontWeight: ui.FontWeight.w600));
   const box = ui.Rect.fromLTRB(56, 200, w - 56, h - 130);
   final s = min(box.width / art.width, box.height / art.height);
   final dst = ui.Rect.fromCenter(center: box.center, width: art.width * s, height: art.height * s);

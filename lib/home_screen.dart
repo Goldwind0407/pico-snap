@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'booth_screen.dart';
 import 'editor_screen.dart';
 import 'library_screen.dart';
 import 'polaroid_camera_screen.dart';
@@ -19,7 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0;
 
   void _open(BuildContext context, EditorMode mode, [int template = 0]) => Navigator.push(
-    context, MaterialPageRoute(builder: (_) => EditorScreen(mode: mode, template: template)),
+    context, MaterialPageRoute(builder: (_) => mode == EditorMode.fourCut ? BoothScreen(template: template) : EditorScreen(mode: mode, template: template)),
   );
 
   Widget _pad(Widget child) => Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: child);

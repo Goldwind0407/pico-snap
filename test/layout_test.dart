@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pico_snap/booth_screen.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/home_screen.dart';
 import 'package:pico_snap/models.dart';
@@ -20,6 +21,13 @@ void main() {
       await pump(t, s, const HomeScreen());
       await t.drag(find.byType(ListView).first, const Offset(0, -900));
       await t.pumpAndSettle();
+    });
+    testWidgets('booth $s', (t) async {
+      await pump(t, s, const BoothScreen());
+      for (final c in stripCategories) {
+        await t.tap(find.text(c));
+        await t.pumpAndSettle();
+      }
     });
     for (final m in EditorMode.values) {
       testWidgets('editor $m $s', (t) async {

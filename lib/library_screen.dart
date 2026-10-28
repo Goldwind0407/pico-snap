@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'cutout/cutout_page.dart';
-import 'editor_screen.dart';
+import 'booth_screen.dart';
 import 'models.dart';
 import 'services/my_library.dart';
 import 'template_maker_screen.dart';
@@ -37,9 +37,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
   }
 
-  /// Open the four-cut editor with the user's template number [i].
+  /// Shoot four cuts with the user's template number [i].
   void _useTemplate(int i) => Navigator.push(context, MaterialPageRoute(
-    builder: (_) => EditorScreen(template: stripTemplates.length + i),
+    builder: (_) => BoothScreen(template: stripTemplates.length + i),
   ));
 
   void _editTemplate(CustomTemplate t) => Navigator.push(context, MaterialPageRoute(

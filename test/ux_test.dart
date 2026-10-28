@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pico_snap/booth_screen.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/home_screen.dart';
 import 'package:pico_snap/library_screen.dart';
@@ -109,15 +110,14 @@ void main() {
     expect(find.text('Create'), findsOneWidget, reason: '回到首頁分頁');
   });
 
-  testWidgets('我的素材：點模板直接打開四格編輯器並套用', (t) async {
+  testWidgets('我的素材：點模板直接用它拍四格', (t) async {
     MyLibrary.addTemplate(const CustomTemplate(id: 't1', caption: 'mine!', frame: Color(0xFFB9C9AE)));
     await _phone(t, const LibraryScreen());
     await t.tap(find.text('模板'));
     await t.pumpAndSettle();
     await t.tap(find.byType(PhotoStrip));
     await t.pumpAndSettle();
-    final editor = t.widget<EditorScreen>(find.byType(EditorScreen));
-    expect(editor.template, stripTemplates.length);
+    expect(t.widget<BoothScreen>(find.byType(BoothScreen)).template, stripTemplates.length);
     expect(find.text('mine!'), findsWidgets);
   });
 }
