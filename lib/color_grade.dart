@@ -28,7 +28,7 @@ class Grade {
   final double tint;
   /// Stops.
   final double exposure;
-  /// Film-like S contrast, 0 to 1.
+  /// Film-like S contrast, −1 to 1.
   final double contrast;
   /// Lift (+) or deepen (−) the shadows; lift (+) or pull down (−) the
   /// highlights. −1 to 1.
@@ -36,15 +36,15 @@ class Grade {
   final Map<Hue, Hsl> hsl;
   /// Tone curves as (in, out) points: master, then per channel.
   final List<(double, double)> curve, red, green, blue;
-  /// Colour pushed into the shadows / highlights, as RGB offsets.
-  final (double, double, double) shadowTone, highlightTone;
+  /// Colour pushed into the shadows / midtones / highlights, as RGB offsets.
+  final (double, double, double) shadowTone, midTone, highlightTone;
   /// Saturation multiplier; vibrance boosts dull colours more than vivid ones.
   final double saturation, vibrance;
 
   const Grade({
     this.temp = 0, this.tint = 0, this.exposure = 0, this.contrast = 0, this.shadows = 0, this.highlights = 0,
     this.hsl = const {}, this.curve = const [], this.red = const [], this.green = const [], this.blue = const [],
-    this.shadowTone = (0, 0, 0), this.highlightTone = (0, 0, 0), this.saturation = 1, this.vibrance = 0,
+    this.shadowTone = (0, 0, 0), this.midTone = (0, 0, 0), this.highlightTone = (0, 0, 0), this.saturation = 1, this.vibrance = 0,
   });
 
   static const none = Grade();
@@ -97,22 +97,22 @@ class _Prepared {
     var r = r0, gg = g0, b = b0;
     // White balance and exposure.
     final ex = math.pow(2, g.exposure).toDouble();
-    r *= (1 + .12 * g.temp) * ex;
-    gg *= (1 - .08 * g.tint) * ex;
-    b *= (1 - .12 * g.temp) * ex;
+    r *= (1 + .22 * g.temp + .06 * g.tint) * ex;
+    gg *= (1 - .14 * g.tint) * ex;
+    b *= (1 - .22 * g.temp + .06 * g.tint) * ex;
     // HSL colour mixing.
     if (g.hsl.isNotEmpty) (r, gg, b) = _mix(r, gg, b);
     // Shadows and highlights by luminance.
     if (g.shadows != 0 || g.highlights != 0) {
       final l = _luma(r, gg, b).clamp(0.0, 1.0);
-      final ws = 1 - _smooth(0, .55, l), wh = _smooth(.45, 1, l);
-      final d = g.shadows * .22 * ws * (1 - l) + g.highlights * .22 * wh * l;
+      final ws = 1 - _smooth(0, .58, l), wh = _smooth(.42, 1, l);
+      final d = g.shadows * .32 * ws * (1 - l) + g.highlights * .32 * wh * l;
       r += d;
       gg += d;
       b += d;
     }
     // S-shaped contrast.
-    if (g.contrast > 0) {
+    if (g.contrast != 0) {
       double s(double v) {
         final c = v.clamp(0.0, 1.0);
         return c + (c * c * (3 - 2 * c) - c) * g.contrast;
@@ -126,12 +126,12 @@ class _Prepared {
     r = _lookup(this.r, _lookup(master, r));
     gg = _lookup(gr, _lookup(master, gg));
     b = _lookup(this.b, _lookup(master, b));
-    // Split toning.
+    // Split toning (shadows, midtones, highlights).
     final l = _luma(r, gg, b).clamp(0.0, 1.0);
-    final ws = 1 - _smooth(0, .6, l), wh = _smooth(.4, 1, l);
-    r += g.shadowTone.$1 * ws + g.highlightTone.$1 * wh;
-    gg += g.shadowTone.$2 * ws + g.highlightTone.$2 * wh;
-    b += g.shadowTone.$3 * ws + g.highlightTone.$3 * wh;
+    final ws = 1 - _smooth(0, .6, l), wh = _smooth(.4, 1, l), wm = 4 * l * (1 - l);
+    r += g.shadowTone.$1 * ws + g.midTone.$1 * wm + g.highlightTone.$1 * wh;
+    gg += g.shadowTone.$2 * ws + g.midTone.$2 * wm + g.highlightTone.$2 * wh;
+    b += g.shadowTone.$3 * ws + g.midTone.$3 * wm + g.highlightTone.$3 * wh;
     // Saturation and vibrance around the luminance.
     if (g.saturation != 1 || g.vibrance != 0) {
       final y = _luma(r, gg, b);
@@ -159,7 +159,7 @@ class _Prepared {
     // Greys and near-greys barely move: there's no colour to judge.
     final k = math.min(1.0, s * 2.5);
     final s2 = (s * (1 + ds * k)).clamp(0.0, 1.0);
-    final l2 = (l + dl * .25 * k * (1 - (l - .5).abs() * 2).clamp(.2, 1.0)).clamp(0.0, 1.0);
+    final l2 = (l + dl * .36 * k * (1 - (l - .5).abs() * 2).clamp(.25, 1.0)).clamp(0.0, 1.0);
     return _fromHsl((h + dh * k) % 360, s2, l2);
   }
 

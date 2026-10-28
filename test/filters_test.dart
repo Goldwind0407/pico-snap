@@ -37,12 +37,13 @@ void main() {
     expect(photoFilters.map((f) => f.id).toSet(), hasLength(photoFilters.length), reason: 'id 不重複');
   });
 
-  test('青橙：暗部偏青、亮部偏橙；黑茶接近灰階', () {
+  test('青橙：暗部偏青、亮部偏橙；黑茶接近灰階；銀鹽黑白為單色調', () {
     final to = filterById('teal_orange');
     final dark = _apply(to, [40, 40, 40]), light = _apply(to, [220, 220, 220]);
     expect(dark[2], greaterThan(dark[0]), reason: '暗部藍多於紅');
     expect(light[0], greaterThan(light[2]), reason: '亮部紅多於藍');
     expect(_sat(_apply(filterById('dark_tea'), [200, 60, 60])), lessThan(.45), reason: '顏色被壓得很淡');
+    expect(_sat(_apply(filterById('bw_film'), [220, 80, 140])), lessThan(.02), reason: '銀鹽黑白幾乎無彩度');
   });
 
   test('褪色感：黑色點被拉起來，純黑變成帶灰', () {
@@ -52,9 +53,9 @@ void main() {
     }
   });
 
-  test('膚色通透：千禧通透、清透野餐的膚色變亮、不更黃', () {
+  test('膚色通透：奶油蜜桃、日系富士、千禧通透、清透野餐的膚色變亮、不更黃', () {
     const skin = [224, 172, 140];
-    for (final id in ['y2k_clear', 'picnic', 'flash_blue']) {
+    for (final id in ['peach_cream', 'fuji_clear', 'y2k_clear', 'picnic', 'flash_blue']) {
       final out = _apply(filterById(id), skin);
       final l0 = skin[0] + skin[1] + skin[2], l1 = out[0] + out[1] + out[2];
       expect(l1, greaterThan(l0), reason: '$id 變亮');
