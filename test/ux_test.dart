@@ -12,6 +12,7 @@ import 'package:pico_snap/polaroid_camera_screen.dart';
 import 'package:pico_snap/services/my_library.dart';
 import 'package:pico_snap/widgets/frames.dart';
 import 'package:pico_snap/widgets/instant_print.dart';
+import 'package:pico_snap/widgets/sticker_item.dart';
 
 /// A wide photo (3:2), so it can be moved sideways in a squarish window.
 Future<Uint8List> _photo() async {
@@ -97,6 +98,33 @@ void main() {
     await t.tap(find.text('做成拼貼'));
     await t.pumpAndSettle();
     expect(t.widget<EditorScreen>(find.byType(EditorScreen)).films, [FilmStock.black]);
+  });
+
+  testWidgets('相機：下次打開還是上次選的底片', (t) async {
+    final photo = (await t.runAsync(_photo))!;
+    await _phone(t, PolaroidCameraScreen(pickPhoto: () async => photo, motion: const Stream.empty()));
+    await t.tap(find.text('黑底片'));
+    await t.pump();
+    await t.pumpWidget(const SizedBox());
+    await _phone(t, PolaroidCameraScreen(pickPhoto: () async => photo, motion: const Stream.empty()));
+    await t.tap(find.text('從相簿'));
+    await t.pump();
+    await t.pump(const Duration(seconds: 3));
+    expect(t.widget<InstantPrint>(find.byType(InstantPrint)).film, FilmStock.black);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('插畫模板：文字變成可以拖曳的貼紙', (t) async {
+    final art = allStripTemplates.indexWhere((s) => s.art != null);
+    await _phone(t, EditorScreen(template: art));
+    await t.tap(find.text('文字'));
+    await t.pumpAndSettle();
+    await t.enterText(find.byType(TextField), '好開心');
+    await t.tap(find.text('加上去'));
+    await t.pumpAndSettle();
+    expect(find.byWidgetPredicate((w) => w is TextSticker && w.text == '好開心'), findsOneWidget);
+    expect(find.byType(StickerItem), findsOneWidget);
   });
 
   testWidgets('首頁：「我的」是分頁，返回鍵先回首頁', (t) async {

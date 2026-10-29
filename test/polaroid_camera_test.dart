@@ -58,12 +58,13 @@ void main() {
     expect(find.text('存到相簿'), findsOneWidget);
     expect(find.text('再拍一張'), findsOneWidget);
 
-    // 沒有自動印日期；按「手寫」直接在相片上寫
+    // 沒有自動印日期；按「在相片上手寫」直接在相片上寫
     final caption = find.byKey(const ValueKey('instant-caption'));
     expect(find.descendant(of: caption, matching: find.byType(Text)), findsNothing, reason: '白邊一開始是空的');
     expect(find.byType(DoodleInput), findsNothing);
     final small = t.getRect(find.byType(InstantPrint)).width;
-    await t.tap(find.text('手寫'));
+    expect(find.text('簽名、寫日期，或畫點小塗鴉'), findsOneWidget);
+    await t.tap(find.text('在相片上手寫'));
     await t.pumpAndSettle();
     expect(find.byType(DoodleInput), findsOneWidget, reason: '整張相片都可以寫');
     expect(t.getRect(find.byType(InstantPrint)).width, greaterThan(small * 1.2), reason: '寫字時相片放大');
@@ -83,6 +84,8 @@ void main() {
     expect(written(), hasLength(1));
     expect(written().single.points.length, greaterThan(4));
     expect(written().single.color, FilmStock.white.pen, reason: '白底片預設黑筆');
+    expect(find.text('修改手寫'), findsOneWidget, reason: '寫過之後按鈕改成修改');
+    expect(find.text('簽名、寫日期，或畫點小塗鴉'), findsNothing);
 
     // 存檔：測試裡沒有相簿外掛，會顯示錯誤但不會當掉
     await t.tap(find.text('存到相簿'));

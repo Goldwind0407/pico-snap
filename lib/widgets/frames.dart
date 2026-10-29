@@ -601,6 +601,7 @@ class StickerVisual extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (sticker.startsWith('assets/')) return Image.asset(sticker, width: size, height: size, filterQuality: FilterQuality.medium);
+    if (sticker.startsWith('text:')) return SizedBox.square(dimension: size, child: FittedBox(child: TextSticker(sticker.substring(5))));
     if (sticker.startsWith('my:')) {
       final custom = customStickers[sticker];
       // Deleted while still referenced somewhere: draw nothing.
@@ -608,6 +609,28 @@ class StickerVisual extends StatelessWidget {
       return Image.memory(custom, width: size, height: size, gaplessPlayback: true, filterQuality: FilterQuality.medium);
     }
     return SizedBox.square(dimension: size, child: FittedBox(child: EmojiSticker(sticker, size: size * .8)));
+  }
+}
+
+/// Words typed in the editor, handwritten with a white sticker edge.
+class TextSticker extends StatelessWidget {
+  final String text;
+  const TextSticker(this.text, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final style = hand(48);
+    return Padding(
+      padding: const EdgeInsets.all(6),
+      child: Stack(children: [
+        Text(text, style: style.copyWith(foreground: Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 10
+          ..strokeJoin = StrokeJoin.round
+          ..color = Colors.white)),
+        Text(text, style: style),
+      ]),
+    );
   }
 }
 

@@ -147,9 +147,13 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   int _penWidth = 0;
   int _inkVersion = 0;
   final _printKey = GlobalKey();
-  _Body _body = _Body.cream;
-  FilmStock _film = FilmStock.white;
-  PhotoFilter _filter = photoFilters.first;
+  /// Body, film and filter last used, picked again next time the camera opens.
+  static _Body _lastBody = _Body.cream;
+  static FilmStock _lastFilm = FilmStock.white;
+  static String? _lastFilter;
+  _Body _body = _lastBody;
+  FilmStock _film = _lastFilm;
+  PhotoFilter _filter = filterById(_lastFilter);
   /// The filter row is rebuilt after each shot; it starts where it was left.
   double _filterOffset = 0;
   ScrollController? _filterScroll;
@@ -433,6 +437,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   }
 
   void _penDown(Offset at, Size size) => setState(() {
+    _current!.saved = false;
     _current!.handwriting.add(Stroke(points: [normalise(at, size)], color: _pen, width: _handWidths[_penWidth], style: PenStyle.pen));
     _inkVersion++;
   });
@@ -447,6 +452,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   }
 
   void _editInk(void Function(List<Stroke> strokes) edit) => setState(() {
+    _current!.saved = false;
     edit(_current!.handwriting);
     _inkVersion++;
   });
@@ -505,7 +511,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     padding: const EdgeInsets.fromLTRB(8, 8, 12, 0),
     child: Row(children: [
       IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
-      const Expanded(child: Text('Instant Camera', style: TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
+      const Expanded(child: Text('Polaroid', style: TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
       if (_canFlip)
         IconButton(onPressed: _stage == _Stage.aiming ? _flipCamera : null, icon: const Icon(Icons.cameraswitch_outlined), color: ink, disabledColor: line),
     ]),
@@ -567,7 +573,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       left: camLeft, top: camTop, width: cw, height: ch,
       child: IgnorePointer(
         ignoring: _stage != _Stage.aiming,
-        child: Opacity(opacity: 1 - .82 * l, child: _CameraBody(body: _body, lens: ColorFiltered(colorFilter: _filter.previewFilter, child: _viewfinder()), onShutter: _shoot)),
+        child: Opacity(opacity: (1 - .82 * l) * (1 - z), child: _CameraBody(body: _body, lens: ColorFiltered(colorFilter: _filter.previewFilter, child: _viewfinder()), onShutter: _shoot)),
       ),
     );
     // A big viewfinder above the camera, the shape of the print's window, so
@@ -637,7 +643,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       final f = photoFilters[i];
       final on = f.id == _filter.id;
       return GestureDetector(
-        onTap: () => setState(() => _filter = f),
+        onTap: () => setState(() => _lastFilter = (_filter = f).id),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -655,7 +661,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   Widget _options() => SizedBox(height: 34, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
     for (final b in _Body.values)
       GestureDetector(
-        onTap: () => setState(() => _body = b),
+        onTap: () => setState(() => _lastBody = _body = b),
         child: Container(
           width: 26, height: 26, margin: const EdgeInsets.symmetric(horizontal: 4),
           decoration: BoxDecoration(
@@ -668,7 +674,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     Container(width: 1, height: 20, margin: const EdgeInsets.symmetric(horizontal: 10), color: line),
     for (final f in FilmStock.values)
       GestureDetector(
-        onTap: () => setState(() => _film = f),
+        onTap: () => setState(() => _lastFilm = _film = f),
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 3),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -708,21 +714,31 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     ]),
     _Stage.ejecting => const Center(child: Text('出片中…', style: TextStyle(fontSize: 15, color: muted, fontWeight: FontWeight.w800))),
     _Stage.developing => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-      const Text('顯影中…', style: TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 4),
-      Text('輕點照片可以跳過', style: hand(20, color: muted)),
+      const Text('顯影中…', style: TextStyle(fontSize: 18, color: ink, fontWeight: FontWeight.w900)),
+      const SizedBox(height: 6),
+      const Text('輕點照片可以跳過', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)),
     ])),
     _Stage.done when _writing => _penBar(),
-    _Stage.done => Padding(
+    _Stage.done => _doneBar(),
+  };
+
+  /// Write on the print, shoot again, save.
+  Widget _doneBar() {
+    final inked = _current?.handwriting.isNotEmpty ?? false;
+    final saved = _current?.saved ?? false;
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        TextButton.icon(
+        OutlinedButton.icon(
           onPressed: _startWriting, icon: const Icon(Icons.edit_rounded, size: 18),
-          label: const Text('手寫', style: TextStyle(fontWeight: FontWeight.w800)),
-          style: TextButton.styleFrom(foregroundColor: ink),
+          label: Text(inked ? '修改手寫' : '在相片上手寫', style: const TextStyle(fontWeight: FontWeight.w800)),
+          style: OutlinedButton.styleFrom(foregroundColor: ink, backgroundColor: blush, side: const BorderSide(color: blushLine), shape: const StadiumBorder()),
         ),
-        Text('用手指直接在相片上寫字、畫畫', style: hand(18, color: muted)),
-        const SizedBox(height: 8),
+        if (!inked) ...[
+          const SizedBox(height: 6),
+          const Text('簽名、寫日期，或畫點小塗鴉', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)),
+        ],
+        const SizedBox(height: 16),
         Row(children: [
           Expanded(child: OutlinedButton.icon(
             onPressed: _again, icon: const Icon(Icons.camera_alt_outlined, size: 18), label: const Text('再拍一張', style: TextStyle(fontWeight: FontWeight.w800)),
@@ -730,13 +746,18 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
           )),
           const SizedBox(width: 10),
           Expanded(child: FilledButton.icon(
-            onPressed: _save, icon: const Icon(Icons.download_rounded, size: 18), label: Text(_saving ? '儲存中…' : '存到相簿', style: const TextStyle(fontWeight: FontWeight.w800)),
-            style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+            onPressed: saved || _saving ? null : _save,
+            icon: Icon(saved ? Icons.check_rounded : Icons.download_rounded, size: 18),
+            label: Text(_saving ? '儲存中…' : saved ? '已存到相簿' : '存到相簿', style: const TextStyle(fontWeight: FontWeight.w800)),
+            style: FilledButton.styleFrom(
+              backgroundColor: coral, disabledBackgroundColor: saved ? sage : null, disabledForegroundColor: saved ? ink : null,
+              padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
           )),
         ]),
       ]),
-    ),
-  };
+    );
+  }
 
   /// The handwriting tools, in place of the buttons while writing.
   Widget _penBar() {

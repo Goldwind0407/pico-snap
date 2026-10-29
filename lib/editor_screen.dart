@@ -16,6 +16,7 @@ import 'services/photo_save_service.dart';
 import 'services/timelapse_recorder.dart';
 import 'theme.dart';
 import 'widgets/doodle.dart';
+import 'widgets/filter_thumbs.dart';
 import 'widgets/frames.dart';
 import 'widgets/instant_print.dart';
 import 'widgets/sticker_item.dart';
@@ -119,9 +120,9 @@ class _EditorScreenState extends State<EditorScreen> {
   };
 
   String get _title => switch (widget.mode) {
-    EditorMode.fourCut => 'Four Cut',
+    EditorMode.fourCut => 'Four Cuts',
     EditorMode.polaroid => 'Polaroid',
-    EditorMode.sticker => 'Sticker Editor',
+    EditorMode.sticker => 'Sticker',
   };
 
   double get _aspect => switch (widget.mode) {
@@ -332,6 +333,21 @@ class _EditorScreenState extends State<EditorScreen> {
     if (_photos[i] == null) _pickPhoto(i);
   }
 
+  /// Outline the chosen photo only while a tool works on one photo.
+  bool get _showCell => !_capturing && (_tool == _Tool.photo || _tool == _Tool.filter || (_tool == _Tool.text && widget.mode == EditorMode.polaroid));
+
+  /// The template prints its own words: typed text goes on as a sticker.
+  bool get _printedText => widget.mode == EditorMode.fourCut && allStripTemplates[_template].art != null;
+
+  void _addText(String text) {
+    text = text.trim();
+    if (text.isEmpty) return;
+    _textCtrl.clear();
+    _addSticker('text:$text');
+    // Words fill the width of a sticker's square: start them wide enough to read.
+    setState(() => _stickers.last = _stickers.last.copyWith(scale: 2.2, center: Offset(.5, _stickers.last.center.dy)));
+  }
+
   /// The cell whose photo can be dragged and pinched right now.
   int? get _adjusting => !_capturing && _tool == _Tool.photo && _photos[_selectedCell] != null ? _selectedCell : null;
 
@@ -497,7 +513,7 @@ class _EditorScreenState extends State<EditorScreen> {
   Widget _artwork(Size size) => switch (widget.mode) {
     EditorMode.fourCut => FittedBox(child: PhotoStrip(
       template: allStripTemplates[_template], photos: _photos, caption: _stripCaption,
-      placeholder: _capturing ? null : const AddPhotoHint(scale: 1.4), selected: _capturing ? null : _selectedCell, onTapCell: _tapCell,
+      placeholder: _capturing ? null : const AddPhotoHint(scale: 1.4), selected: _showCell ? _selectedCell : null, onTapCell: _tapCell,
       fits: _fits, aspects: _aspects, adjusting: _adjusting, onFit: _setFit, filters: _filters,
     )),
     EditorMode.polaroid => _polaroidArtwork(size),
@@ -533,7 +549,7 @@ class _EditorScreenState extends State<EditorScreen> {
                     image: _photos[i], film: _films[i], caption: _polaroidCaptions[i],
                     handwriting: i < widget.handwriting.length ? widget.handwriting[i] : const [],
                     placeholder: _capturing ? null : const AddPhotoHint(scale: 1.3),
-                    selected: !_capturing && _selectedCell == i, onTap: () => _tapCell(i),
+                    selected: _showCell && _selectedCell == i, onTap: () => _tapCell(i),
                     onCaption: () => setState(() {
                       _selectedCell = i;
                       _tool = _Tool.text;
@@ -806,29 +822,7 @@ class _EditorScreenState extends State<EditorScreen> {
             ),
         ]),
       ),
-      Expanded(child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-        itemCount: photoFilters.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) {
-          final f = photoFilters[i];
-          final on = f.id == current.id;
-          return GestureDetector(
-            onTap: () => _setFilter(f),
-            child: Column(children: [
-              Container(
-                width: 64, height: 64,
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: on ? coral : Colors.transparent, width: 2.5)),
-                padding: const EdgeInsets.all(2),
-                child: ClipRRect(borderRadius: BorderRadius.circular(9), child: FilterEffects(filter: f, child: Image(image: filtered(image, f, maxSide: 180), fit: BoxFit.cover, width: 60, height: 60, gaplessPlayback: true))),
-              ),
-              const SizedBox(height: 4),
-              Text(f.name, style: TextStyle(fontSize: 11, color: on ? ink : muted, fontWeight: on ? FontWeight.w900 : FontWeight.w600)),
-            ]),
-          );
-        },
-      )),
+      Expanded(child: FilterThumbs(image: image, selected: current.id, onPick: _setFilter, padding: const EdgeInsets.fromLTRB(16, 6, 16, 10))),
     ]);
   }
 
@@ -979,12 +973,49 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  Widget _textTool() => widget.mode == EditorMode.fourCut && allStripTemplates[_template].art != null
-    ? Center(child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
-        child: Text('這款模板的文字是印好的，可以用貼紙裝飾，或換一款模板來寫字。', textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, height: 1.5, color: muted.withValues(alpha: .9), fontWeight: FontWeight.w700)),
-      ))
+  Widget _textTool() => _printedText
+    ? Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('加一句話（可以拖曳、縮放）', style: TextStyle(fontSize: 13, color: ink, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: TextField(
+              controller: _textCtrl,
+              maxLength: 20,
+              onSubmitted: _addText,
+              style: hand(24),
+              decoration: InputDecoration(
+                isDense: true, filled: true, fillColor: cream, counterText: '', hintText: '想說的話…',
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: line)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: coral, width: 1.5)),
+              ),
+            )),
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: () => _addText(_textCtrl.text),
+              style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              child: const Text('加上去', style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          SizedBox(height: 34, child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _captionIdeas.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, i) => GestureDetector(
+              onTap: () => _addText(_captionIdeas[i]),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: blush, borderRadius: BorderRadius.circular(17)),
+                child: Text(_captionIdeas[i], style: hand(18)),
+              ),
+            ),
+          )),
+        ]),
+      )
     : Padding(
     padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

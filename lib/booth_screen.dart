@@ -17,6 +17,7 @@ import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
 import 'services/timelapse_recorder.dart';
 import 'theme.dart';
+import 'widgets/filter_thumbs.dart';
 import 'widgets/frames.dart';
 
 /// Photo window [i] of [t], in PhotoStrip design units.
@@ -100,6 +101,8 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   PhotoFilter _filter = photoFilters.first;
   final _stripKey = GlobalKey();
   bool _withVideo = true, _saving = false, _saved = false;
+  /// What went into the album, shown once saved.
+  String? _savedWhat;
   /// While making the video: the frames shown in the strip, and progress.
   List<ImageProvider>? _playing;
   double? _progress;
@@ -399,7 +402,10 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
       _saving = false;
       _playing = null;
       _progress = null;
-      if (error == null) _saved = true;
+      if (error == null) {
+        _saved = true;
+        _savedWhat = done.endsWith('影片') ? '圖片和影片都存到相簿了' : '已存到相簿';
+      }
     });
     showMessage(context, error ?? done, error: error != null, above: 150);
   }
@@ -579,7 +585,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
           IconButton(onPressed: _flipCamera, icon: const Icon(Icons.cameraswitch_outlined), color: ink),
       ]),
       Expanded(child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
         child: Center(child: Stack(alignment: Alignment.center, children: [
             _framedFinder(i, live: frozen == null),
             if (_count != null) AnimatedBuilder(
@@ -629,9 +635,15 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   Widget _framedFinder(int i, {required bool live}) {
     final design = _t.designSize, cell = cellRect(_t, i);
     final m = cell.shortestSide * .18;
-    final view = Rect.fromLTRB(
-      max(0, cell.left - m), max(0, cell.top - m), min(design.width, cell.right + m), min(design.height, cell.bottom + m),
-    );
+    // Above and below, stop halfway to the next window so its edge doesn't peek in.
+    var top = max(0.0, cell.top - m), bottom = min(design.height, cell.bottom + m);
+    for (var k = 0; k < _shots; k++) {
+      final o = cellRect(_t, k);
+      if (k == i || o.right <= cell.left || o.left >= cell.right) continue;
+      if (o.bottom <= cell.top) top = max(top, (o.bottom + cell.top) / 2);
+      if (o.top >= cell.bottom) bottom = min(bottom, (cell.bottom + o.top) / 2);
+    }
+    final view = Rect.fromLTRB(max(0, cell.left - m), top, min(design.width, cell.right + m), bottom);
     Widget still(({Uint8List bytes, bool mirror}) p) => SizedBox.expand(child: Transform.flip(
       flipX: p.mirror,
       child: Image.memory(p.bytes, fit: BoxFit.cover, gaplessPlayback: true, cacheWidth: 900),
@@ -683,14 +695,6 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
               template: _t, photos: _playing ?? _providers, filters: List.filled(_shots, _filter),
             )),
           )),
-          if (_progress != null)
-            Positioned(bottom: 0, child: DecoratedBox(
-              decoration: BoxDecoration(color: ink.withValues(alpha: .75), borderRadius: BorderRadius.circular(20)),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                child: Text('影片製作中 ${(_progress! * 100).round()}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-              ),
-            )),
         ]),
       )),
       if (filtering) ..._filterControls() else ..._saveControls(),
@@ -698,14 +702,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   }
 
   List<Widget> _filterControls() => [
-    SizedBox(height: 44, child: ListView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      children: [
-        for (final f in photoFilters)
-          Padding(padding: const EdgeInsets.only(right: 8), child: _Chip(label: f.name, selected: f.id == _filter.id, onTap: () => setState(() => _filter = f))),
-      ],
-    )),
+    SizedBox(height: 86, child: FilterThumbs(image: _providers.first, selected: _filter.id, onPick: (f) => setState(() => _filter = f))),
     Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
       child: Row(children: [
@@ -724,10 +721,22 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
     ),
   ];
 
+  /// Stays on screen once saved, so there's no doubt it worked.
+  Widget _savedNote() => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    decoration: BoxDecoration(color: sage.withValues(alpha: .45), borderRadius: BorderRadius.circular(16)),
+    child: Row(children: [
+      const Icon(Icons.check_circle_rounded, color: ink),
+      const SizedBox(width: 10),
+      Expanded(child: Text(_savedWhat ?? '已存到相簿', style: const TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800))),
+    ]),
+  );
+
   List<Widget> _saveControls() => [
     Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: GestureDetector(
+      child: _saved ? _savedNote() : GestureDetector(
         onTap: _canVideo && !_saving ? () => setState(() => _withVideo = !_withVideo) : null,
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
@@ -767,8 +776,11 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
             ])
           : SizedBox(width: double.infinity, child: FilledButton(
               onPressed: _saving ? null : _save,
-              style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-              child: Text(_saving ? '儲存中…' : '存到相簿', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+              style: FilledButton.styleFrom(backgroundColor: coral, disabledBackgroundColor: coral.withValues(alpha: .6), disabledForegroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+              child: Text(
+                _progress != null ? '影片製作中 ${(_progress! * 100).round()}%' : _saving ? '儲存中…' : '存到相簿',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+              ),
             )),
     ),
   ];
