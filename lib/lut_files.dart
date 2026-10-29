@@ -82,6 +82,10 @@ const lutLooks = <String, LutLook>{
   // Teal shadows, warm amber highlights, faded blacks, muted greens. The file
   // is colour only, so the instant-film texture comes from here.
   'teal_warm_film': LutLook('青暖底片', grain: .25, vignette: .14, soften: .3, halation: .15),
+  // Warm amber skin against cool teal backgrounds, like Japanese street snaps.
+  'teal_amber_street': LutLook('日系街拍', grain: .2, vignette: .12, soften: .2, halation: .1),
+  // Washed-out colour and grey-brown blacks: an old roll of 400 film.
+  'vintage_film_400': LutLook('復古膠卷', grain: .35, vignette: .18, soften: .35, halation: .2),
 };
 
 /// A LUT as read from a file: [size]³ entries of r, g, b (0–1), blue
