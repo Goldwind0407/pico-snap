@@ -8,6 +8,8 @@ import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/models.dart';
 import 'package:pico_snap/widgets/frames.dart';
 
+import 'test_filters.dart';
+
 Future<Uint8List> _photo() async {
   final r = ui.PictureRecorder();
   ui.Canvas(r).drawRect(const Rect.fromLTWH(0, 0, 160, 120), Paint()..color = const Color(0xFFF08030));
@@ -27,6 +29,8 @@ Future<void> _phone(WidgetTester t, Widget home) async {
 Finder _count(String n) => find.byWidgetPredicate((w) => w is Text && w.data == n && (w.style?.fontSize ?? 0) > 60);
 
 void main() {
+  useTestFilters();
+
   test('取景框跟模板的照片格一樣比例', () {
     final drawn = stripTemplates.firstWhere((t) => t.art == null);
     expect(cellAspect(drawn, 0), closeTo(176 / 128, 1e-9));
@@ -70,12 +74,12 @@ void main() {
     expect(shots, 4);
     // 5. 拍完才挑濾鏡，套在全部照片
     expect(find.text('挑濾鏡'), findsOneWidget);
-    await t.tap(find.text('青橙'));
+    await t.tap(find.text('測試青橙'));
     await t.pump();
     final strip = t.widget<PhotoStrip>(find.byType(PhotoStrip));
     expect(strip.template, allStripTemplates[1]);
     expect(strip.photos, hasLength(4));
-    expect(strip.filters.every((f) => f.id == 'teal_orange'), isTrue);
+    expect(strip.filters.every((f) => f.id == 'test_teal'), isTrue);
     // 6. 完成：存圖，可選順便存影片（測試沒有相機畫面，所以不能選）
     await t.tap(find.text('下一步'));
     await t.pump();

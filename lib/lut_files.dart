@@ -73,41 +73,7 @@ class LutLook {
 }
 
 /// 濾鏡檔的中文名字和底片效果（key 是檔名，不含副檔名）。
-const lutLooks = {
-  // Film stocks from the RawTherapee Film Simulation Collection (CC BY-SA
-  // 4.0, credit Pat David, Pavlov Dmitry, Michael Ezra). Our own names: the
-  // film brands are trademarks.
-  'film_soft_portrait': LutLook('柔膚人像', grain: .3, soften: .45, halation: .3),
-  'film_warm_portrait': LutLook('暖調人像', grain: .35, vignette: .15, soften: .45, halation: .35),
-  'film_fresh': LutLook('清新日系', grain: .25, soften: .4, halation: .25, halationColor: (.85, .96, 1)),
-  'film_everyday': LutLook('寫實日常', grain: .3, vignette: .12, soften: .35, halation: .2),
-  'film_lilac_instant': LutLook('藍紫拍立得', grain: .3, vignette: .3, soften: .5, halation: .3, halationColor: (.85, .8, 1)),
-  'film_expired_instant': LutLook('過期拍立得', grain: .45, vignette: .35, soften: .55, halation: .4),
-  // Film stocks simulated from their published datasheets with
-  // spectral_film_lut (MIT): negative plus print paper, sRGB in and out.
-  'sfl_portra400': LutLook('柔光人像', grain: .3, vignette: .12, soften: .4, halation: .3),
-  'sfl_portra160': LutLook('細緻人像', grain: .22, soften: .4, halation: .25),
-  'sfl_gold200': LutLook('金色夏日', grain: .4, vignette: .18, soften: .45, halation: .4),
-  'sfl_ultramax400': LutLook('日常底片', grain: .4, vignette: .15, soften: .4, halation: .35),
-  'sfl_pro400h': LutLook('薄荷日系', grain: .25, soften: .4, halation: .25, halationColor: (.85, .96, 1)),
-  'sfl_superia400': LutLook('街拍底片', grain: .4, vignette: .2, soften: .4, halation: .35),
-  'sfl_c200': LutLook('隨身底片', grain: .45, vignette: .22, soften: .45, halation: .4),
-  'sfl_instax': LutLook('拍立得相紙', grain: .25, vignette: .25, soften: .5, halation: .3),
-  'sfl_fp100c': LutLook('撕拉相紙', grain: .3, vignette: .28, soften: .5, halation: .3),
-  'BlueArchitecture': LutLook('藍調建築'),
-  'BlueHour': LutLook('藍色時刻'),
-  'ColdChrome': LutLook('冷調鉻黃'),
-  'CrispAutumn': LutLook('清爽秋日'),
-  'DarkAndSomber': LutLook('暗調憂鬱'),
-  'HardBoost': LutLook('強烈鮮豔'),
-  'LongBeachMorning': LutLook('海灘晨光'),
-  'LushGreen': LutLook('濃郁綠意'),
-  'MagicHour': LutLook('魔幻時刻'),
-  'NaturalBoost': LutLook('自然增豔'),
-  'OrangeAndBlue': LutLook('橘藍電影'),
-  'SoftBlackAndWhite': LutLook('柔和黑白'),
-  'Waves': LutLook('海浪'),
-};
+const lutLooks = <String, LutLook>{};
 
 /// A LUT as read from a file: [size]³ entries of r, g, b (0–1), blue
 /// changing fastest like [PhotoFilter.lut].
