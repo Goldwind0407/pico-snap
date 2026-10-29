@@ -128,6 +128,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   late final _flash = AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
   // The print wiggles in your hand while you shake it.
   late final _wiggle = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
+  /// The print grows to fill the stage while you write on it.
+  late final _enlarge = AnimationController(vsync: this, duration: const Duration(milliseconds: 280));
   StreamSubscription<UserAccelerometerEvent>? _motion;
   DateTime _lastShake = DateTime(0);
 
@@ -170,6 +172,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     _develop.dispose();
     _flash.dispose();
     _wiggle.dispose();
+    _enlarge.dispose();
     _filterScroll?.dispose();
     _motion?.cancel();
     super.dispose();
@@ -398,6 +401,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       _stage = _Stage.aiming;
       _writing = false;
     });
+    _enlarge.value = 0;
   }
 
   Future<void> _save() async {
@@ -420,6 +424,12 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       _writing = true;
       if (print.handwriting.isEmpty) _pen = print.film.pen;
     });
+    _enlarge.forward();
+  }
+
+  void _stopWriting() {
+    setState(() => _writing = false);
+    _enlarge.reverse();
   }
 
   void _penDown(Offset at, Size size) => setState(() {
@@ -475,7 +485,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       SafeArea(child: Column(children: [
         _topBar(),
         Expanded(child: LayoutBuilder(builder: (context, c) => AnimatedBuilder(
-          animation: Listenable.merge([_eject, _lift, _develop, _wiggle]),
+          animation: Listenable.merge([_eject, _lift, _develop, _wiggle, _enlarge]),
           builder: (context, _) => _stageView(c.biggest),
         ))),
         SizedBox(height: _controlsHeight, child: _bottom()),
@@ -529,11 +539,15 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     final rh = rw / FilmStock.aspect;
     final review = Rect.fromLTWH((size.width - rw) / 2, max(8.0, (size.height - rh) / 2 - 4), rw, rh);
     final l = Curves.easeInOutCubic.transform(_lift.value);
-    final rect = Rect.lerp(ejected, review, l)!;
+    // Writing: as big as the stage allows, straightened.
+    final bw = min(size.width - 16, (size.height - 12) * FilmStock.aspect), bh = bw / FilmStock.aspect;
+    final big = Rect.fromLTWH((size.width - bw) / 2, (size.height - bh) / 2, bw, bh);
+    final z = Curves.easeOutCubic.transform(_enlarge.value);
+    final rect = Rect.lerp(Rect.lerp(ejected, review, l)!, big, z)!;
 
     final print = _current;
     final printView = print == null ? null : Positioned.fromRect(rect: rect, child: Transform.rotate(
-      angle: -.035 * l + (_wiggle.isAnimating ? sin(_wiggle.value * pi * 4) * .06 * (1 - _wiggle.value) : 0),
+      angle: -.035 * l * (1 - z) + (_wiggle.isAnimating ? sin(_wiggle.value * pi * 4) * .06 * (1 - _wiggle.value) : 0),
       child: GestureDetector(
         onTap: _stage == _Stage.developing ? _skipDeveloping : null,
         child: FittedBox(child: DecoratedBox(
@@ -761,7 +775,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
           ),
           const SizedBox(width: 4),
           FilledButton(
-            onPressed: () => setState(() => _writing = false),
+            onPressed: _stopWriting,
             style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12)),
             child: const Text('寫好了', style: TextStyle(fontWeight: FontWeight.w800)),
           ),

@@ -62,9 +62,11 @@ void main() {
     final caption = find.byKey(const ValueKey('instant-caption'));
     expect(find.descendant(of: caption, matching: find.byType(Text)), findsNothing, reason: '白邊一開始是空的');
     expect(find.byType(DoodleInput), findsNothing);
+    final small = t.getRect(find.byType(InstantPrint)).width;
     await t.tap(find.text('手寫'));
     await t.pumpAndSettle();
     expect(find.byType(DoodleInput), findsOneWidget, reason: '整張相片都可以寫');
+    expect(t.getRect(find.byType(InstantPrint)).width, greaterThan(small * 1.2), reason: '寫字時相片放大');
     expect(find.text('存到相簿'), findsNothing, reason: '寫字時下方換成筆的工具');
     final printRect = t.getRect(find.byType(InstantPrint));
     final g = await t.startGesture(printRect.center - Offset(printRect.width * .3, 0));
@@ -76,6 +78,7 @@ void main() {
     await t.tap(find.text('寫好了'));
     await t.pumpAndSettle();
     expect(find.byType(DoodleInput), findsNothing);
+    expect(t.getRect(find.byType(InstantPrint)).width, closeTo(small, 1), reason: '寫好縮回原本大小');
     List<Stroke> written() => t.widget<InstantPrint>(find.byType(InstantPrint)).handwriting;
     expect(written(), hasLength(1));
     expect(written().single.points.length, greaterThan(4));
