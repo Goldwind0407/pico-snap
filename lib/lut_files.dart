@@ -74,12 +74,9 @@ class LutLook {
 
 /// 濾鏡檔的中文名字和底片效果（key 是檔名，不含副檔名）。
 const lutLooks = <String, LutLook>{
-  // Fujifilm's own F-Log2 LUTs (GFX ETERNA 55), baked to take sRGB photos
-  // with design/flog2_bake.py. For testing only: not ours to ship.
-  'fuji_classic_chrome': LutLook('復古正片'),
-  'fuji_classic_neg': LutLook('懷舊負片'),
-  // The same two applied straight to the photo, unconverted: far more
-  // contrast and colour, a loud look of its own.
+  // Fujifilm's own F-Log2 LUTs (GFX ETERNA 55) applied straight to the
+  // photo: far more contrast and colour than the camera look, a loud style of
+  // its own. For testing only: not ours to ship.
   'fuji_classic_chrome_raw': LutLook('濃烈正片'),
   'fuji_classic_neg_raw': LutLook('濃烈負片'),
 };
