@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import 'doodle.dart';
 
-const _handColors = [ink, Colors.white, coral, Color(0xFFFF8FB1), Color(0xFF86BBD8), Color(0xFF8B5E3C)];
+/// The pens a print's border defaults to: black on white film, gold on black.
+const handBlack = Color(0xFF1E1E20), handGold = Color(0xFFD4AF5A);
+
+const _handColors = [handBlack, handGold, Colors.white, coral, Color(0xFFFF8FB1), Color(0xFF86BBD8)];
 
 /// 細、粗：佔寫字區寬度的比例。
 const _handWidths = [.012, .022];

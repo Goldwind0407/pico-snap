@@ -407,7 +407,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     if (print == null || _stage != _Stage.done) return;
     final area = InstantPrint.captionArea(print.film);
     final strokes = await showHandwritingPad(context,
-      initial: print.handwriting, aspect: area.width / area.height, paper: print.film.swatch, pen: print.film.text);
+      initial: print.handwriting, aspect: area.width / area.height, paper: print.film.swatch,
+      pen: print.film == FilmStock.black ? handGold : handBlack);
     if (strokes != null && mounted) setState(() => print.handwriting = strokes);
   }
 

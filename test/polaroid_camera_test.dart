@@ -9,6 +9,7 @@ import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/polaroid_camera_screen.dart';
 import 'package:pico_snap/services/photo_save_service.dart';
 import 'package:pico_snap/widgets/doodle.dart';
+import 'package:pico_snap/widgets/handwriting_pad.dart';
 import 'package:pico_snap/widgets/instant_print.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
@@ -76,6 +77,7 @@ void main() {
     List<Stroke> written() => t.widget<InstantPrint>(find.byType(InstantPrint)).handwriting;
     expect(written(), hasLength(1));
     expect(written().single.points.length, greaterThan(4));
+    expect(written().single.color, handBlack, reason: '白底片預設黑筆');
 
     // 存檔：測試裡沒有相簿外掛，會顯示錯誤但不會當掉
     await t.tap(find.text('存到相簿'));
