@@ -17,7 +17,6 @@ import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
 import 'theme.dart';
 import 'widgets/doodle.dart';
-import 'widgets/handwriting_pad.dart';
 import 'widgets/instant_print.dart';
 
 /// Geometry of the camera photos (all the same model), as fractions of the
@@ -50,13 +49,19 @@ enum _Stage { aiming, ejecting, developing, done }
 
 const _controlsHeight = 196.0;
 
+/// Pens for writing on a print; each film starts with its own ([FilmStock.pen]).
+const _handColors = [Color(0xFF1E1E20), Color(0xFFD4AF5A), Colors.white, coral, Color(0xFFFF8FB1), Color(0xFF86BBD8)];
+
+/// 細、粗：佔相片寬度的比例。
+const _handWidths = [.014, .026];
+
 class _Print {
   final Uint8List bytes;
   final ImageProvider image;
   final FilmStock film;
   final PhotoFilter filter;
-  /// Finger writing on the bottom border; blank until the user writes.
-  List<Stroke> handwriting = const [];
+  /// Finger writing on the print; blank until the user writes.
+  final handwriting = <Stroke>[];
   bool saved = false;
   _Print(this.bytes, this.film, this.filter) : image = MemoryImage(bytes);
 }
@@ -134,6 +139,11 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   _Print? _current;
   final _prints = <_Print>[];
   bool _saving = false;
+  /// Writing on the print with a finger.
+  bool _writing = false;
+  Color _pen = FilmStock.white.pen;
+  int _penWidth = 0;
+  int _inkVersion = 0;
   final _printKey = GlobalKey();
   _Body _body = _Body.cream;
   FilmStock _film = FilmStock.white;
@@ -386,6 +396,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     setState(() {
       _current = null;
       _stage = _Stage.aiming;
+      _writing = false;
     });
   }
 
@@ -402,15 +413,33 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     showMessage(context, error ?? '已存到相簿 ♡', error: error != null, above: _controlsHeight);
   }
 
-  Future<void> _handwrite() async {
+  void _startWriting() {
     final print = _current;
-    if (print == null || _stage != _Stage.done) return;
-    final area = InstantPrint.captionArea(print.film);
-    final strokes = await showHandwritingPad(context,
-      initial: print.handwriting, aspect: area.width / area.height, paper: print.film.swatch,
-      pen: print.film == FilmStock.black ? handGold : handBlack);
-    if (strokes != null && mounted) setState(() => print.handwriting = strokes);
+    if (print == null || _stage != _Stage.done || _writing) return;
+    setState(() {
+      _writing = true;
+      if (print.handwriting.isEmpty) _pen = print.film.pen;
+    });
   }
+
+  void _penDown(Offset at, Size size) => setState(() {
+    _current!.handwriting.add(Stroke(points: [normalise(at, size)], color: _pen, width: _handWidths[_penWidth], style: PenStyle.pen));
+    _inkVersion++;
+  });
+
+  void _penMove(Offset at, Size size) {
+    final p = normalise(at, size), last = _current!.handwriting.last.points;
+    if ((p - last.last).distance * size.width < 1) return;
+    setState(() {
+      last.add(p);
+      _inkVersion++;
+    });
+  }
+
+  void _editInk(void Function(List<Stroke> strokes) edit) => setState(() {
+    edit(_current!.handwriting);
+    _inkVersion++;
+  });
 
   void _collage() {
     if (_prints.isEmpty) return showMessage(context, '先拍一張，再做成拼貼', above: _controlsHeight);
@@ -509,10 +538,14 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         onTap: _stage == _Stage.developing ? _skipDeveloping : null,
         child: FittedBox(child: DecoratedBox(
           decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .1 + .15 * l), blurRadius: 8 + 14 * l, offset: Offset(0, 3 + 7 * l))]),
-          child: RepaintBoundary(key: _printKey, child: InstantPrint(
-            image: print.image, film: print.film, filter: print.filter, develop: _develop.value, caption: '', handwriting: print.handwriting,
-            onCaption: _stage == _Stage.done ? _handwrite : null,
-          )),
+          child: Stack(children: [
+            RepaintBoundary(key: _printKey, child: InstantPrint(
+              image: print.image, film: print.film, filter: print.filter, develop: _develop.value, caption: '',
+              handwriting: print.handwriting, handwritingVersion: _inkVersion,
+              onCaption: _stage == _Stage.done ? _startWriting : null,
+            )),
+            if (_writing) Positioned.fill(child: DoodleInput(onStart: _penDown, onMove: _penMove, onEnd: () {})),
+          ]),
         )),
       ),
     ));
@@ -665,11 +698,17 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       const SizedBox(height: 4),
       Text('輕點照片可以跳過', style: hand(20, color: muted)),
     ])),
+    _Stage.done when _writing => _penBar(),
     _Stage.done => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Text('點相片下方可以手寫', style: hand(20, color: muted)),
-        const SizedBox(height: 10),
+        TextButton.icon(
+          onPressed: _startWriting, icon: const Icon(Icons.edit_rounded, size: 18),
+          label: const Text('手寫', style: TextStyle(fontWeight: FontWeight.w800)),
+          style: TextButton.styleFrom(foregroundColor: ink),
+        ),
+        Text('用手指直接在相片上寫字、畫畫', style: hand(18, color: muted)),
+        const SizedBox(height: 8),
         Row(children: [
           Expanded(child: OutlinedButton.icon(
             onPressed: _again, icon: const Icon(Icons.camera_alt_outlined, size: 18), label: const Text('再拍一張', style: TextStyle(fontWeight: FontWeight.w800)),
@@ -684,6 +723,52 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       ]),
     ),
   };
+
+  /// The handwriting tools, in place of the buttons while writing.
+  Widget _penBar() {
+    final strokes = _current?.handwriting ?? const <Stroke>[];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          for (final c in _handColors)
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: GestureDetector(
+              onTap: () => setState(() => _pen = c),
+              child: Container(
+                width: 30, height: 30,
+                decoration: BoxDecoration(
+                  color: c, shape: BoxShape.circle,
+                  border: Border.all(color: _pen == c ? coral : line, width: _pen == c ? 3 : 1.4),
+                ),
+              ),
+            )),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          for (final (i, label) in ['細', '粗'].indexed)
+            Padding(padding: const EdgeInsets.only(right: 6), child: ChoiceChip(
+              label: Text(label), selected: _penWidth == i, onSelected: (_) => setState(() => _penWidth = i),
+              selectedColor: blush, showCheckmark: false,
+            )),
+          const Spacer(),
+          IconButton(
+            tooltip: '復原', icon: const Icon(Icons.undo_rounded),
+            onPressed: strokes.isEmpty ? null : () => _editInk((s) => s.removeLast()),
+          ),
+          IconButton(
+            tooltip: '全部清掉', icon: const Icon(Icons.delete_outline_rounded),
+            onPressed: strokes.isEmpty ? null : () => _editInk((s) => s.clear()),
+          ),
+          const SizedBox(width: 4),
+          FilledButton(
+            onPressed: () => setState(() => _writing = false),
+            style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12)),
+            child: const Text('寫好了', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ]),
+      ]),
+    );
+  }
 }
 
 /// The instant camera photo with the live picture in its lens, our own name

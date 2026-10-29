@@ -8,14 +8,16 @@ import 'frames.dart';
 /// Instant film. Both stocks come from photos of the same print, so their
 /// photo windows sit in (almost) the same place.
 enum FilmStock {
-  white('白底片', 'assets/instant/film.png', Rect.fromLTWH(.07148, .08732, .85399, .71087), ink, Colors.white),
-  black('黑底片', 'assets/instant/film_black.png', Rect.fromLTWH(.07088, .08738, .85595, .71133), Colors.white, Color(0xFF1E1E20));
+  white('白底片', 'assets/instant/film.png', Rect.fromLTWH(.07148, .08732, .85399, .71087), ink, Colors.white, Color(0xFF1E1E20)),
+  black('黑底片', 'assets/instant/film_black.png', Rect.fromLTWH(.07088, .08738, .85595, .71133), Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A));
 
   final String label, asset;
   /// The photo window, as fractions of the print.
   final Rect window;
   final Color text, swatch;
-  const FilmStock(this.label, this.asset, this.window, this.text, this.swatch);
+  /// The pen handwriting starts with: black on white film, gold on black.
+  final Color pen;
+  const FilmStock(this.label, this.asset, this.window, this.text, this.swatch, this.pen);
 
   /// Width / height of a print.
   static const aspect = .85058;
@@ -42,9 +44,9 @@ ColorFilter developFilter(double t) {
   return ColorFilter.matrix([for (var i = 0; i < 20; i++) blank[i] + (photo[i] - blank[i]) * k]);
 }
 
-/// An instax print with the photo in its window and, on the wide bottom
-/// border, a typed caption and/or finger handwriting. Design size [width] ×
-/// [height].
+/// An instax print with the photo in its window, a typed caption on the wide
+/// bottom border and finger handwriting over the whole print. Design size
+/// [width] × [height].
 class InstantPrint extends StatelessWidget {
   static const width = 160.0, height = width / FilmStock.aspect;
   final ImageProvider? image;
@@ -52,8 +54,10 @@ class InstantPrint extends StatelessWidget {
   /// Developing progress; 1 = fully developed.
   final double develop;
   final String caption;
-  /// Handwriting on the bottom border, in [captionArea] fractions.
+  /// Finger writing anywhere on the print, in fractions of the print.
   final List<Stroke> handwriting;
+  /// Bump while a stroke is being drawn so it repaints.
+  final int handwritingVersion;
   final VoidCallback? onCaption, onTap;
   /// Shown in an empty window.
   final Widget? placeholder;
@@ -63,19 +67,13 @@ class InstantPrint extends StatelessWidget {
   final ValueChanged<PhotoFit>? onFit;
   final PhotoFilter? filter;
   const InstantPrint({
-    super.key, this.image, this.film = FilmStock.white, this.develop = 1, required this.caption, this.handwriting = const [],
+    super.key, this.image, this.film = FilmStock.white, this.develop = 1, required this.caption, this.handwriting = const [], this.handwritingVersion = 0,
     this.onCaption, this.onTap, this.placeholder, this.selected = false, this.fit = const PhotoFit(), this.aspect, this.onFit, this.filter,
   });
 
-  static Rect _window(FilmStock film) =>
-      Rect.fromLTWH(film.window.left * width, film.window.top * height, film.window.width * width, film.window.height * height);
-
-  /// The bottom border you can write on, in design pixels.
-  static Rect captionArea(FilmStock film) => Rect.fromLTRB(8, _window(film).bottom + 2, width - 8, height - 4);
-
   @override
   Widget build(BuildContext context) {
-    final w = _window(film);
+    final w = Rect.fromLTWH(film.window.left * width, film.window.top * height, film.window.width * width, film.window.height * height);
     Widget window = image == null
       ? ColoredBox(color: film == FilmStock.black ? const Color(0xFF2E2E31) : const Color(0xFFF1EDE8), child: Center(child: placeholder))
       : FittedPhoto(image: image!, fit: fit, aspect: aspect, onChanged: onFit, filter: filter);
@@ -87,16 +85,16 @@ class InstantPrint extends StatelessWidget {
         Positioned.fromRect(rect: w.inflate(1), child: IgnorePointer(child: DecoratedBox(
           decoration: BoxDecoration(border: Border.all(color: coral, width: 3)),
         ))),
-      Positioned.fromRect(rect: captionArea(film), child: GestureDetector(
+      Positioned(left: 8, right: 8, top: w.bottom + 2, bottom: 4, child: GestureDetector(
         key: const ValueKey('instant-caption'),
         onTap: onCaption,
         behavior: HitTestBehavior.opaque,
-        child: Stack(fit: StackFit.expand, children: [
-          if (caption.isNotEmpty)
-            Center(child: Text(caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: hand(24, color: film.text))),
-          if (handwriting.isNotEmpty) CustomPaint(painter: DoodlePainter(handwriting, handwriting.length)),
-        ]),
+        child: caption.isEmpty
+          ? const SizedBox.expand()
+          : Center(child: Text(caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: hand(24, color: film.text))),
       )),
+      if (handwriting.isNotEmpty)
+        Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: DoodlePainter(handwriting, handwritingVersion)))),
     ]));
   }
 }

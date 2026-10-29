@@ -9,7 +9,6 @@ import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/polaroid_camera_screen.dart';
 import 'package:pico_snap/services/photo_save_service.dart';
 import 'package:pico_snap/widgets/doodle.dart';
-import 'package:pico_snap/widgets/handwriting_pad.dart';
 import 'package:pico_snap/widgets/instant_print.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
@@ -59,25 +58,28 @@ void main() {
     expect(find.text('存到相簿'), findsOneWidget);
     expect(find.text('再拍一張'), findsOneWidget);
 
-    // 沒有自動印日期；點白邊用手指寫字
+    // 沒有自動印日期；按「手寫」直接在相片上寫
     final caption = find.byKey(const ValueKey('instant-caption'));
     expect(find.descendant(of: caption, matching: find.byType(Text)), findsNothing, reason: '白邊一開始是空的');
-    await t.tap(caption);
+    expect(find.byType(DoodleInput), findsNothing);
+    await t.tap(find.text('手寫'));
     await t.pumpAndSettle();
-    expect(find.text('在相片下方手寫'), findsOneWidget);
-    final pad = t.getRect(find.byType(DoodleInput));
-    final g = await t.startGesture(pad.centerLeft + const Offset(30, 0));
+    expect(find.byType(DoodleInput), findsOneWidget, reason: '整張相片都可以寫');
+    expect(find.text('存到相簿'), findsNothing, reason: '寫字時下方換成筆的工具');
+    final printRect = t.getRect(find.byType(InstantPrint));
+    final g = await t.startGesture(printRect.center - Offset(printRect.width * .3, 0));
     for (var i = 1; i <= 8; i++) {
-      await g.moveBy(const Offset(20, 3));
+      await g.moveBy(Offset(printRect.width * .07, 2));
       await t.pump();
     }
     await g.up();
     await t.tap(find.text('寫好了'));
     await t.pumpAndSettle();
+    expect(find.byType(DoodleInput), findsNothing);
     List<Stroke> written() => t.widget<InstantPrint>(find.byType(InstantPrint)).handwriting;
     expect(written(), hasLength(1));
     expect(written().single.points.length, greaterThan(4));
-    expect(written().single.color, handBlack, reason: '白底片預設黑筆');
+    expect(written().single.color, FilmStock.white.pen, reason: '白底片預設黑筆');
 
     // 存檔：測試裡沒有相簿外掛，會顯示錯誤但不會當掉
     await t.tap(find.text('存到相簿'));
