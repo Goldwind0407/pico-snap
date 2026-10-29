@@ -56,7 +56,9 @@ class Stroke {
       ..strokeJoin = StrokeJoin.round
       ..isAntiAlias = true;
     switch (style) {
-      case PenStyle.pen || PenStyle.eraser:
+      case PenStyle.pen:
+        _paintFelt(canvas, size, w, pen);
+      case PenStyle.eraser:
         canvas.drawPath(path, pen(color, w));
       case PenStyle.marker:
         canvas.drawPath(path, pen(color.withValues(alpha: .45), w * 2.4));
@@ -64,6 +66,117 @@ class Stroke {
         canvas.drawPath(path, pen(Colors.white, w * 2 + 2));
         canvas.drawPath(path, pen(color, w));
     }
+  }
+
+  /// The stroke as dense points along the smoothed path, each with how wide
+  /// the felt tip is there and how fast the hand was going (0–1).
+  List<({Offset at, double width, double speed})> _feltPoints(Size size, double w) {
+    final p = [for (final o in points) Offset(o.dx * size.width, o.dy * size.height)];
+    // A felt tip lays down more ink where the hand slows and less on quick
+    // flicks; ease towards it so the edge doesn't wobble.
+    final widths = <double>[], speeds = <double>[];
+    var width = w, speed = 0.0;
+    for (var i = 0; i < p.length; i++) {
+      final v = i == 0 ? 0.0 : ((p[i] - p[i - 1]).distance / (w * 2.2)).clamp(0.0, 1.0);
+      speed += (v - speed) * .4;
+      width += (w * (1.1 - .32 * speed) - width) * .35;
+      widths.add(width);
+      speeds.add(speed);
+    }
+    final out = <({Offset at, double width, double speed})>[(at: p.first, width: widths.first, speed: 0)];
+    // Same curve as [_path]: through the midpoints, sampled finely.
+    var from = p.first;
+    for (var i = 1; i < p.length; i++) {
+      final last = i == p.length - 1;
+      final to = last ? p[i] : (p[i] + p[i + 1]) / 2;
+      final n = max(1, ((to - from).distance / max(1, w * .4)).ceil());
+      for (var k = 1; k <= n; k++) {
+        final t = k / n;
+        final at = last ? Offset.lerp(from, to, t)! : from * ((1 - t) * (1 - t)) + p[i] * (2 * (1 - t) * t) + to * (t * t);
+        out.add((at: at, width: widths[i - 1] + (widths[i] - widths[i - 1]) * t, speed: speeds[i]));
+      }
+      from = to;
+    }
+    // A quick flick lifts off thinner.
+    final tail = min(out.length - 1, 6);
+    for (var k = 0; k < tail; k++) {
+      final j = out.length - 1 - k, e = out[j];
+      out[j] = (at: e.at, width: e.width * (1 - .3 * e.speed * (1 - k / tail)), speed: e.speed);
+    }
+    return out;
+  }
+
+  /// A marker on glossy photo paper: a soft-edged body that swells and thins
+  /// with the hand, a little pool of ink where the tip lands, dry streaks
+  /// on fast strokes and a sheen on metallic ink.
+  void _paintFelt(Canvas canvas, Size size, double w, Paint Function(Color, double) pen) {
+    final pts = _feltPoints(size, w);
+    final rnd = Random(Object.hash(points.first.dx, points.first.dy));
+    var bounds = Rect.fromCircle(center: pts.first.at, radius: w * 2);
+    for (final e in pts) {
+      bounds = bounds.expandToInclude(Rect.fromCircle(center: e.at, radius: e.width));
+    }
+    // Drawn opaque into a layer and laid down a touch see-through, so a
+    // stroke doesn't darken over itself but two crossing strokes do.
+    canvas.saveLayer(bounds, Paint()..color = const Color(0xF2000000));
+    final soft = MaskFilter.blur(BlurStyle.normal, max(.3, w * .04));
+    canvas.drawCircle(pts.first.at, pts.first.width * .56, Paint()..color = color..maskFilter = soft);
+    for (var j = 1; j < pts.length; j++) {
+      canvas.drawLine(pts[j - 1].at, pts[j].at, pen(color, (pts[j - 1].width + pts[j].width) / 2)..maskFilter = soft);
+    }
+    if (pts.length == 1) {
+      canvas.restore();
+      return;
+    }
+    Offset normal(int j) {
+      final d = pts[min(j + 1, pts.length - 1)].at - pts[max(j - 1, 0)].at;
+      final l = d.distance;
+      return l == 0 ? Offset.zero : Offset(-d.dy / l, d.dx / l);
+    }
+    // Paint markers (light ink) cover well and barely streak.
+    final light = color.computeLuminance() > .3;
+    // Dry streaks: the felt runs thin on fast strokes and leaves broken
+    // lines of paper showing through, always in the same places on this
+    // stroke.
+    for (var k = 0; k < 4; k++) {
+      final side = (rnd.nextDouble() - .5) * .8, thin = .12 + rnd.nextDouble() * .14;
+      final gaps = [for (var j = 0; j < pts.length; j++) rnd.nextDouble()];
+      for (var j = 1; j < pts.length; j++) {
+        final a = pts[j - 1], b = pts[j];
+        final dry = ((b.speed - .4) / .6).clamp(0.0, 1.0);
+        if (dry == 0 || gaps[j] < .35) continue;
+        canvas.drawLine(
+          a.at + normal(j - 1) * (side * a.width), b.at + normal(j) * (side * b.width),
+          pen(Color.fromRGBO(0, 0, 0, (light ? .14 : .32) * dry * gaps[j]), b.width * thin)
+            ..blendMode = BlendMode.dstOut
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, b.width * .06),
+        );
+      }
+    }
+    if (light) {
+      // Paint markers catch the light down the middle.
+      final shine = pen(Color.lerp(color, Colors.white, .6)!.withValues(alpha: .18), 1)
+        ..blendMode = BlendMode.srcATop
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, max(.5, w * .16));
+      for (var j = 1; j < pts.length; j++) {
+        final a = pts[j - 1], b = pts[j];
+        canvas.drawLine(
+          a.at - normal(j - 1) * (a.width * .1), b.at - normal(j) * (b.width * .1),
+          shine..strokeWidth = (a.width + b.width) * .18,
+        );
+      }
+    }
+    if (light && HSVColor.fromColor(color).saturation > .25) {
+      // Metallic ink: fine glitter that sparkles.
+      final fleck = Paint()..blendMode = BlendMode.srcATop;
+      for (final e in pts) {
+        if (rnd.nextDouble() > .5) continue;
+        final at = e.at + Offset(rnd.nextDouble() - .5, rnd.nextDouble() - .5) * e.width * .9;
+        canvas.drawCircle(at, e.width * (.03 + rnd.nextDouble() * .05),
+            fleck..color = Color.lerp(color, Colors.white, .5 + rnd.nextDouble() * .5)!.withValues(alpha: .5 + rnd.nextDouble() * .5));
+      }
+    }
+    canvas.restore();
   }
 
   /// 手指在 [at]（畫布像素）、半徑 [radius] 的範圍有沒有碰到這一筆。
