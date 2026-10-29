@@ -83,6 +83,17 @@ const lutLooks = {
   'film_everyday': LutLook('寫實日常', grain: .3, vignette: .12, soften: .35, halation: .2),
   'film_lilac_instant': LutLook('藍紫拍立得', grain: .3, vignette: .3, soften: .5, halation: .3, halationColor: (.85, .8, 1)),
   'film_expired_instant': LutLook('過期拍立得', grain: .45, vignette: .35, soften: .55, halation: .4),
+  // Film stocks simulated from their published datasheets with
+  // spectral_film_lut (MIT): negative plus print paper, sRGB in and out.
+  'sfl_portra400': LutLook('柔光人像', grain: .3, vignette: .12, soften: .4, halation: .3),
+  'sfl_portra160': LutLook('細緻人像', grain: .22, soften: .4, halation: .25),
+  'sfl_gold200': LutLook('金色夏日', grain: .4, vignette: .18, soften: .45, halation: .4),
+  'sfl_ultramax400': LutLook('日常底片', grain: .4, vignette: .15, soften: .4, halation: .35),
+  'sfl_pro400h': LutLook('薄荷日系', grain: .25, soften: .4, halation: .25, halationColor: (.85, .96, 1)),
+  'sfl_superia400': LutLook('街拍底片', grain: .4, vignette: .2, soften: .4, halation: .35),
+  'sfl_c200': LutLook('隨身底片', grain: .45, vignette: .22, soften: .45, halation: .4),
+  'sfl_instax': LutLook('拍立得相紙', grain: .25, vignette: .25, soften: .5, halation: .3),
+  'sfl_fp100c': LutLook('撕拉相紙', grain: .3, vignette: .28, soften: .5, halation: .3),
   'BlueArchitecture': LutLook('藍調建築'),
   'BlueHour': LutLook('藍色時刻'),
   'ColdChrome': LutLook('冷調鉻黃'),
