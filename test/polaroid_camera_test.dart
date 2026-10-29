@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/polaroid_camera_screen.dart';
 import 'package:pico_snap/services/photo_save_service.dart';
+import 'package:pico_snap/widgets/doodle.dart';
 import 'package:pico_snap/widgets/instant_print.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
@@ -57,14 +58,24 @@ void main() {
     expect(find.text('存到相簿'), findsOneWidget);
     expect(find.text('再拍一張'), findsOneWidget);
 
-    // 在白邊寫字
-    final caption = find.descendant(of: find.byType(InstantPrint), matching: find.byType(Text));
+    // 沒有自動印日期；點白邊用手指寫字
+    final caption = find.byKey(const ValueKey('instant-caption'));
+    expect(find.descendant(of: caption, matching: find.byType(Text)), findsNothing, reason: '白邊一開始是空的');
     await t.tap(caption);
     await t.pumpAndSettle();
-    await t.enterText(find.byType(TextField), 'cheese!');
-    await t.tap(find.text('好'));
+    expect(find.text('在相片下方手寫'), findsOneWidget);
+    final pad = t.getRect(find.byType(DoodleInput));
+    final g = await t.startGesture(pad.centerLeft + const Offset(30, 0));
+    for (var i = 1; i <= 8; i++) {
+      await g.moveBy(const Offset(20, 3));
+      await t.pump();
+    }
+    await g.up();
+    await t.tap(find.text('寫好了'));
     await t.pumpAndSettle();
-    expect(find.text('cheese!'), findsWidgets);
+    List<Stroke> written() => t.widget<InstantPrint>(find.byType(InstantPrint)).handwriting;
+    expect(written(), hasLength(1));
+    expect(written().single.points.length, greaterThan(4));
 
     // 存檔：測試裡沒有相簿外掛，會顯示錯誤但不會當掉
     await t.tap(find.text('存到相簿'));
@@ -82,9 +93,10 @@ void main() {
     expect(find.byType(EditorScreen), findsOneWidget);
     final editor = t.widget<EditorScreen>(find.byType(EditorScreen));
     expect(editor.photos, hasLength(1));
-    expect(editor.captions, ['cheese!']);
+    expect(editor.captions, [''], reason: '手寫的那張不放範例文字');
+    expect(editor.handwriting.single, hasLength(1));
     expect(find.byType(InstantPrint), findsNWidgets(4), reason: '拼貼也是同一種底片');
-    expect(find.text('cheese!'), findsOneWidget);
+    expect(find.byWidgetPredicate((w) => w is InstantPrint && w.handwriting.isNotEmpty), findsOneWidget, reason: '手寫帶到拼貼');
   });
 
   testWidgets('顯影約 20 秒；搖手機會加快', (t) async {

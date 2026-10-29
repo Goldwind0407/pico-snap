@@ -55,9 +55,11 @@ class EditorScreen extends StatefulWidget {
   /// instant camera.
   final List<Uint8List> photos;
   final List<String> captions;
+  /// Finger writing on each Polaroid's bottom border.
+  final List<List<Stroke>> handwriting;
   final List<FilmStock> films;
   final List<PhotoFilter> filters;
-  const EditorScreen({super.key, this.mode = EditorMode.fourCut, this.template = 0, this.photos = const [], this.captions = const [], this.films = const [], this.filters = const []});
+  const EditorScreen({super.key, this.mode = EditorMode.fourCut, this.template = 0, this.photos = const [], this.captions = const [], this.handwriting = const [], this.films = const [], this.filters = const []});
 
   @override
   State<EditorScreen> createState() => _EditorScreenState();
@@ -529,6 +531,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .16), blurRadius: 10, offset: const Offset(0, 4))]),
                   child: InstantPrint(
                     image: _photos[i], film: _films[i], caption: _polaroidCaptions[i],
+                    handwriting: i < widget.handwriting.length ? widget.handwriting[i] : const [],
                     placeholder: _capturing ? null : const AddPhotoHint(scale: 1.3),
                     selected: !_capturing && _selectedCell == i, onTap: () => _tapCell(i),
                     onCaption: () => setState(() {

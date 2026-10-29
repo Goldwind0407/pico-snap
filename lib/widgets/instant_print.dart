@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../filters.dart';
 import '../theme.dart';
+import 'doodle.dart';
 import 'frames.dart';
 
 /// Instant film. Both stocks come from photos of the same print, so their
@@ -41,8 +42,9 @@ ColorFilter developFilter(double t) {
   return ColorFilter.matrix([for (var i = 0; i < 20; i++) blank[i] + (photo[i] - blank[i]) * k]);
 }
 
-/// An instax print with the photo in its window and a handwritten caption on
-/// the wide bottom border. Design size [width] × [height].
+/// An instax print with the photo in its window and, on the wide bottom
+/// border, a typed caption and/or finger handwriting. Design size [width] ×
+/// [height].
 class InstantPrint extends StatelessWidget {
   static const width = 160.0, height = width / FilmStock.aspect;
   final ImageProvider? image;
@@ -50,6 +52,8 @@ class InstantPrint extends StatelessWidget {
   /// Developing progress; 1 = fully developed.
   final double develop;
   final String caption;
+  /// Handwriting on the bottom border, in [captionArea] fractions.
+  final List<Stroke> handwriting;
   final VoidCallback? onCaption, onTap;
   /// Shown in an empty window.
   final Widget? placeholder;
@@ -59,13 +63,19 @@ class InstantPrint extends StatelessWidget {
   final ValueChanged<PhotoFit>? onFit;
   final PhotoFilter? filter;
   const InstantPrint({
-    super.key, this.image, this.film = FilmStock.white, this.develop = 1, required this.caption,
+    super.key, this.image, this.film = FilmStock.white, this.develop = 1, required this.caption, this.handwriting = const [],
     this.onCaption, this.onTap, this.placeholder, this.selected = false, this.fit = const PhotoFit(), this.aspect, this.onFit, this.filter,
   });
 
+  static Rect _window(FilmStock film) =>
+      Rect.fromLTWH(film.window.left * width, film.window.top * height, film.window.width * width, film.window.height * height);
+
+  /// The bottom border you can write on, in design pixels.
+  static Rect captionArea(FilmStock film) => Rect.fromLTRB(8, _window(film).bottom + 2, width - 8, height - 4);
+
   @override
   Widget build(BuildContext context) {
-    final w = Rect.fromLTWH(film.window.left * width, film.window.top * height, film.window.width * width, film.window.height * height);
+    final w = _window(film);
     Widget window = image == null
       ? ColoredBox(color: film == FilmStock.black ? const Color(0xFF2E2E31) : const Color(0xFFF1EDE8), child: Center(child: placeholder))
       : FittedPhoto(image: image!, fit: fit, aspect: aspect, onChanged: onFit, filter: filter);
@@ -77,10 +87,15 @@ class InstantPrint extends StatelessWidget {
         Positioned.fromRect(rect: w.inflate(1), child: IgnorePointer(child: DecoratedBox(
           decoration: BoxDecoration(border: Border.all(color: coral, width: 3)),
         ))),
-      Positioned(left: 8, right: 8, top: w.bottom + 2, bottom: 4, child: GestureDetector(
+      Positioned.fromRect(rect: captionArea(film), child: GestureDetector(
+        key: const ValueKey('instant-caption'),
         onTap: onCaption,
         behavior: HitTestBehavior.opaque,
-        child: Center(child: Text(caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: hand(24, color: film.text))),
+        child: Stack(fit: StackFit.expand, children: [
+          if (caption.isNotEmpty)
+            Center(child: Text(caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: hand(24, color: film.text))),
+          if (handwriting.isNotEmpty) CustomPaint(painter: DoodlePainter(handwriting, handwriting.length)),
+        ]),
       )),
     ]));
   }

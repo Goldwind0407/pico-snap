@@ -16,6 +16,8 @@ import 'models.dart';
 import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
 import 'theme.dart';
+import 'widgets/doodle.dart';
+import 'widgets/handwriting_pad.dart';
 import 'widgets/instant_print.dart';
 
 /// Geometry of the camera photos (all the same model), as fractions of the
@@ -53,9 +55,10 @@ class _Print {
   final ImageProvider image;
   final FilmStock film;
   final PhotoFilter filter;
-  String caption;
+  /// Finger writing on the bottom border; blank until the user writes.
+  List<Stroke> handwriting = const [];
   bool saved = false;
-  _Print(this.bytes, this.film, this.filter, this.caption) : image = MemoryImage(bytes);
+  _Print(this.bytes, this.film, this.filter) : image = MemoryImage(bytes);
 }
 
 /// 拍立得相機：取景在鏡頭裡，按下快門後相片從上方的出片口慢慢吐出來，
@@ -312,15 +315,9 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     if (bytes != null && mounted && _stage == _Stage.aiming) await _printOut(bytes);
   }
 
-  String _today() {
-    final d = DateTime.now();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${d.day} ${months[d.month - 1]}';
-  }
-
   /// The print comes out of the slot, is taken to the front and develops.
   Future<void> _printOut(Uint8List bytes) async {
-    final print = _Print(bytes, _film, _filter, _today());
+    final print = _Print(bytes, _film, _filter);
     // The row goes away while printing; a new controller picks up the offset.
     final old = _filterScroll;
     _filterScroll = null;
@@ -405,11 +402,13 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     showMessage(context, error ?? '已存到相簿 ♡', error: error != null, above: _controlsHeight);
   }
 
-  Future<void> _editCaption() async {
+  Future<void> _handwrite() async {
     final print = _current;
     if (print == null || _stage != _Stage.done) return;
-    final text = await showDialog<String>(context: context, builder: (_) => _CaptionDialog(initial: print.caption));
-    if (text != null && mounted) setState(() => print.caption = text.trim());
+    final area = InstantPrint.captionArea(print.film);
+    final strokes = await showHandwritingPad(context,
+      initial: print.handwriting, aspect: area.width / area.height, paper: print.film.swatch, pen: print.film.text);
+    if (strokes != null && mounted) setState(() => print.handwriting = strokes);
   }
 
   void _collage() {
@@ -418,7 +417,9 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     Navigator.push(context, MaterialPageRoute(builder: (_) => EditorScreen(
       mode: EditorMode.polaroid,
       photos: [for (final p in last) p.bytes],
-      captions: [for (final p in last) p.caption],
+      // Handwritten instead of typed: no sample captions on top of it.
+      captions: [for (final _ in last) ''],
+      handwriting: [for (final p in last) p.handwriting],
       films: [for (final p in last) p.film],
       filters: [for (final p in last) p.filter],
     )));
@@ -508,8 +509,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         child: FittedBox(child: DecoratedBox(
           decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .1 + .15 * l), blurRadius: 8 + 14 * l, offset: Offset(0, 3 + 7 * l))]),
           child: RepaintBoundary(key: _printKey, child: InstantPrint(
-            image: print.image, film: print.film, filter: print.filter, develop: _develop.value, caption: print.caption,
-            onCaption: _stage == _Stage.done ? _editCaption : null,
+            image: print.image, film: print.film, filter: print.filter, develop: _develop.value, caption: '', handwriting: print.handwriting,
+            onCaption: _stage == _Stage.done ? _handwrite : null,
           )),
         )),
       ),
@@ -666,7 +667,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     _Stage.done => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Text('點相片下方可以寫字', style: hand(20, color: muted)),
+        Text('點相片下方可以手寫', style: hand(20, color: muted)),
         const SizedBox(height: 10),
         Row(children: [
           Expanded(child: OutlinedButton.icon(
@@ -837,39 +838,6 @@ class _CornersPainter extends CustomPainter {
 
 /// Writes on the print's white strip. Owns its controller so it lives as long
 /// as the dialog, closing animation included.
-class _CaptionDialog extends StatefulWidget {
-  final String initial;
-  const _CaptionDialog({required this.initial});
-
-  @override
-  State<_CaptionDialog> createState() => _CaptionDialogState();
-}
-
-class _CaptionDialogState extends State<_CaptionDialog> {
-  late final _ctrl = TextEditingController(text: widget.initial);
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    backgroundColor: cream,
-    title: const Text('在相片下方寫字', style: TextStyle(fontSize: 18, color: ink, fontWeight: FontWeight.w900)),
-    content: TextField(
-      controller: _ctrl, autofocus: true, maxLength: 16, style: hand(26),
-      decoration: const InputDecoration(hintText: 'say something ♡'),
-      onSubmitted: (v) => Navigator.pop(context, v),
-    ),
-    actions: [
-      TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消', style: TextStyle(color: muted))),
-      TextButton(onPressed: () => Navigator.pop(context, _ctrl.text), child: const Text('好', style: TextStyle(color: coral, fontWeight: FontWeight.w800))),
-    ],
-  );
-}
-
 /// Prints taken so far; tap to make a collage of the last four.
 class _Tray extends StatelessWidget {
   final List<_Print> prints;
