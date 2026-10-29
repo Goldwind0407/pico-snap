@@ -78,6 +78,10 @@ const lutLooks = <String, LutLook>{
   // with design/flog2_bake.py. For testing only: not ours to ship.
   'fuji_classic_chrome': LutLook('復古正片'),
   'fuji_classic_neg': LutLook('懷舊負片'),
+  // The same two applied straight to the photo, unconverted: far more
+  // contrast and colour, a loud look of its own.
+  'fuji_classic_chrome_raw': LutLook('濃烈正片'),
+  'fuji_classic_neg_raw': LutLook('濃烈負片'),
 };
 
 /// A LUT as read from a file: [size]³ entries of r, g, b (0–1), blue

@@ -108,7 +108,7 @@
   - [RawTherapee Film Simulation Collection](https://rawpedia.rawtherapee.com/)（Pat David、Pavlov Dmitry、Michael Ezra，**CC BY-SA 4.0**）：可以商用，但要在 App 裡標示出處，換算過的檔案也要維持 CC BY-SA。
   - [spectral_film_lut](https://github.com/JanLohse/spectral_film_lut)（MIT）：照底片官方資料模擬沖印、自己產生 LUT（輸入輸出 sRGB、曝光補償約 -0.7，拍立得 -1.0 到 -1.3）。
   - 濾鏡名字用我們自己的，不用 Kodak、Fuji、Polaroid 等商標。
-- **相機廠的 Log LUT**（例如 Fujifilm 給 GFX ETERNA 55 的 `FLog2_to_*.cube`）是給 F-Log2 影片用的，不能直接套手機照片。用 `python design/flog2_bake.py <Fuji 的 .cube> assets/luts/<名字>.cube "<標題>" 1.0` 先把 sRGB 換成 F-Gamut／F-Log2 再接上它，做成吃 sRGB 的 33³ 檔（最後的數字是曝光倍率）。目前放了 `fuji_classic_chrome`（復古正片）和 `fuji_classic_neg`（懷舊負片）**只供自己測試**：這是 Fujifilm 的檔案，上架前要拿掉。
+- **相機廠的 Log LUT**（例如 Fujifilm 給 GFX ETERNA 55 的 `FLog2_to_*.cube`）是給 F-Log2 影片用的，不能直接套手機照片。用 `python design/flog2_bake.py <Fuji 的 .cube> assets/luts/<名字>.cube "<標題>" 1.0` 先把 sRGB 換成 F-Gamut／F-Log2 再接上它，做成吃 sRGB 的 33³ 檔（最後的數字是曝光倍率）。目前放了 `fuji_classic_chrome`（復古正片）和 `fuji_classic_neg`（懷舊負片），以及不換算、直接套的 `fuji_classic_chrome_raw`（濃烈正片）、`fuji_classic_neg_raw`（濃烈負片，對比和飽和度很強）。這四款**只供自己測試**：這是 Fujifilm 的檔案，上架前要拿掉。
 - **授權**：`assets/luts/` 裡的檔案會進 Git。網路上的免費 LUT 大多只能自己用來調色、**不能放進 App 散布或販售**（例如 RocketStock 的 35 Free LUTs 明文禁止；Shutterstock 的免費包沒附授權）；上架前確認每個檔案都能散布。
 
 ### 去背

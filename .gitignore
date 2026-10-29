@@ -52,3 +52,6 @@ app.*.map.json
 /design/mockups/
 
 # 濾鏡檔授權各自不同，留在本機（見 README「濾鏡檔」）
+
+# Claude Code personal settings
+/.claude/settings.local.json
