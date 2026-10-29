@@ -79,6 +79,9 @@ const lutLooks = <String, LutLook>{
   // its own. For testing only: not ours to ship.
   'fuji_classic_chrome_raw': LutLook('濃烈正片'),
   'fuji_classic_neg_raw': LutLook('濃烈負片'),
+  // Teal shadows, warm amber highlights, faded blacks, muted greens. The file
+  // is colour only, so the instant-film texture comes from here.
+  'teal_warm_film': LutLook('青暖底片', grain: .25, vignette: .14, soften: .3, halation: .15),
 };
 
 /// A LUT as read from a file: [size]³ entries of r, g, b (0–1), blue
