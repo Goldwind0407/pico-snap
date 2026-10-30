@@ -532,7 +532,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     final cw = [size.width * .8, size.height * .5, 360.0].reduce(min);
     final ch = cw / _body.aspect;
     final camLeft = (size.width - cw) / 2, camTop = size.height - ch - 4;
-    final pw = cw * _Cam.film, ph = pw / FilmStock.aspect;
+    final aspect = (_current?.film ?? _film).aspect;
+    final pw = cw * _Cam.film, ph = pw / aspect;
     final slotX = camLeft + _Cam.slot.dx * cw, slotY = camTop + _Cam.slot.dy * ch + 10;
     // Coming out of the slot; the tail stays in the slot like the real thing.
     final e = _eject.value;
@@ -541,12 +542,12 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     final jitter = moving ? sin(e * 900) * .6 : 0.0;
     final ejected = Rect.fromLTWH(slotX - pw / 2 + jitter, slotY - out * ph * .9, pw, ph);
     // Taken to the front to watch it develop.
-    final rw = min(size.width * .72, (size.height - 16) * .92 * FilmStock.aspect);
-    final rh = rw / FilmStock.aspect;
+    final rw = min(size.width * .72, (size.height - 16) * .92 * aspect);
+    final rh = rw / aspect;
     final review = Rect.fromLTWH((size.width - rw) / 2, max(8.0, (size.height - rh) / 2 - 4), rw, rh);
     final l = Curves.easeInOutCubic.transform(_lift.value);
     // Writing: as big as the stage allows, straightened.
-    final bw = min(size.width - 16, (size.height - 12) * FilmStock.aspect), bh = bw / FilmStock.aspect;
+    final bw = min(size.width - 16, (size.height - 12) * aspect), bh = bw / aspect;
     final big = Rect.fromLTWH((size.width - bw) / 2, (size.height - bh) / 2, bw, bh);
     final z = Curves.easeOutCubic.transform(_enlarge.value);
     final rect = Rect.lerp(Rect.lerp(ejected, review, l)!, big, z)!;
@@ -579,7 +580,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     // A big viewfinder above the camera, the shape of the print's window, so
     // you see exactly what will be printed. Fades while the motor spins up.
     final win = _film.window;
-    final winAspect = win.width * FilmStock.aspect / win.height;
+    final winAspect = win.width * _film.aspect / win.height;
     final vh = min(camTop - 28, size.width * .66 / winAspect);
     final vw = vh * winAspect;
     final finderOpacity = _stage == _Stage.aiming ? 1.0 : (1 - e / _emergeStart).clamp(0.0, 1.0);
@@ -658,7 +659,10 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     },
   ));
 
-  Widget _options() => SizedBox(height: 34, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+  // Scrolls sideways once there are more films than fit.
+  Widget _options() => SizedBox(height: 34, child: Center(child: SingleChildScrollView(
+    scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
     for (final b in _Body.values)
       GestureDetector(
         onTap: () => setState(() => _lastBody = _body = b),
@@ -689,7 +693,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
           ]),
         ),
       ),
-  ]));
+  ]))));
 
   Widget _controls() => Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
     _Tray(prints: _prints, onTap: _collage),

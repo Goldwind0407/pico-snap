@@ -6,10 +6,16 @@ import 'doodle.dart';
 import 'frames.dart';
 
 /// Instant film. Both stocks come from photos of the same print, so their
-/// photo windows sit in (almost) the same place.
+/// photo windows sit in (almost) the same place. The frames after them are
+/// whole cards with their own shape.
 enum FilmStock {
   white('白底片', 'assets/instant/film.png', Rect.fromLTWH(.07148, .08732, .85399, .71087), ink, Colors.white, Color(0xFF1E1E20)),
-  black('黑底片', 'assets/instant/film_black.png', Rect.fromLTWH(.07088, .08738, .85595, .71133), Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A));
+  black('黑底片', 'assets/instant/film_black.png', Rect.fromLTWH(.07088, .08738, .85595, .71133), Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A)),
+  // Film-strip cards drawn with Gemini. For testing only: the character ones
+  // use other people's characters and names, not ours to ship.
+  filmFrame('底片框', 'assets/instant/frame_film.png', _frameWindow, Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A), aspect: _frameAspect),
+  keroroFrame('Keroro 框', 'assets/instant/frame_keroro.png', _frameWindow, Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A), aspect: _frameAspect),
+  pokemonFrame('寶可夢框', 'assets/instant/frame_pokemon.png', _frameWindow, Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A), aspect: _frameAspect);
 
   final String label, asset;
   /// The photo window, as fractions of the print.
@@ -17,11 +23,15 @@ enum FilmStock {
   final Color text, swatch;
   /// The pen handwriting starts with: black on white film, gold on black.
   final Color pen;
-  const FilmStock(this.label, this.asset, this.window, this.text, this.swatch, this.pen);
-
   /// Width / height of a print.
-  static const aspect = .85058;
+  final double aspect;
+  const FilmStock(this.label, this.asset, this.window, this.text, this.swatch, this.pen, {this.aspect = .85058});
+
+  bool get dark => text == Colors.white;
 }
+
+const _frameAspect = 900 / 1260;
+const _frameWindow = Rect.fromLTWH(.12816, .10957, .74563, .681);
 
 /// How instax film develops at [t] (0–1): a flat pale grey-blue blank, then
 /// a faint, warm, low-contrast picture that gains colour and contrast.
@@ -46,9 +56,10 @@ ColorFilter developFilter(double t) {
 
 /// An instax print with the photo in its window, a typed caption on the wide
 /// bottom border and finger handwriting over the whole print. Design size
-/// [width] × [height].
+/// [width] × [heightOf] the film.
 class InstantPrint extends StatelessWidget {
-  static const width = 160.0, height = width / FilmStock.aspect;
+  static const width = 160.0;
+  static double heightOf(FilmStock film) => width / film.aspect;
   final ImageProvider? image;
   final FilmStock film;
   /// Developing progress; 1 = fully developed.
@@ -73,9 +84,10 @@ class InstantPrint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final height = heightOf(film);
     final w = Rect.fromLTWH(film.window.left * width, film.window.top * height, film.window.width * width, film.window.height * height);
     Widget window = image == null
-      ? ColoredBox(color: film == FilmStock.black ? const Color(0xFF2E2E31) : const Color(0xFFF1EDE8), child: Center(child: placeholder))
+      ? ColoredBox(color: film.dark ? const Color(0xFF2E2E31) : const Color(0xFFF1EDE8), child: Center(child: placeholder))
       : FittedPhoto(image: image!, fit: fit, aspect: aspect, onChanged: onFit, filter: filter);
     if (image != null && develop < 1) window = ColorFiltered(colorFilter: developFilter(develop), child: window);
     return SizedBox(width: width, height: height, child: Stack(children: [

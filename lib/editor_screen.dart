@@ -522,7 +522,6 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Widget _polaroidArtwork(Size size) {
     final w = min(size.width * .37, size.height * .26);
-    final h = w * InstantPrint.height / InstantPrint.width;
     // Draw the selected print last so it sits on top.
     final order = [for (var i = 0; i < 4; i++) if (i != _selectedCell) i, _selectedCell];
     Widget doodle(double x, double y, Widget child) => Positioned(left: x * size.width, top: y * size.height, child: child);
@@ -538,10 +537,10 @@ class _EditorScreenState extends State<EditorScreen> {
         doodle(.55, .53, const DoodleHeart(size: 11, color: Color(0xFFD9C3F0))),
         doodle(.10, .86, const DoodleHeart(size: 13)),
         for (final i in order)
-          Positioned(
+          if (w / _films[i].aspect case final h) Positioned(
             left: _scatter[i].$1.dx * size.width - w / 2, top: _scatter[i].$1.dy * size.height - h / 2, width: w, height: h,
             child: Transform.rotate(angle: _scatter[i].$2, child: FittedBox(child: SizedBox(
-              width: InstantPrint.width, height: InstantPrint.height,
+              width: InstantPrint.width, height: InstantPrint.heightOf(_films[i]),
               child: Stack(clipBehavior: Clip.none, children: [
                 Positioned.fill(child: DecoratedBox(
                   decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .16), blurRadius: 10, offset: const Offset(0, 4))]),
@@ -696,30 +695,32 @@ class _EditorScreenState extends State<EditorScreen> {
       const SizedBox(height: 10),
       Row(children: [
         const SizedBox(width: 44, child: Text('底片', style: TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800))),
-        for (final f in FilmStock.values)
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: GestureDetector(
-              onTap: () => setState(() {
-                for (var i = 0; i < _films.length; i++) {
-                  _films[i] = f;
-                }
-                _edited = true;
-              }),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: _films.every((x) => x == f) ? blush : cream, borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: _films.every((x) => x == f) ? blushLine : line),
+        Expanded(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+            for (final f in FilmStock.values)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: GestureDetector(
+                  onTap: () => setState(() {
+                    for (var i = 0; i < _films.length; i++) {
+                      _films[i] = f;
+                    }
+                    _edited = true;
+                  }),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: _films.every((x) => x == f) ? blush : cream, borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: _films.every((x) => x == f) ? blushLine : line),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Container(width: 11, height: 13, decoration: BoxDecoration(color: f.swatch, borderRadius: BorderRadius.circular(2), border: Border.all(color: line))),
+                      const SizedBox(width: 6),
+                      Text(f.label, style: TextStyle(fontSize: 13, color: ink, fontWeight: _films.every((x) => x == f) ? FontWeight.w900 : FontWeight.w600)),
+                    ]),
+                  ),
                 ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Container(width: 11, height: 13, decoration: BoxDecoration(color: f.swatch, borderRadius: BorderRadius.circular(2), border: Border.all(color: line))),
-                  const SizedBox(width: 6),
-                  Text(f.label, style: TextStyle(fontSize: 13, color: ink, fontWeight: _films.every((x) => x == f) ? FontWeight.w900 : FontWeight.w600)),
-                ]),
               ),
-            ),
-          ),
+        ]))),
       ]),
     ]),
   );
