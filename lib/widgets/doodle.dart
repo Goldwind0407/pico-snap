@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -32,6 +33,12 @@ class Stroke {
   final PenStyle style;
   Stroke({required this.points, required this.color, required this.width, required this.style});
 
+  // The marker drawing is costly to work out; keep it until the stroke grows
+  // or the canvas changes size.
+  ui.Picture? _felt;
+  Size? _feltSize;
+  int _feltLength = 0;
+
   Path _path(Size size) {
     final p = [for (final o in points) Offset(o.dx * size.width, o.dy * size.height)];
     final path = Path()..moveTo(p.first.dx, p.first.dy);
@@ -57,7 +64,15 @@ class Stroke {
       ..isAntiAlias = true;
     switch (style) {
       case PenStyle.pen:
-        _paintFelt(canvas, size, w, pen);
+        if (_felt == null || _feltSize != size || _feltLength != points.length) {
+          _felt?.dispose();
+          final rec = ui.PictureRecorder();
+          _paintFelt(Canvas(rec), size, w, pen);
+          _felt = rec.endRecording();
+          _feltSize = size;
+          _feltLength = points.length;
+        }
+        canvas.drawPicture(_felt!);
       case PenStyle.eraser:
         canvas.drawPath(path, pen(color, w));
       case PenStyle.marker:
@@ -119,10 +134,10 @@ class Stroke {
     // Drawn opaque into a layer and laid down a touch see-through, so a
     // stroke doesn't darken over itself but two crossing strokes do.
     canvas.saveLayer(bounds, Paint()..color = const Color(0xF2000000));
-    final soft = MaskFilter.blur(BlurStyle.normal, max(.3, w * .04));
-    canvas.drawCircle(pts.first.at, pts.first.width * .56, Paint()..color = color..maskFilter = soft);
+    canvas.drawCircle(pts.first.at, pts.first.width * .56, Paint()..color = color);
+    final body = pen(color, w);
     for (var j = 1; j < pts.length; j++) {
-      canvas.drawLine(pts[j - 1].at, pts[j].at, pen(color, (pts[j - 1].width + pts[j].width) / 2)..maskFilter = soft);
+      canvas.drawLine(pts[j - 1].at, pts[j].at, body..strokeWidth = (pts[j - 1].width + pts[j].width) / 2);
     }
     if (pts.length == 1) {
       canvas.restore();
@@ -148,23 +163,20 @@ class Stroke {
         canvas.drawLine(
           a.at + normal(j - 1) * (side * a.width), b.at + normal(j) * (side * b.width),
           pen(Color.fromRGBO(0, 0, 0, (light ? .14 : .32) * dry * gaps[j]), b.width * thin)
-            ..blendMode = BlendMode.dstOut
-            ..maskFilter = MaskFilter.blur(BlurStyle.normal, b.width * .06),
+            ..blendMode = BlendMode.dstOut,
         );
       }
     }
     if (light) {
       // Paint markers catch the light down the middle.
-      final shine = pen(Color.lerp(color, Colors.white, .6)!.withValues(alpha: .18), 1)
-        ..blendMode = BlendMode.srcATop
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, max(.5, w * .16));
-      for (var j = 1; j < pts.length; j++) {
-        final a = pts[j - 1], b = pts[j];
-        canvas.drawLine(
-          a.at - normal(j - 1) * (a.width * .1), b.at - normal(j) * (b.width * .1),
-          shine..strokeWidth = (a.width + b.width) * .18,
-        );
+      final shine = Path();
+      for (var j = 0; j < pts.length; j++) {
+        final at = pts[j].at - normal(j) * (pts[j].width * .1);
+        j == 0 ? shine.moveTo(at.dx, at.dy) : shine.lineTo(at.dx, at.dy);
       }
+      canvas.drawPath(shine, pen(Color.lerp(color, Colors.white, .6)!.withValues(alpha: .18), w * .2)
+        ..blendMode = BlendMode.srcATop
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, max(.5, w * .16)));
     }
     if (light && HSVColor.fromColor(color).saturation > .25) {
       // Metallic ink: fine glitter that sparkles.
@@ -207,7 +219,8 @@ class DoodlePainter extends CustomPainter {
   final List<Stroke> strokes;
   /// 變了就重畫：畫的時候 [strokes] 最後一筆會一直加點，數量不會變。
   final int version;
-  const DoodlePainter(this.strokes, this.version);
+  /// Repaint on this without rebuilding, while a stroke is being drawn.
+  DoodlePainter(this.strokes, this.version, {super.repaint});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -219,6 +232,24 @@ class DoodlePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(DoodlePainter old) => old.strokes != strokes || old.version != version;
+}
+
+/// [strokes] over the whole canvas. The finished ones sit in their own
+/// layer that stays put; only the last one repaints on [repaint] while it is
+/// being drawn.
+class InkLayer extends StatelessWidget {
+  final List<Stroke> strokes;
+  final int version;
+  final Listenable? repaint;
+  const InkLayer({super.key, required this.strokes, this.version = 0, this.repaint});
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(child: Stack(fit: StackFit.expand, children: [
+    if (strokes.length > 1)
+      RepaintBoundary(child: CustomPaint(painter: DoodlePainter(strokes.sublist(0, strokes.length - 1), version))),
+    if (strokes.isNotEmpty)
+      CustomPaint(painter: DoodlePainter([strokes.last], version, repaint: repaint)),
+  ]));
 }
 
 /// 畫筆工具開著的時候蓋在畫布最上面，接住手指。只跟第一根手指，

@@ -69,6 +69,8 @@ class InstantPrint extends StatelessWidget {
   final List<Stroke> handwriting;
   /// Bump while a stroke is being drawn so it repaints.
   final int handwritingVersion;
+  /// Ticks as a stroke grows, to repaint just the ink.
+  final Listenable? handwritingRepaint;
   final VoidCallback? onCaption, onTap;
   /// Shown in an empty window.
   final Widget? placeholder;
@@ -78,7 +80,7 @@ class InstantPrint extends StatelessWidget {
   final ValueChanged<PhotoFit>? onFit;
   final PhotoFilter? filter;
   const InstantPrint({
-    super.key, this.image, this.film = FilmStock.white, this.develop = 1, required this.caption, this.handwriting = const [], this.handwritingVersion = 0,
+    super.key, this.image, this.film = FilmStock.white, this.develop = 1, required this.caption, this.handwriting = const [], this.handwritingVersion = 0, this.handwritingRepaint,
     this.onCaption, this.onTap, this.placeholder, this.selected = false, this.fit = const PhotoFit(), this.aspect, this.onFit, this.filter,
   });
 
@@ -106,7 +108,7 @@ class InstantPrint extends StatelessWidget {
           : Center(child: Text(caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: hand(24, color: film.text))),
       )),
       if (handwriting.isNotEmpty)
-        Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: DoodlePainter(handwriting, handwritingVersion)))),
+        Positioned.fill(child: InkLayer(strokes: handwriting, version: handwritingVersion, repaint: handwritingRepaint)),
     ]));
   }
 }

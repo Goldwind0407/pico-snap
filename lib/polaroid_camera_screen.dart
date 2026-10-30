@@ -146,6 +146,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   Color _pen = FilmStock.white.pen;
   int _penWidth = 0;
   int _inkVersion = 0;
+  /// Ticks as a stroke grows: repaints the ink without rebuilding the screen.
+  final _inkTick = ValueNotifier(0);
   final _printKey = GlobalKey();
   /// Body, film and filter last used, picked again next time the camera opens.
   static _Body _lastBody = _Body.cream;
@@ -168,6 +170,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _inkTick.dispose();
     _cameraGen++;
     _motor?.cancel();
     _camera?.dispose();
@@ -445,10 +448,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   void _penMove(Offset at, Size size) {
     final p = normalise(at, size), last = _current!.handwriting.last.points;
     if ((p - last.last).distance * size.width < 1) return;
-    setState(() {
-      last.add(p);
-      _inkVersion++;
-    });
+    last.add(p);
+    _inkTick.value++;
   }
 
   void _editInk(void Function(List<Stroke> strokes) edit) => setState(() {
@@ -562,7 +563,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
           child: Stack(children: [
             RepaintBoundary(key: _printKey, child: InstantPrint(
               image: print.image, film: print.film, filter: print.filter, develop: _develop.value, caption: '',
-              handwriting: print.handwriting, handwritingVersion: _inkVersion,
+              handwriting: print.handwriting, handwritingVersion: _inkVersion, handwritingRepaint: _inkTick,
               onCaption: _stage == _Stage.done ? _startWriting : null,
             )),
             if (_writing) Positioned.fill(child: DoodleInput(onStart: _penDown, onMove: _penMove, onEnd: () {})),

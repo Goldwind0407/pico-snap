@@ -27,8 +27,8 @@ Future<void> _phone(WidgetTester t, Widget home) async {
 }
 
 List<Stroke> _strokes(WidgetTester t) {
-  final paint = find.byWidgetPredicate((w) => w is CustomPaint && w.painter is DoodlePainter);
-  return paint.evaluate().isEmpty ? const [] : (t.widget<CustomPaint>(paint).painter! as DoodlePainter).strokes;
+  final ink = find.byType(InkLayer);
+  return ink.evaluate().isEmpty ? const [] : t.widget<InkLayer>(ink).strokes;
 }
 
 /// A finger stroke across the canvas, from [from] by [by] in small steps.

@@ -102,8 +102,8 @@ class _EditorScreenState extends State<EditorScreen> {
   List<StickerData> _stickers = [];
   /// Brush lines, drawn over everything.
   List<Stroke> _strokes = [];
-  /// Bumped while a line is being drawn, so it repaints as it grows.
-  int _inkVersion = 0;
+  /// Ticks as a line grows: repaints the ink without rebuilding the screen.
+  final _inkTick = ValueNotifier(0);
   PenStyle _pen = PenStyle.pen;
   Color _penColor = coral;
   int _penWidth = 1;
@@ -162,6 +162,7 @@ class _EditorScreenState extends State<EditorScreen> {
   @override
   void dispose() {
     _recorder.dispose();
+    _inkTick.dispose();
     _textCtrl.dispose();
     super.dispose();
   }
@@ -377,8 +378,8 @@ class _EditorScreenState extends State<EditorScreen> {
     _strokes = [..._strokes, Stroke(points: [normalise(at, size)], color: _penColor, width: penWidths[_penWidth], style: _pen)];
   });
 
-  void _penMove(Offset at, Size size) => setState(() {
-    if (_pen == PenStyle.eraser) return _erase(at, size);
+  void _penMove(Offset at, Size size) {
+    if (_pen == PenStyle.eraser) return setState(() => _erase(at, size));
     if (_strokes.isEmpty) return;
     final points = _strokes.last.points;
     final p = normalise(at, size);
@@ -386,8 +387,8 @@ class _EditorScreenState extends State<EditorScreen> {
     final last = points.last;
     if (Offset((p.dx - last.dx) * size.width, (p.dy - last.dy) * size.height).distance < 1.5) return;
     points.add(p);
-    _inkVersion++;
-  });
+    _inkTick.value++;
+  }
 
   /// Wipe out every line the finger touches; one undo step per swipe.
   void _erase(Offset at, Size size) {
@@ -503,7 +504,7 @@ class _EditorScreenState extends State<EditorScreen> {
             }),
           ),
         // Always there: adding it on the first line would rebuild the input below mid-stroke.
-        Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: DoodlePainter(_strokes, _inkVersion)))),
+        Positioned.fill(child: InkLayer(strokes: _strokes, repaint: _inkTick)),
         if (_tool == _Tool.brush && !_capturing)
           Positioned.fill(child: DoodleInput(onStart: _penDown, onMove: _penMove, onEnd: () => _erased = false)),
       ])),
