@@ -86,6 +86,12 @@ const lutLooks = <String, LutLook>{
   'teal_amber_street': LutLook('日系街拍', grain: .2, vignette: .12, soften: .2, halation: .1),
   // Washed-out colour and grey-brown blacks: an old roll of 400 film.
   'vintage_film_400': LutLook('復古膠卷', grain: .35, vignette: .18, soften: .35, halation: .2),
+  // RocketStock's free LUT pack (2017): fine for our own photos, but the
+  // licence doesn't let us hand the files out inside an app. For testing only:
+  // not ours to ship.
+  'rs_faded_47': LutLook('黃褪舊照', grain: .3, vignette: .15),
+  'rs_pitaya_15': LutLook('火龍果', grain: .15),
+  'rs_tweed_71': LutLook('柔霧淡調', grain: .15, soften: .2),
 };
 
 /// A LUT as read from a file: [size]³ entries of r, g, b (0–1), blue
