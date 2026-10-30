@@ -30,8 +30,8 @@ enum FilmStock {
   bool get dark => text == Colors.white;
 }
 
-const _frameAspect = 900 / 1260;
-const _frameWindow = Rect.fromLTWH(.12816, .10957, .74563, .681);
+const _frameAspect = 1588 / 2207;
+const _frameWindow = Rect.fromLTWH(.13854, .11192, .72544, .66742);
 
 /// How instax film develops at [t] (0–1): a flat pale grey-blue blank, then
 /// a faint, warm, low-contrast picture that gains colour and contrast.
