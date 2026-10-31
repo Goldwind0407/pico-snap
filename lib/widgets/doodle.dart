@@ -134,11 +134,16 @@ class Stroke {
     // Drawn opaque into a layer and laid down a touch see-through, so a
     // stroke doesn't darken over itself but two crossing strokes do.
     canvas.saveLayer(bounds, Paint()..color = const Color(0xF2000000));
-    canvas.drawCircle(pts.first.at, pts.first.width * .56, Paint()..color = color);
-    final body = pen(color, w);
-    for (var j = 1; j < pts.length; j++) {
-      canvas.drawLine(pts[j - 1].at, pts[j].at, body..strokeWidth = (pts[j - 1].width + pts[j].width) / 2);
+    // The body as one shape (a dot of felt at every sample, merged) rather
+    // than hundreds of separate lines: far fewer draws for the GPU.
+    final body = Path()..addOval(Rect.fromCircle(center: pts.first.at, radius: pts.first.width * .56));
+    for (var j = 0; j < pts.length; j++) {
+      final e = pts[j];
+      body.addOval(Rect.fromCircle(center: e.at, radius: e.width / 2));
+      // One more between samples keeps the edge smooth, not beaded.
+      if (j > 0) body.addOval(Rect.fromCircle(center: (pts[j - 1].at + e.at) / 2, radius: (pts[j - 1].width + e.width) / 4));
     }
+    canvas.drawPath(body, Paint()..color = color);
     if (pts.length == 1) {
       canvas.restore();
       return;
@@ -153,18 +158,22 @@ class Stroke {
     // Dry streaks: the felt runs thin on fast strokes and leaves broken
     // lines of paper showing through, always in the same places on this
     // stroke.
+    // Grouped by how strong they are, so each streak is a few draws.
     for (var k = 0; k < 4; k++) {
       final side = (rnd.nextDouble() - .5) * .8, thin = .12 + rnd.nextDouble() * .14;
       final gaps = [for (var j = 0; j < pts.length; j++) rnd.nextDouble()];
+      final levels = List.generate(4, (_) => Path());
       for (var j = 1; j < pts.length; j++) {
         final a = pts[j - 1], b = pts[j];
         final dry = ((b.speed - .4) / .6).clamp(0.0, 1.0);
         if (dry == 0 || gaps[j] < .35) continue;
-        canvas.drawLine(
-          a.at + normal(j - 1) * (side * a.width), b.at + normal(j) * (side * b.width),
-          pen(Color.fromRGBO(0, 0, 0, (light ? .14 : .32) * dry * gaps[j]), b.width * thin)
-            ..blendMode = BlendMode.dstOut,
-        );
+        final from = a.at + normal(j - 1) * (side * a.width), to = b.at + normal(j) * (side * b.width);
+        levels[min(3, (dry * gaps[j] * 4).floor())]
+          ..moveTo(from.dx, from.dy)
+          ..lineTo(to.dx, to.dy);
+      }
+      for (var l = 0; l < 4; l++) {
+        canvas.drawPath(levels[l], pen(Color.fromRGBO(0, 0, 0, (light ? .14 : .32) * (l + .5) / 4), w * thin)..blendMode = BlendMode.dstOut);
       }
     }
     if (light) {
@@ -180,12 +189,16 @@ class Stroke {
     }
     if (light && HSVColor.fromColor(color).saturation > .25) {
       // Metallic ink: fine glitter that sparkles.
-      final fleck = Paint()..blendMode = BlendMode.srcATop;
+      final flecks = List.generate(3, (_) => Path());
       for (final e in pts) {
         if (rnd.nextDouble() > .5) continue;
         final at = e.at + Offset(rnd.nextDouble() - .5, rnd.nextDouble() - .5) * e.width * .9;
-        canvas.drawCircle(at, e.width * (.03 + rnd.nextDouble() * .05),
-            fleck..color = Color.lerp(color, Colors.white, .5 + rnd.nextDouble() * .5)!.withValues(alpha: .5 + rnd.nextDouble() * .5));
+        flecks[rnd.nextInt(3)].addOval(Rect.fromCircle(center: at, radius: e.width * (.03 + rnd.nextDouble() * .05)));
+      }
+      for (var l = 0; l < 3; l++) {
+        canvas.drawPath(flecks[l], Paint()
+          ..blendMode = BlendMode.srcATop
+          ..color = Color.lerp(color, Colors.white, .5 + l * .25)!.withValues(alpha: .6 + l * .2));
       }
     }
     canvas.restore();
@@ -234,22 +247,94 @@ class DoodlePainter extends CustomPainter {
   bool shouldRepaint(DoodlePainter old) => old.strokes != strokes || old.version != version;
 }
 
-/// [strokes] over the whole canvas. The finished ones sit in their own
-/// layer that stays put; only the last one repaints on [repaint] while it is
-/// being drawn.
-class InkLayer extends StatelessWidget {
+/// [strokes] over the whole canvas. The finished ones are flattened into one
+/// picture as they're done (each marker stroke is hundreds of draws and a
+/// layer, too slow to redo every frame); only the last one repaints on
+/// [repaint] while it is being drawn.
+class InkLayer extends StatefulWidget {
   final List<Stroke> strokes;
   final int version;
   final Listenable? repaint;
   const InkLayer({super.key, required this.strokes, this.version = 0, this.repaint});
 
   @override
-  Widget build(BuildContext context) => IgnorePointer(child: Stack(fit: StackFit.expand, children: [
-    if (strokes.length > 1)
-      RepaintBoundary(child: CustomPaint(painter: DoodlePainter(strokes.sublist(0, strokes.length - 1), version))),
-    if (strokes.isNotEmpty)
-      CustomPaint(painter: DoodlePainter([strokes.last], version, repaint: repaint)),
-  ]));
+  State<InkLayer> createState() => _InkLayerState();
+}
+
+class _InkLayerState extends State<InkLayer> {
+  final _done = _FlatInk();
+
+  @override
+  void dispose() {
+    _done.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strokes = widget.strokes;
+    return IgnorePointer(child: Stack(fit: StackFit.expand, children: [
+      if (strokes.length > 1)
+        RepaintBoundary(child: CustomPaint(painter: _FlatInkPainter(_done, strokes.sublist(0, strokes.length - 1), widget.version))),
+      if (strokes.isNotEmpty)
+        CustomPaint(painter: DoodlePainter([strokes.last], widget.version, repaint: widget.repaint)),
+    ]));
+  }
+}
+
+/// Finished strokes as one image, big enough to save from (the long side
+/// about as big as a saved picture), with each new stroke drawn on top of
+/// the last image.
+class _FlatInk {
+  static const _longSide = 2400.0;
+  ui.Image? image;
+  List<Stroke> _drawn = const [];
+  Size? _size;
+
+  ui.Image update(List<Stroke> strokes, Size size) {
+    final old = image;
+    final scale = _longSide / max(1, size.longestSide);
+    final w = max(1, (size.width * scale).round()), h = max(1, (size.height * scale).round());
+    // Only strokes added after the ones already drawn: draw just those.
+    final grows = old != null && _size == size && strokes.length >= _drawn.length &&
+        Iterable.generate(_drawn.length).every((i) => identical(strokes[i], _drawn[i]));
+    if (grows && strokes.length == _drawn.length) return old;
+    final rec = ui.PictureRecorder();
+    final canvas = Canvas(rec)..scale(scale);
+    if (grows) canvas.drawImageRect(old, Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()), Offset.zero & size, Paint());
+    for (final s in strokes.skip(grows ? _drawn.length : 0)) {
+      s.paint(canvas, size);
+    }
+    final picture = rec.endRecording();
+    image = picture.toImageSync(w, h);
+    picture.dispose();
+    old?.dispose();
+    _drawn = List.of(strokes);
+    _size = size;
+    return image!;
+  }
+
+  void dispose() => image?.dispose();
+}
+
+class _FlatInkPainter extends CustomPainter {
+  final _FlatInk flat;
+  final List<Stroke> strokes;
+  final int version;
+  _FlatInkPainter(this.flat, this.strokes, this.version);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final image = flat.update(strokes, size);
+    canvas.drawImageRect(
+      image, Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()), Offset.zero & size,
+      Paint()..filterQuality = FilterQuality.medium,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_FlatInkPainter old) => old.version != version || old.strokes.length != strokes.length ||
+      Iterable.generate(strokes.length).any((i) => !identical(strokes[i], old.strokes[i]));
 }
 
 /// 畫筆工具開著的時候蓋在畫布最上面，接住手指。只跟第一根手指，

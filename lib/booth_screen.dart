@@ -275,7 +275,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
       ..clear()
       ..addAll(photos);
     setState(() {
-      _providers = [for (final p in _photos) MemoryImage(p)];
+      _providers = [for (final p in _photos) photoImage(p)];
       _stage = _Stage.filter;
     });
   }

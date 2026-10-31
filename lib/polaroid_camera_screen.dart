@@ -63,7 +63,7 @@ class _Print {
   /// Finger writing on the print; blank until the user writes.
   final handwriting = <Stroke>[];
   bool saved = false;
-  _Print(this.bytes, this.film, this.filter) : image = MemoryImage(bytes);
+  _Print(this.bytes, this.film, this.filter) : image = photoImage(bytes);
 }
 
 /// 拍立得相機：取景在鏡頭裡，按下快門後相片從上方的出片口慢慢吐出來，
@@ -366,6 +366,12 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     }
     HapticFeedback.lightImpact(); // stops with a little clunk
     if (!mounted) return;
+    // Nobody is looking through the camera until the next shot; keep it
+    // from heating the phone.
+    _serial(() async {
+      final c = _camera;
+      if (_stage != _Stage.aiming && c != null && c.value.isInitialized && !c.value.isPreviewPaused) await c.pausePreview();
+    });
     _prints.add(print);
     setState(() => _stage = _Stage.developing);
     _develop.forward(from: 0);
@@ -400,6 +406,10 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   }
 
   void _again() {
+    _serial(() async {
+      final c = _camera;
+      if (c != null && c.value.isInitialized && c.value.isPreviewPaused) await c.resumePreview();
+    });
     _eject.value = 0;
     _lift.value = 0;
     _develop.value = 0;

@@ -149,6 +149,12 @@ Uint8List _gradeJob(({Uint8List rgba, Float32List lut, int w, int h, double soft
   return out;
 }
 
+/// A photo from [bytes], decoded no bigger than we ever save it. A phone
+/// photo at full size is ~48 MB in memory; a few of them push each other
+/// out of the image cache and get decoded again and again.
+ImageProvider photoImage(Uint8List bytes) =>
+    ResizeImage(MemoryImage(bytes), width: 2400, height: 2400, policy: ResizeImagePolicy.fit, allowUpscaling: false);
+
 /// [image] with [filter] applied exactly: the graded photo plus film effects.
 ImageProvider filtered(ImageProvider image, PhotoFilter? filter, {int maxSide = 2048}) =>
     filter == null || filter.isNone ? image : FilteredImage(image, filter, maxSide: maxSide);

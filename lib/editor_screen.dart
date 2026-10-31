@@ -151,7 +151,7 @@ class _EditorScreenState extends State<EditorScreen> {
     super.initState();
     for (var i = 0; i < widget.photos.length && i < _cells; i++) {
       _photoBytes[i] = widget.photos[i];
-      _photos[i] = MemoryImage(widget.photos[i]);
+      _photos[i] = photoImage(widget.photos[i]);
       _measure(i);
     }
     for (var i = 0; i < widget.captions.length && i < _polaroidCaptions.length; i++) {
@@ -200,7 +200,7 @@ class _EditorScreenState extends State<EditorScreen> {
     if (widget.mode != EditorMode.sticker) _tool = _Tool.photo;
     setState(() {
       _edited = true;
-      _photos[i] = MemoryImage(bytes);
+      _photos[i] = photoImage(bytes);
       _photoBytes[i] = bytes;
       _fits[i] = const PhotoFit();
       _aspects[i] = null;
