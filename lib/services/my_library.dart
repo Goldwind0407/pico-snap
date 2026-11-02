@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models.dart';
+import 'file_store.dart';
 
 /// 使用者在「我的素材」做的貼紙和模板。
 ///
@@ -21,20 +22,30 @@ class MyLibrary {
   static Directory? _dir;
 
   static Future<void> load() async {
+    final Directory dir;
     try {
       final docs = await getApplicationDocumentsDirectory();
-      final dir = Directory('${docs.path}/my_library');
-      final stickers = Directory('${dir.path}/stickers');
-      await stickers.create(recursive: true);
-      _dir = dir;
-      // 檔名是建立時間，排序之後就是做的順序
-      final files = stickers.listSync().whereType<File>().where((f) => f.path.endsWith('.png')).toList()
+      dir = Directory('${docs.path}/my_library');
+      await Directory('${dir.path}/stickers').create(recursive: true);
+    } catch (e) {
+      debugPrint('[LIBRARY] 沒有文件資料夾，這次只放在記憶體裡: $e');
+      changes.value++;
+      return;
+    }
+    _dir = dir;
+    // 檔名是建立時間，排序之後就是做的順序
+    try {
+      final files = Directory('${dir.path}/stickers').listSync().whereType<File>().where((f) => f.path.endsWith('.png')).toList()
         ..sort((a, b) => a.path.compareTo(b.path));
       for (final f in files) {
         final name = f.uri.pathSegments.last;
         customStickers['my:${name.substring(0, name.length - 4)}'] = f.readAsBytesSync();
       }
-      final json = File('${dir.path}/templates.json');
+    } catch (e) {
+      debugPrint('[LIBRARY] 讀取貼紙失敗: $e');
+    }
+    final json = File('${dir.path}/templates.json');
+    try {
       if (json.existsSync()) {
         final list = jsonDecode(json.readAsStringSync()) as List;
         customTemplates
@@ -42,7 +53,8 @@ class MyLibrary {
           ..addAll([for (final t in list) CustomTemplate.fromJson((t as Map).cast<String, Object?>())]);
       }
     } catch (e) {
-      debugPrint('[LIBRARY] 讀取我的素材失敗，這次只放在記憶體裡: $e');
+      debugPrint('[LIBRARY] 模板檔壞掉了，先收到旁邊: $e');
+      keepAside(json);
     }
     changes.value++;
   }
@@ -61,14 +73,14 @@ class MyLibrary {
     final id = 'my:$key';
     customStickers[id] = png;
     changes.value++;
-    _write(() => File('${_dir!.path}/stickers/$key.png').writeAsBytes(png));
+    _write(() => _writer.writeBytes(File('${_dir!.path}/stickers/$key.png'), png));
     return id;
   }
 
   static void removeSticker(String id) {
     customStickers.remove(id);
     changes.value++;
-    _write(() => File('${_dir!.path}/stickers/${id.substring(3)}.png').delete());
+    _write(() => _writer.run(() => File('${_dir!.path}/stickers/${id.substring(3)}.png').delete()));
   }
 
   static void addTemplate(CustomTemplate template) {
@@ -92,12 +104,15 @@ class MyLibrary {
   static void _saveTemplates() {
     changes.value++;
     final json = jsonEncode([for (final t in customTemplates) t.toJson()]);
-    _write(() => File('${_dir!.path}/templates.json').writeAsString(json));
+    _write(() => _writer.writeString(File('${_dir!.path}/templates.json'), json));
   }
 
-  /// 最近一次寫進手機有沒有成功。畫面上已經先改好了，失敗的話呼叫的
-  /// 地方要告訴使用者：關掉 App 再打開就不見了。
+  /// 最近一次寫進手機有沒有成功（等它前面排隊的都寫完）。畫面上已經先
+  /// 改好了，失敗的話呼叫的地方要告訴使用者：關掉 App 再打開就不見了。
   static Future<bool> lastWrite = Future.value(true);
+
+  /// 一次寫一個：快速連改兩次模板，後面那次一定最後寫進去。
+  static final _writer = FileWriter();
 
   static void _write(Future<void> Function() op) {
     lastWrite = () async {

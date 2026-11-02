@@ -41,22 +41,27 @@ class PhotoSaveService {
       debugPrint('[SAVE] 截圖失敗: $e');
       return '產生圖片失敗，請再試一次';
     }
-    final recorder = ui.PictureRecorder();
-    final w = shot.width.toDouble(), h = shot.height.toDouble();
-    ui.Canvas(recorder)
-      ..drawRect(Rect.fromLTWH(0, 0, w, h), Paint()..color = background)
-      ..drawImage(shot, Offset.zero, Paint());
-    final flat = await recorder.endRecording().toImage(shot.width, shot.height);
-    shot.dispose();
-    final data = await flat.toByteData(format: ui.ImageByteFormat.png);
-    if (data == null) {
-      flat.dispose();
+    // Full-size pictures: freed on every path, errors included.
+    ui.Image? flat;
+    try {
+      final recorder = ui.PictureRecorder();
+      final w = shot.width.toDouble(), h = shot.height.toDouble();
+      ui.Canvas(recorder)
+        ..drawRect(Rect.fromLTWH(0, 0, w, h), Paint()..color = background)
+        ..drawImage(shot, Offset.zero, Paint());
+      flat = await recorder.endRecording().toImage(shot.width, shot.height);
+      final data = await flat.toByteData(format: ui.ImageByteFormat.png);
+      if (data == null) return '產生圖片失敗，請再試一次';
+      final error = await saveBytes(data.buffer.asUint8List());
+      if (error == null && keep != null) await _keep(flat, keep);
+      return error;
+    } catch (e) {
+      debugPrint('[SAVE] 產生圖片失敗: $e');
       return '產生圖片失敗，請再試一次';
+    } finally {
+      shot.dispose();
+      flat?.dispose();
     }
-    final error = await saveBytes(data.buffer.asUint8List());
-    if (error == null && keep != null) await _keep(flat, keep);
-    flat.dispose();
-    return error;
   }
 
   /// 作品集裡的那份：最長邊 [_keepSide]，夠在 App 裡全螢幕看。
@@ -74,8 +79,12 @@ class PhotoSaveService {
         Paint()..filterQuality = FilterQuality.medium,
       );
       final small = await recorder.endRecording().toImage(w, h);
-      final data = await small.toByteData(format: ui.ImageByteFormat.png);
-      small.dispose();
+      final ByteData? data;
+      try {
+        data = await small.toByteData(format: ui.ImageByteFormat.png);
+      } finally {
+        small.dispose();
+      }
       if (data != null) await MyWorks.add(data.buffer.asUint8List(), kind);
     } catch (e) {
       // 相簿已經存好了，作品集少一張不影響

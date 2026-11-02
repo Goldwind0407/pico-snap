@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'file_store.dart';
+
 /// 作品是用哪一種玩法做的。
 enum WorkKind {
   fourCut('四格拍貼'),
@@ -49,12 +51,20 @@ class MyWorks {
   static Directory? _dir;
 
   static Future<void> load() async {
+    final Directory dir;
     try {
       final docs = await getApplicationDocumentsDirectory();
-      final dir = Directory('${docs.path}/works');
-      await dir.create(recursive: true);
-      _dir = dir;
-      final list = File('${dir.path}/works.json');
+      dir = await Directory('${docs.path}/works').create(recursive: true);
+    } catch (e) {
+      debugPrint('[WORKS] 沒有文件資料夾，這次只放在記憶體裡: $e');
+      changes.value++;
+      return;
+    }
+    _dir = dir;
+    // Each file on its own: a broken list mustn't keep the diary from
+    // loading (the next note would then save over all the old ones).
+    final list = File('${dir.path}/works.json');
+    try {
       if (list.existsSync()) {
         works
           ..clear()
@@ -65,14 +75,20 @@ class MyWorks {
                   Work(id: '${w['id']}', kind: kind, created: DateTime.fromMillisecondsSinceEpoch(w['t'] as int), file: f),
           ]);
       }
-      final diary = File('${dir.path}/diary.json');
+    } catch (e) {
+      debugPrint('[WORKS] 作品清單壞掉了，先收到旁邊: $e');
+      keepAside(list);
+    }
+    final diary = File('${dir.path}/diary.json');
+    try {
       if (diary.existsSync()) {
         notes
           ..clear()
           ..addAll((jsonDecode(diary.readAsStringSync()) as Map).cast<String, String>());
       }
     } catch (e) {
-      debugPrint('[WORKS] 讀取作品集失敗，這次只放在記憶體裡: $e');
+      debugPrint('[WORKS] 日記檔壞掉了，先收到旁邊: $e');
+      keepAside(diary);
     }
     changes.value++;
   }
@@ -97,13 +113,15 @@ class MyWorks {
     if (_dir case final dir?) {
       try {
         final f = File('${dir.path}/$id.png');
-        await f.writeAsBytes(png);
+        await _writer.writeBytes(f, png);
         work = Work(id: id, kind: kind, created: created, file: f);
       } catch (e) {
         debugPrint('[WORKS] 存作品失敗，這次只放在記憶體裡: $e');
       }
     }
     works.insert(0, work);
+    // Shown either way; if the list didn't save, it's gone after a restart
+    // (the picture itself is safe in the phone's album).
     await _saveList();
     return work;
   }
@@ -144,11 +162,14 @@ class MyWorks {
     return _write('works.json', jsonEncode([for (final w in works) w.toJson()]));
   }
 
+  /// One write at a time, so a slower earlier save can't land last.
+  static final _writer = FileWriter();
+
   static Future<bool> _write(String name, String json) async {
     final dir = _dir;
     if (dir == null) return true;
     try {
-      await File('${dir.path}/$name').writeAsString(json);
+      await _writer.writeString(File('${dir.path}/$name'), json);
       return true;
     } catch (e) {
       debugPrint('[WORKS] 存檔失敗: $e');

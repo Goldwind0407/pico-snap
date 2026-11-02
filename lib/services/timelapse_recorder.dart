@@ -36,6 +36,13 @@ class TimelapseRecorder {
   Timer? _timer;
   Future<ui.Image?> Function()? _pending;
   bool _busy = false, _closed = false;
+  /// [render] started: no more shots, but the one being taken still lands.
+  bool _finishing = false;
+  /// The shot being taken and the video being made, waited for before
+  /// either ends or the folder is deleted.
+  Future<void> _shot = Future.value();
+  Future<void> _encoding = Future.value();
+  bool _encodingNow = false;
   int _seq = 0;
 
   int get frameCount => _frames.length;
@@ -48,17 +55,17 @@ class TimelapseRecorder {
 
   /// 畫面變了：等一下用 [source] 截一張。
   void request(Future<ui.Image?> Function() source) {
-    if (_closed) return;
+    if (_closed || _finishing) return;
     _pending = source;
     if (_busy || (_timer?.isActive ?? false)) return;
     final wait = _interval - DateTime.now().difference(_last);
-    _timer = Timer(wait.isNegative ? Duration.zero : wait, _flush);
+    _timer = Timer(wait.isNegative ? Duration.zero : wait, () => _shot = _flush());
   }
 
   Future<void> _flush() async {
     final source = _pending;
     _pending = null;
-    if (source == null || _closed) return;
+    if (source == null || _closed || _finishing) return;
     _busy = true;
     _last = DateTime.now();
     try {
@@ -71,7 +78,7 @@ class TimelapseRecorder {
       _busy = false;
     }
     final next = _pending;
-    if (next != null && !_closed) request(next);
+    if (next != null && !_closed && !_finishing) request(next);
   }
 
   Future<Directory?> _ensureDir() async {
@@ -109,7 +116,8 @@ class TimelapseRecorder {
     final path = await _write(art, 'f${(_seq++).toString().padLeft(5, '0')}');
     if (path == null) return;
     _frames.add(path);
-    if (_frames.length >= maxFrames) _thin();
+    // Not while the encoder is reading the frames; the next one thins.
+    if (_frames.length >= maxFrames && !_encodingNow) _thin();
   }
 
   /// 隔一張丟一張，之後截得慢一倍。
@@ -131,26 +139,48 @@ class TimelapseRecorder {
   /// 做成 MP4：錄到的過程，最後是 [finished]（乾淨的成品）停兩秒。
   /// 回傳影片路徑；做不出來回傳 null。
   Future<String?> render(ui.Image finished) async {
+    _finishing = true;
     _timer?.cancel();
-    final last = await _write(finished, 'final_${_seq++}');
-    if (last == null) return null;
-    final out = '${_dir!.path}/pico_snap_${DateTime.now().millisecondsSinceEpoch}.mp4';
+    _pending = null;
     try {
-      return await _channel.invokeMethod<String>('encode', {
-        'frames': [for (final f in _frames) for (var i = 0; i < _repeat; i++) f, for (var i = 0; i < fps * holdSeconds; i++) last],
-        'out': out, 'fps': fps, 'width': width, 'height': height,
-      });
-    } catch (e) {
-      debugPrint('[TIMELAPSE] 影片編碼失敗: $e');
-      return null;
+      // A shot already being taken goes in before the finished picture.
+      await _shot;
+      return await _encode(finished);
+    } finally {
+      // Editing on after saving keeps recording, for the next save.
+      _finishing = false;
     }
   }
 
+  Future<String?> _encode(ui.Image finished) async {
+    final last = await _write(finished, 'final_${_seq++}');
+    if (last == null) return null;
+    final out = '${_dir!.path}/pico_snap_${DateTime.now().millisecondsSinceEpoch}.mp4';
+    final job = _channel.invokeMethod<String>('encode', {
+      'frames': [for (final f in _frames) for (var i = 0; i < _repeat; i++) f, for (var i = 0; i < fps * holdSeconds; i++) last],
+      'out': out, 'fps': fps, 'width': width, 'height': height,
+    });
+    _encoding = job.then((_) {}, onError: (_) {});
+    _encodingNow = true;
+    try {
+      return await job;
+    } catch (e) {
+      debugPrint('[TIMELAPSE] 影片編碼失敗: $e');
+      return null;
+    } finally {
+      _encodingNow = false;
+    }
+  }
+
+  /// Stops recording; the folder goes once the shot and video in progress
+  /// are done with it.
   void dispose() {
     _closed = true;
     _timer?.cancel();
-    final dir = _dir;
-    if (dir != null) dir.delete(recursive: true).ignore();
+    Future.wait([_shot, _encoding]).whenComplete(() {
+      final dir = _dir;
+      if (dir != null) dir.delete(recursive: true).ignore();
+    });
   }
 }
 

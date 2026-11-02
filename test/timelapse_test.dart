@@ -99,4 +99,26 @@ void main() {
     expect(await rec.render(await _art(const Color(0xFFFFFFFF))), isNull);
     rec.dispose();
   });
+
+  test('按儲存時還在截的那一張也會進影片，而且在成品前面', () async {
+    final rec = TimelapseRecorder(dir: tmp);
+    List<Object?>? frames;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      const MethodChannel('picosnap/video'), (call) async {
+        frames = (call.arguments as Map)['frames'] as List;
+        return '${tmp.path}/out.mp4';
+      });
+    addTearDown(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(const MethodChannel('picosnap/video'), null));
+    // A slow screenshot, still being taken when the user presses save.
+    rec.request(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      return _art(const Color(0xFFFF0000));
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    final path = await rec.render(await _art(const Color(0xFF00FF00)));
+    expect(path, isNotNull);
+    expect(frames!.where((f) => '$f'.contains('/f00000')), isNotEmpty, reason: '那一張沒有被漏掉');
+    expect('${frames!.first}', contains('/f00000'), reason: '過程在前，成品在後');
+    rec.dispose();
+  });
 }
