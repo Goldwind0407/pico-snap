@@ -127,9 +127,10 @@ void main() {
     expect(find.byType(StickerItem), findsOneWidget);
   });
 
-  testWidgets('首頁：「我的」是分頁，返回鍵先回首頁', (t) async {
+  testWidgets('首頁：「素材」是分頁，返回鍵先回首頁；沒有還沒開放的商店', (t) async {
     await _phone(t, const HomeScreen());
-    await t.tap(find.text('我的'));
+    expect(find.text('商店'), findsNothing);
+    await t.tap(find.text('素材'));
     await t.pumpAndSettle();
     expect(find.text('我的素材'), findsOneWidget);
     expect(find.byIcon(Icons.arrow_back_rounded), findsNothing, reason: '分頁裡沒有返回箭頭');

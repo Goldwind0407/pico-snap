@@ -17,7 +17,7 @@ import 'my_works.dart';
 class PhotoSaveService {
   PhotoSaveService._();
 
-  static const _album = 'PICO SNAP';
+  static const _album = '快趣拍';
   static int _lastStamp = 0;
 
   /// 把 [key] 那個 RepaintBoundary 裡畫的東西存進相簿，最長邊大約

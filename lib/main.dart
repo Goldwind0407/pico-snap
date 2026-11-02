@@ -19,7 +19,7 @@ class PicoSnapApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'PICO SNAP',
+    title: '快趣拍',
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
       useMaterial3: true,

@@ -23,7 +23,7 @@ enum FramePattern { none, dots, paws, confetti, gingham, stripes }
 enum FooterStyle {
   /// Handwritten caption.
   caption,
-  /// "PICO SNAP" wordmark with the date, like a classic photo booth print.
+  /// 快趣拍 wordmark with the date, like a classic photo booth print.
   logoDate,
   /// Big bold title with a handwritten subtitle.
   title,
@@ -121,7 +121,7 @@ const stripTemplates = [
   StripTemplate(name: 'Peach', category: '可愛', caption: 'cute caption ♡', frame: Color(0xFFF9CACB), cell: sky, tape: true),
   StripTemplate(name: 'Coral', category: '可愛', caption: 'little moments', frame: Color(0xFFF2867B), cell: Color(0xFFF8D0D4), captionColor: Colors.white),
   StripTemplate(
-    name: 'Paw Party', category: '可愛', caption: 'PICO SNAP', subtitle: 'meow meow',
+    name: 'Paw Party', category: '可愛', caption: '快趣拍', subtitle: 'meow meow',
     frame: Color(0xFFFAD9D7), cell: Color(0xFF2A2730), pattern: FramePattern.paws, patternColor: Color(0xFFFFF4F2),
     cellShape: CellShape.wavy, footer: FooterStyle.title, captionColor: Color(0xFF2D3FA8), outline: false,
     decos: [

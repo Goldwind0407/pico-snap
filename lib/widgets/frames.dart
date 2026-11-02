@@ -237,8 +237,8 @@ class PhotoStrip extends StatelessWidget {
           Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.photo_camera_outlined, size: 16, color: t.captionColor),
             const SizedBox(width: 5),
-            Flexible(child: Text('PICO SNAP', maxLines: 1, softWrap: false, overflow: TextOverflow.fade,
-              style: TextStyle(fontFamily: 'Nunito', fontSize: 15, letterSpacing: 2.4, color: t.captionColor, fontWeight: FontWeight.w900))),
+            Flexible(child: Text('快趣拍', maxLines: 1, softWrap: false, overflow: TextOverflow.fade,
+              style: TextStyle(fontFamily: 'Nunito', fontSize: 15, letterSpacing: 3, color: t.captionColor, fontWeight: FontWeight.w900))),
           ]),
           const SizedBox(height: 4),
           Text(text.isEmpty ? date : text, maxLines: 1, overflow: TextOverflow.ellipsis,

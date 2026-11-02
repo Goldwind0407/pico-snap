@@ -25,7 +25,7 @@ class TimelapseRecorder {
   static const _channel = MethodChannel('picosnap/video');
 
   final int maxFrames;
-  /// 影片上方 PICO SNAP 下面那行手寫字。
+  /// 影片上方 App 名稱下面那行手寫字。
   final String subtitle;
   final Directory? _baseDir;
   Directory? _dir;
@@ -184,13 +184,13 @@ class TimelapseRecorder {
   }
 }
 
-/// 一格影片：奶油色底、上面 PICO SNAP、中間是作品、下面一行手寫字。
+/// 一格影片：奶油色底、上面 App 名稱、中間是作品、下面一行手寫字。
 @visibleForTesting
 Future<ui.Image> composeFrame(ui.Image art, {String subtitle = 'the making of ♡'}) {
   const w = TimelapseRecorder.width * 1.0, h = TimelapseRecorder.height * 1.0;
   final recorder = ui.PictureRecorder();
   final c = ui.Canvas(recorder)..drawRect(const ui.Rect.fromLTWH(0, 0, w, h), ui.Paint()..color = cream);
-  _text(c, 'PICO SNAP', 62, ui.TextStyle(color: coral, fontSize: 44, fontFamily: 'Nunito', fontWeight: ui.FontWeight.w900, letterSpacing: 5));
+  _text(c, '快趣拍', 58, ui.TextStyle(color: coral, fontSize: 48, fontFamily: 'Nunito', fontWeight: ui.FontWeight.w900, letterSpacing: 6));
   _text(c, subtitle, 122, ui.TextStyle(color: muted, fontSize: 36, fontFamily: 'Caveat', fontWeight: ui.FontWeight.w600));
   const box = ui.Rect.fromLTRB(56, 200, w - 56, h - 130);
   final s = min(box.width / art.width, box.height / art.height);
@@ -200,7 +200,7 @@ Future<ui.Image> composeFrame(ui.Image art, {String subtitle = 'the making of �
       ..color = ink.withValues(alpha: .16)
       ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 18))
     ..drawImageRect(art, ui.Rect.fromLTWH(0, 0, art.width * 1.0, art.height * 1.0), dst, ui.Paint()..filterQuality = ui.FilterQuality.medium);
-  _text(c, 'made with PICO SNAP', h - 92, ui.TextStyle(color: muted, fontSize: 34, fontFamily: 'Caveat', fontWeight: ui.FontWeight.w600));
+  _text(c, 'made with 快趣拍', h - 92, ui.TextStyle(color: muted, fontSize: 34, fontFamily: 'Caveat', fontWeight: ui.FontWeight.w600));
   return recorder.endRecording().toImage(TimelapseRecorder.width, TimelapseRecorder.height);
 }
 

@@ -833,7 +833,7 @@ class _EditorScreenState extends State<EditorScreen> {
         },
       )),
       if (mine && pack.isEmpty)
-        const Expanded(child: Center(child: Text('還沒有自己的貼紙\n可以到首頁的「我的」把照片做成貼紙', textAlign: TextAlign.center,
+        const Expanded(child: Center(child: Text('還沒有自己的貼紙\n可以到首頁下方的「素材」把照片做成貼紙', textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12, height: 1.6, color: muted, fontWeight: FontWeight.w600))))
       else Expanded(child: GridView.builder(
         padding: EdgeInsets.zero,

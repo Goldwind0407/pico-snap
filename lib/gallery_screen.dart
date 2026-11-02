@@ -13,7 +13,9 @@ String _time(DateTime d) => '${d.hour.toString().padLeft(2, '0')}:${d.minute.toS
 
 /// 「作品集」：存到相簿過的作品，新的在前面。
 class GalleryScreen extends StatefulWidget {
-  const GalleryScreen({super.key});
+  /// Shown as the home page's「作品集」tab: no back arrow, room for the tab bar.
+  final bool embedded;
+  const GalleryScreen({super.key, this.embedded = false});
 
   @override
   State<GalleryScreen> createState() => _GalleryScreenState();
@@ -36,7 +38,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
             child: Row(children: [
-              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
+              if (widget.embedded) const SizedBox(width: 12, height: 48)
+              else IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
               const Expanded(child: Text('作品集', style: TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
               if (MyWorks.works.isNotEmpty)
                 Text('${MyWorks.works.length} 件', style: const TextStyle(fontSize: 13, color: muted, fontWeight: FontWeight.w700)),
@@ -55,7 +58,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
               ],
             )),
           Expanded(child: shown.isEmpty ? const _Empty() : GridView.builder(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+            padding: EdgeInsets.fromLTRB(20, 10, 20, widget.embedded ? 130 : 24),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: .72),
             itemCount: shown.length,
             itemBuilder: (_, i) => WorkTile(work: shown[i], onTap: () => WorkViewer.open(context, shown, i)),

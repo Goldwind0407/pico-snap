@@ -11,7 +11,7 @@ import 'widgets/frames.dart';
 
 /// 「我的素材」：新增、刪除自己的貼紙和模板。編輯作品時只能使用，不能在那裡改。
 class LibraryScreen extends StatefulWidget {
-  /// Shown as the home page's「我的」tab: no back arrow, room for the tab bar.
+  /// Shown as the home page's「素材」tab: no back arrow, room for the tab bar.
   final bool embedded;
   const LibraryScreen({super.key, this.embedded = false});
 

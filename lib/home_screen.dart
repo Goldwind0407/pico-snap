@@ -18,7 +18,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  /// 0 = 首頁, 1 = 我的, 2 = 日記.
+  /// 0 = 首頁, 1 = 素材, 2 = 日記, 3 = 作品集.
   int _tab = 0;
 
   void _open(BuildContext context, EditorMode mode, [int template = 0]) => Navigator.push(
@@ -37,39 +37,40 @@ class _HomeScreenState extends State<HomeScreen> {
     child: Scaffold(
       backgroundColor: cream,
       extendBody: true,
-      body: IndexedStack(index: _tab, children: [_home(context), const LibraryScreen(embedded: true), const DiaryScreen()]),
+      body: IndexedStack(index: _tab, children: [
+        _home(context), const LibraryScreen(embedded: true), const DiaryScreen(), const GalleryScreen(embedded: true),
+      ]),
       bottomNavigationBar: _BottomBar(
         tab: _tab,
         onCamera: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolaroidCameraScreen())),
-        onSoon: (label) => showSoonToast(context, label),
         onTab: (t) => setState(() => _tab = t),
       ),
     ),
   );
 
   Widget _home(BuildContext context) => SafeArea(bottom: false, child: ListView(padding: const EdgeInsets.fromLTRB(0, 10, 0, 120), children: [
-      _pad(_Header(onGallery: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GalleryScreen())))),
+      _pad(const _Header()),
       const SizedBox(height: 22),
       _pad(_HeroCard(onStart: () => _open(context, EditorMode.fourCut))),
       const SizedBox(height: 30),
       _pad(const _SectionTitle(title: 'Create', note: '選一種玩法')),
       const SizedBox(height: 14),
-      _pad(Row(children: [
+      _pad(IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Expanded(child: _ModeCard(
-          label: 'Four Cuts', sub: '四格拍貼', color: blush, border: blushLine,
+          label: '四格拍貼', sub: 'Four Cuts', color: blush, border: blushLine,
           art: const _FourCutsArt(), onTap: () => _open(context, EditorMode.fourCut),
         )),
         const SizedBox(width: 12),
         Expanded(child: _ModeCard(
-          label: 'Polaroid', sub: '拍立得', color: lilac, border: lilacLine,
+          label: '拍立得', sub: 'Polaroid', color: lilac, border: lilacLine,
           art: const _PolaroidArt(), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolaroidCameraScreen())),
         )),
         const SizedBox(width: 12),
         Expanded(child: _ModeCard(
-          label: 'Sticker', sub: '貼紙裝飾', color: butter, border: butterLine,
+          label: '貼紙裝飾', sub: 'Sticker', color: butter, border: butterLine,
           art: const _StickerArt(), onTap: () => _open(context, EditorMode.sticker),
         )),
-      ])),
+      ]))),
       const SizedBox(height: 30),
       _pad(const _SectionTitle(title: "Today's styles", note: '今日風格')),
       const SizedBox(height: 14),
@@ -84,8 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _Header extends StatelessWidget {
-  final VoidCallback onGallery;
-  const _Header({required this.onGallery});
+  const _Header();
 
   @override
   Widget build(BuildContext context) => Row(children: [
@@ -93,18 +93,19 @@ class _Header extends StatelessWidget {
       width: 44, height: 44,
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: line)),
       alignment: Alignment.center,
-      child: const Text('PICO\nSNAP', textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 9, height: 1.05, color: coral, fontWeight: FontWeight.w900)),
+      child: const Text('快趣\n拍', textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 11, height: 1.05, color: coral, fontWeight: FontWeight.w900)),
     ),
     const Expanded(child: Text.rich(
       TextSpan(children: [
-        TextSpan(text: 'PICO ', style: TextStyle(color: coral)),
-        TextSpan(text: 'SNAP', style: TextStyle(color: ink)),
+        TextSpan(text: '快趣', style: TextStyle(color: coral)),
+        TextSpan(text: '拍', style: TextStyle(color: ink)),
       ]),
       textAlign: TextAlign.center,
-      style: TextStyle(fontSize: 26, letterSpacing: .5, fontWeight: FontWeight.w900),
+      style: TextStyle(fontSize: 26, letterSpacing: 3, fontWeight: FontWeight.w900),
     )),
-    IconButton(onPressed: onGallery, tooltip: '作品集', icon: const Icon(Icons.photo_outlined, size: 30, color: ink)),
+    // Balances the logo so the name sits in the middle.
+    const SizedBox(width: 44),
   ]);
 }
 
@@ -182,14 +183,16 @@ class _ModeCard extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: Container(
-      height: 140,
+      constraints: const BoxConstraints(minHeight: 140),
       padding: const EdgeInsets.fromLTRB(6, 10, 6, 10),
       decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(18), border: Border.all(color: border, width: 1.6)),
+      // The drawing keeps its size; with large text the card grows instead.
       child: Column(children: [
-        Expanded(child: Center(child: FittedBox(child: art))),
+        SizedBox(height: 78, child: Center(child: FittedBox(child: art))),
+        const Spacer(),
         const SizedBox(height: 6),
-        Text(label, style: const TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800)),
-        Text(sub, style: const TextStyle(fontSize: 10, color: muted, fontWeight: FontWeight.w700)),
+        Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800)),
+        Text(sub, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: muted, fontWeight: FontWeight.w700)),
       ]),
     ),
   );
@@ -281,9 +284,8 @@ class _StyleCard extends StatelessWidget {
 class _BottomBar extends StatelessWidget {
   final int tab;
   final VoidCallback onCamera;
-  final ValueChanged<String> onSoon;
   final ValueChanged<int> onTab;
-  const _BottomBar({required this.tab, required this.onCamera, required this.onSoon, required this.onTab});
+  const _BottomBar({required this.tab, required this.onCamera, required this.onTab});
 
   @override
   Widget build(BuildContext context) => SizedBox(
@@ -297,10 +299,10 @@ class _BottomBar extends StatelessWidget {
         ),
         child: SafeArea(top: false, child: Row(children: [
           Expanded(child: _NavItem(icon: tab == 0 ? Icons.home_rounded : Icons.home_outlined, label: '首頁', selected: tab == 0, onTap: () => onTab(0))),
-          Expanded(child: _NavItem(icon: tab == 2 ? Icons.menu_book_rounded : Icons.menu_book_outlined, label: '日記', selected: tab == 2, onTap: () => onTab(2))),
+          Expanded(child: _NavItem(icon: tab == 3 ? Icons.photo_library_rounded : Icons.photo_library_outlined, label: '作品集', selected: tab == 3, onTap: () => onTab(3))),
           const SizedBox(width: 72),
-          Expanded(child: _NavItem(icon: Icons.shopping_bag_outlined, label: '商店', onTap: () => onSoon('商店'))),
-          Expanded(child: _NavItem(icon: tab == 1 ? Icons.person_rounded : Icons.person_outline_rounded, label: '我的', selected: tab == 1, onTap: () => onTab(1))),
+          Expanded(child: _NavItem(icon: tab == 2 ? Icons.menu_book_rounded : Icons.menu_book_outlined, label: '日記', selected: tab == 2, onTap: () => onTab(2))),
+          Expanded(child: _NavItem(icon: tab == 1 ? Icons.collections_bookmark_rounded : Icons.collections_bookmark_outlined, label: '素材', selected: tab == 1, onTap: () => onTab(1))),
         ])),
       )),
       Positioned(top: 0, left: 0, right: 0, child: Center(child: GestureDetector(

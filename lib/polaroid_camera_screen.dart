@@ -910,7 +910,7 @@ class _CameraBody extends StatelessWidget {
         ))),
       ]))),
       Positioned.fromRect(rect: logo, child: FittedBox(child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        Text('PICO SNAP', style: TextStyle(fontSize: 40, height: 1, letterSpacing: 1.5, color: body.text, fontWeight: FontWeight.w900)),
+        Text('快趣拍', style: TextStyle(fontSize: 40, height: 1, letterSpacing: 4, color: body.text, fontWeight: FontWeight.w900)),
         const SizedBox(height: 6),
         Text('Instant Camera', style: TextStyle(fontSize: 20, height: 1, color: body.text.withValues(alpha: .9), fontWeight: FontWeight.w700)),
       ]))),

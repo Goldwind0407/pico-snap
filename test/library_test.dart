@@ -157,7 +157,7 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.text('📷 我的'));
     await t.pumpAndSettle();
-    expect(find.textContaining('到首頁的「我的」'), findsOneWidget);
+    expect(find.textContaining('到首頁下方的「素材」'), findsOneWidget);
   });
 
   test('舊格式的模板（固定位置的貼紙）還讀得到', () {

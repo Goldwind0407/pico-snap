@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>PICO SNAP</string>
+	<string>快趣拍</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -64,7 +64,7 @@
 	<string>需要相機權限，才能直接拍照放進拍貼。</string>
 	<!-- 相機外掛有用到麥克風的程式，上架審核要有說明；拍立得拍照不錄音。 -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>PICO SNAP 拍照時不會使用麥克風。</string>
+	<string>快趣拍 拍照時不會使用麥克風。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>需要相簿權限，才能把做好的作品存到手機。</string>
 </dict>

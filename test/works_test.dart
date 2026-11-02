@@ -91,16 +91,15 @@ void main() {
     expect(find.byType(WorkTile), findsOneWidget, reason: '只剩一種就不用篩選，顯示全部');
   });
 
-  testWidgets('首頁：右上角打開作品集，底部「日記」可以寫今天的心情', (t) async {
+  testWidgets('首頁：底部「作品集」是分頁，「日記」可以寫今天的心情', (t) async {
     final png = (await t.runAsync(_png))!;
     await t.runAsync(() => MyWorks.add(png, WorkKind.fourCut));
     await _phone(t, const HomeScreen());
 
-    await t.tap(find.byTooltip('作品集'));
+    await t.tap(find.text('作品集'));
     await t.pumpAndSettle();
     expect(find.byType(WorkTile), findsOneWidget);
-    await t.tap(find.byIcon(Icons.arrow_back_rounded));
-    await t.pumpAndSettle();
+    expect(find.byIcon(Icons.arrow_back_rounded), findsNothing, reason: '分頁裡沒有返回箭頭');
 
     await t.tap(find.text('日記'));
     await t.pumpAndSettle();
