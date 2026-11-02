@@ -11,11 +11,14 @@ import 'frames.dart';
 enum FilmStock {
   white('白底片', 'assets/instant/film.png', Rect.fromLTWH(.07148, .08732, .85399, .71087), ink, Colors.white, Color(0xFF1E1E20)),
   black('黑底片', 'assets/instant/film_black.png', Rect.fromLTWH(.07088, .08738, .85595, .71133), Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A)),
-  // Film-strip cards drawn with Gemini. For testing only: the character ones
-  // use other people's characters and names, not ours to ship.
+  // Cards drawn with Gemini; the character ones have a transparent window
+  // and lie over the photo so their characters can overlap it. For testing
+  // only: they use other people's characters, names and logos, not ours to
+  // ship.
   filmFrame('底片框', 'assets/instant/frame_film.png', _frameWindow, Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A), aspect: _frameAspect),
-  keroroFrame('Keroro 框', 'assets/instant/frame_keroro.png', _frameWindow, Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A), aspect: _frameAspect),
-  pokemonFrame('寶可夢框', 'assets/instant/frame_pokemon.png', _frameWindow, Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A), aspect: _frameAspect);
+  keroroFrame('Keroro 框', 'assets/instant/frame_keroro.png', Rect.fromLTWH(.09667, .07833, .78222, .71167), ink, Colors.white, ink, aspect: .75, overlay: true),
+  pokemonFrame('寶可夢框', 'assets/instant/frame_pokemon.png', Rect.fromLTWH(.16889, .11612, .66333, .68121), Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A), aspect: .66568, overlay: true),
+  rakutenFrame('樂天桃猿框', 'assets/instant/frame_rakuten.png', Rect.fromLTWH(.09778, .08622, .8, .69156), ink, Colors.white, Color(0xFF9E1B32), aspect: .8, overlay: true);
 
   final String label, asset;
   /// The photo window, as fractions of the print.
@@ -25,7 +28,10 @@ enum FilmStock {
   final Color pen;
   /// Width / height of a print.
   final double aspect;
-  const FilmStock(this.label, this.asset, this.window, this.text, this.swatch, this.pen, {this.aspect = .85058});
+  /// The card is drawn over the photo (its window is transparent), so
+  /// decorations can overlap the photo's edges.
+  final bool overlay;
+  const FilmStock(this.label, this.asset, this.window, this.text, this.swatch, this.pen, {this.aspect = .85058, this.overlay = false});
 
   bool get dark => text == Colors.white;
 }
@@ -92,9 +98,11 @@ class InstantPrint extends StatelessWidget {
       ? ColoredBox(color: film.dark ? const Color(0xFF2E2E31) : const Color(0xFFF1EDE8), child: Center(child: placeholder))
       : FittedPhoto(image: image!, fit: fit, aspect: aspect, onChanged: onFit, filter: filter);
     if (image != null && develop < 1) window = ColorFiltered(colorFilter: developFilter(develop), child: window);
+    final card = Positioned.fill(child: IgnorePointer(ignoring: film.overlay, child: Image.asset(film.asset, fit: BoxFit.fill, filterQuality: FilterQuality.medium)));
     return SizedBox(width: width, height: height, child: Stack(children: [
-      Positioned.fill(child: Image.asset(film.asset, fit: BoxFit.fill, filterQuality: FilterQuality.medium)),
+      if (!film.overlay) card,
       Positioned.fromRect(rect: w, child: GestureDetector(onTap: onTap, child: ClipRect(child: window))),
+      if (film.overlay) card,
       if (selected)
         Positioned.fromRect(rect: w.inflate(1), child: IgnorePointer(child: DecoratedBox(
           decoration: BoxDecoration(border: Border.all(color: coral, width: 3)),
