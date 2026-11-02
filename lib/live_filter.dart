@@ -23,8 +23,8 @@ class FilterLayer extends StatefulWidget {
 class _FilterLayerState extends State<FilterLayer> {
   ui.FragmentShader? _shader;
   /// What [_shader] was set up for.
-  (String, double)? _shaderFor;
-  final _luts = <String, ui.Image>{};
+  (PhotoFilter, double)? _shaderFor;
+  final _luts = <PhotoFilter, ui.Image>{};
 
   @override
   void initState() {
@@ -35,7 +35,7 @@ class _FilterLayerState extends State<FilterLayer> {
   @override
   void didUpdateWidget(FilterLayer old) {
     super.didUpdateWidget(old);
-    if (old.filter.id != widget.filter.id) _load();
+    if (old.filter != widget.filter) _load();
   }
 
   @override
@@ -46,20 +46,30 @@ class _FilterLayerState extends State<FilterLayer> {
 
   Future<void> _load() async {
     final f = widget.filter;
-    if (f.isNone || _luts.containsKey(f.id) || !FilmShader.supported) return;
-    final program = await FilmShader.program;
-    if (program == null) return;
-    final lut = await FilmShader.lut(f);
-    if (mounted) setState(() => _luts[f.id] = lut);
+    if (f.isNone) return;
+    try {
+      await f.prepare();
+      if (!mounted || widget.filter != f) return;
+      setState(() {});
+      if (_luts.containsKey(f) || !FilmShader.supported) return;
+      final program = await FilmShader.program;
+      if (program == null) return;
+      final lut = await FilmShader.lut(f);
+      if (mounted) setState(() => _luts[f] = lut);
+    } catch (e) {
+      debugPrint('[FILTER] preview unavailable: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final f = widget.filter;
     if (f.isNone) return widget.child;
-    final program = FilmShader.loaded, lut = _luts[f.id];
+    final program = FilmShader.loaded, lut = _luts[f];
     if (program == null || lut == null) {
-      return FilterEffects(filter: f, grainBaked: false, child: ColorFiltered(colorFilter: f.previewFilter, child: widget.child));
+      return FilterEffects(filter: f, grainBaked: false, child: ColorFiltered(
+        colorFilter: f.preparedPreviewFilter ?? const ColorFilter.mode(Colors.transparent, BlendMode.srcOver),
+        child: widget.child));
     }
     return FilterEffects(filter: f, child: LayoutBuilder(builder: (context, c) {
       final side = c.biggest.longestSide * MediaQuery.devicePixelRatioOf(context);
@@ -69,7 +79,7 @@ class _FilterLayerState extends State<FilterLayer> {
   }
 
   ui.FragmentShader _shaderOf(ui.FragmentProgram program, ui.Image lut, PhotoFilter f, double side) {
-    final key = (f.id, side);
+    final key = (f, side);
     final existing = _shader;
     if (existing != null && _shaderFor == key) return existing;
     existing?.dispose();
@@ -114,11 +124,12 @@ abstract final class FilmShader {
     }
   }();
 
-  static final _luts = <String, Future<ui.Image>>{};
+  static final _luts = Expando<Future<ui.Image>>();
 
   /// [filter]'s LUT laid out for the shader: 33 slices of red × green side
   /// by side, one per blue step.
-  static Future<ui.Image> lut(PhotoFilter filter) => _luts[filter.id] ??= () {
+  static Future<ui.Image> lut(PhotoFilter filter) => _luts[filter] ??= () async {
+    await filter.prepare();
     final src = filter.lut;
     final n = math.pow(src.length ~/ 3, 1 / 3).round();
     final px = lutPixels(src, n);

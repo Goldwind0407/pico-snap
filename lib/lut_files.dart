@@ -30,7 +30,11 @@ class LutFiles {
     return (table: resampleLut(lut.table, lut.size, lutSize), size: lutSize, title: lut.title);
   }
 
-  static Future<void> load() async {
+  static Future<void>? _loading;
+
+  static Future<void> load() => _loading ??= _load();
+
+  static Future<void> _load() async {
     final List<String> paths;
     try {
       final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
@@ -45,6 +49,7 @@ class LutFiles {
     for (final path in paths) {
       final file = Uri.decodeComponent(path.substring(folder.length));
       final base = file.substring(0, file.lastIndexOf('.'));
+      if (photoFilters.any((f) => f.id == 'lut:$base')) continue;
       try {
         // A .cube is a megabyte of text: parse it off the UI thread.
         final lut = _isCube(path)

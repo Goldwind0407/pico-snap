@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../filters.dart';
+import '../lut_files.dart';
 import '../theme.dart';
 
 /// Every filter as a small preview of [image], so you see the look before
@@ -13,7 +14,9 @@ class FilterThumbs extends StatelessWidget {
   const FilterThumbs({super.key, required this.image, required this.selected, required this.onPick, this.padding = const EdgeInsets.symmetric(horizontal: 16)});
 
   @override
-  Widget build(BuildContext context) => ListView.separated(
+  Widget build(BuildContext context) => ValueListenableBuilder<int>(
+    valueListenable: LutFiles.changes,
+    builder: (_, version, child) => ListView.separated(
     scrollDirection: Axis.horizontal,
     padding: padding,
     itemCount: photoFilters.length,
@@ -35,5 +38,5 @@ class FilterThumbs extends StatelessWidget {
         ]),
       );
     },
-  );
+  ));
 }

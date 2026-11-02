@@ -50,16 +50,34 @@ class PhotoFilter {
 
   bool get isNone => id == 'none';
 
-  static final _luts = <String, Float32List>{};
-  static final _matrices = <String, List<double>>{};
+  static final _luts = Expando<Float32List>();
+  static final _matrices = Expando<List<double>>();
+  static final _preparing = Expando<Future<void>>();
 
   /// The grade as a lookup table (built once).
-  Float32List get lut => _luts[id] ??= table ?? grade.lut(lutSize);
+  Float32List get lut => _luts[this] ??= table ?? grade.lut(lutSize);
 
   /// The closest colour matrix, for the live camera viewfinder.
-  List<double> get matrix => _matrices[id] ??= fitMatrix(lut, lutSize);
+  List<double> get matrix => _matrices[this] ??= fitMatrix(lut, lutSize);
+
+  ColorFilter? get preparedPreviewFilter {
+    final m = _matrices[this];
+    return m == null ? null : ColorFilter.matrix(m);
+  }
+
+  /// Generate both lookup data and the fallback preview off the UI isolate.
+  Future<void> prepare() => _preparing[this] ??= () async {
+    final result = await compute(_prepareFilter, (grade: grade, table: table));
+    _luts[this] = result.$1;
+    _matrices[this] = result.$2;
+  }();
 
   ColorFilter get previewFilter => ColorFilter.matrix(matrix);
+}
+
+(Float32List, List<double>) _prepareFilter(({Grade grade, Float32List? table}) input) {
+  final lut = input.table ?? input.grade.lut(lutSize);
+  return (lut, fitMatrix(lut, lutSize));
 }
 
 /// Every filter in the app: 原圖 first, then the ones from lookup files
@@ -95,6 +113,7 @@ PhotoFilter filterById(String? id) => photoFilters.firstWhere((f) => f.id == id,
 /// are drawn separately by [FilterEffects].
 @immutable
 class FilteredImage extends ImageProvider<FilteredImage> {
+  static final _work = _FilterWorkQueue();
   final ImageProvider base;
   final PhotoFilter filter;
   final int maxSide;
@@ -107,27 +126,65 @@ class FilteredImage extends ImageProvider<FilteredImage> {
   ImageStreamCompleter loadImage(FilteredImage key, ImageDecoderCallback decode) => OneFrameImageStreamCompleter(_load());
 
   Future<ImageInfo> _load() async {
+    await filter.prepare();
+    return _work.run(() async {
+      final pixels = await _pixels(base, maxSide);
+      final w = pixels.w, h = pixels.h;
+      // Grain is per pixel: a tiny thumbnail gets less so it reads the same.
+      final grain = filter.grain * math.min(1.0, math.max(w, h) / 900);
+      final graded = await compute(_gradeJob, (
+        rgba: pixels.rgba, lut: filter.lut, w: w, h: h,
+        soften: filter.soften, halation: filter.halation, color: filter.halationColor, grain: grain,
+      ));
+      final c = Completer<ui.Image>();
+      ui.decodeImageFromPixels(graded, w, h, ui.PixelFormat.rgba8888, c.complete);
+      return ImageInfo(image: await c.future);
+    });
+  }
+
+  // Share thumbnail readbacks across filters. Bounded to avoid retaining photos
+  // when switching between editing sessions; failed reads can be retried.
+  static final _thumbPixels = <(ImageProvider, int), Future<({Uint8List rgba, int w, int h})>>{};
+
+  static Future<({Uint8List rgba, int w, int h})> _pixels(ImageProvider base, int maxSide) async {
+    if (maxSide > 256) return _readPixels(base, maxSide);
+    final key = (base, maxSide);
+    final cached = _thumbPixels.remove(key);
+    final job = cached ?? _readPixels(base, maxSide);
+    _thumbPixels[key] = job;
+    while (_thumbPixels.length > 4) {
+      _thumbPixels.remove(_thumbPixels.keys.first);
+    }
+    try {
+      return await job;
+    } catch (_) {
+      if (identical(_thumbPixels[key], job)) _thumbPixels.remove(key);
+      rethrow;
+    }
+  }
+
+  static Future<({Uint8List rgba, int w, int h})> _readPixels(ImageProvider base, int maxSide) async {
     final src = await _resolve(base);
     final s = math.min(1.0, maxSide / math.max(src.width, src.height));
     final w = math.max(1, (src.width * s).round()), h = math.max(1, (src.height * s).round());
     final rec = ui.PictureRecorder();
-    ui.Canvas(rec).drawImageRect(
-      src, Rect.fromLTWH(0, 0, src.width.toDouble(), src.height.toDouble()), Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()),
-      Paint()..filterQuality = FilterQuality.medium,
-    );
-    src.dispose();
-    final small = await rec.endRecording().toImage(w, h);
-    final data = await small.toByteData(format: ui.ImageByteFormat.rawStraightRgba);
-    small.dispose();
-    // Grain is per pixel: a tiny thumbnail gets less so it reads the same.
-    final grain = filter.grain * math.min(1.0, math.max(w, h) / 900);
-    final graded = await compute(_gradeJob, (
-      rgba: data!.buffer.asUint8List(), lut: filter.lut, w: w, h: h,
-      soften: filter.soften, halation: filter.halation, color: filter.halationColor, grain: grain,
-    ));
-    final c = Completer<ui.Image>();
-    ui.decodeImageFromPixels(graded, w, h, ui.PixelFormat.rgba8888, c.complete);
-    return ImageInfo(image: await c.future);
+    ui.Picture? picture;
+    ui.Image? small;
+    try {
+      ui.Canvas(rec).drawImageRect(
+        src, Rect.fromLTWH(0, 0, src.width.toDouble(), src.height.toDouble()), Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()),
+        Paint()..filterQuality = FilterQuality.medium,
+      );
+      picture = rec.endRecording();
+      small = await picture.toImage(w, h);
+      final data = await small.toByteData(format: ui.ImageByteFormat.rawStraightRgba);
+      if (data == null) throw StateError('Cannot read photo pixels');
+      return (rgba: data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes), w: w, h: h);
+    } finally {
+      small?.dispose();
+      picture?.dispose();
+      src.dispose();
+    }
   }
 
   static Future<ui.Image> _resolve(ImageProvider provider) {
@@ -147,10 +204,68 @@ class FilteredImage extends ImageProvider<FilteredImage> {
   }
 
   @override
-  bool operator ==(Object other) => other is FilteredImage && other.base == base && other.filter.id == filter.id && other.maxSide == maxSide;
+  bool operator ==(Object other) => other is FilteredImage && other.base == base && other.filter == filter && other.maxSide == maxSide;
 
   @override
-  int get hashCode => Object.hash(base, filter.id, maxSide);
+  int get hashCode => Object.hash(base, filter, maxSide);
+}
+
+/// Limit full-image allocations and isolates when several cells change at once.
+class _FilterWorkQueue {
+  int _active = 0;
+  final _waiting = <Completer<void>>[];
+
+  Future<T> run<T>(Future<T> Function() action) async {
+    if (_active >= 2) {
+      final ready = Completer<void>();
+      _waiting.add(ready);
+      await ready.future;
+    } else {
+      _active++;
+    }
+    try {
+      return await action();
+    } finally {
+      if (_waiting.isEmpty) {
+        _active--;
+      } else {
+        _waiting.removeAt(0).complete();
+      }
+    }
+  }
+}
+
+/// Wait for the images actually requested by a capture subtree, including a
+/// replacement hidden by gaplessPlayback. A painted frame alone isn't enough.
+Future<void> waitForPhotoImages(BuildContext context) async {
+  final providers = <ImageProvider>{};
+  void visit(Element element) {
+    final widget = element.widget;
+    if (widget is Image) providers.add(widget.image);
+    element.visitChildren(visit);
+  }
+  visit(context as Element);
+  final cleanups = <VoidCallback>[];
+  try {
+    await Future.wait(providers.map((provider) {
+      final done = Completer<void>();
+      final stream = provider.resolve(createLocalImageConfiguration(context));
+      late final ImageStreamListener listener;
+      listener = ImageStreamListener((info, _) {
+        info.dispose();
+        stream.removeListener(listener);
+        if (!done.isCompleted) done.complete();
+      }, onError: (Object error, StackTrace? stack) {
+        stream.removeListener(listener);
+        if (!done.isCompleted) done.completeError(error, stack);
+      });
+      cleanups.add(() => stream.removeListener(listener));
+      stream.addListener(listener);
+      return done.future;
+    })).timeout(const Duration(seconds: 30));
+  } finally {
+    for (final cleanup in cleanups) { cleanup(); }
+  }
 }
 
 Uint8List _gradeJob(({Uint8List rgba, Float32List lut, int w, int h, double soften, double halation, (double, double, double) color, double grain}) a) {
@@ -168,6 +283,47 @@ ImageProvider photoImage(Uint8List bytes) =>
 /// [image] with [filter] applied exactly: the graded photo plus film effects.
 ImageProvider filtered(ImageProvider image, PhotoFilter? filter, {int maxSide = 2048}) =>
     filter == null || filter.isNone ? image : FilteredImage(image, filter, maxSide: maxSide);
+
+/// A capture boundary that temporarily requests export-sized photo pixels.
+/// Keeping the setting local also leaves thumbnail work at preview resolution.
+class PhotoCapture extends StatefulWidget {
+  final Widget child;
+  const PhotoCapture({super.key, required this.child});
+
+  @override
+  State<PhotoCapture> createState() => PhotoCaptureState();
+}
+
+class PhotoCaptureState extends State<PhotoCapture> {
+  int? _exportSide;
+
+  void setExportSide(int? side) {
+    if (mounted) setState(() => _exportSide = side);
+  }
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(
+    child: PhotoResolution(maxSide: _exportSide, child: widget.child),
+  );
+}
+
+class PhotoResolution extends InheritedWidget {
+  final int? maxSide;
+  const PhotoResolution({super.key, required this.maxSide, required super.child});
+
+  static int? of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<PhotoResolution>()?.maxSide;
+
+  @override
+  bool updateShouldNotify(PhotoResolution oldWidget) => oldWidget.maxSide != maxSide;
+}
+
+/// Decode from the encoded source again for export, rather than enlarging the
+/// 2400px preview. Camera frame providers without encoded originals are kept.
+ImageProvider exportPhoto(ImageProvider image, int maxSide) {
+  final source = image is ResizeImage ? image.imageProvider : image;
+  return ResizeImage(source, width: maxSide, height: maxSide,
+    policy: ResizeImagePolicy.fit, allowUpscaling: false);
+}
 
 /// Film effects of [filter] over [child] (which is already graded).
 class FilterEffects extends StatelessWidget {

@@ -476,7 +476,7 @@ class _EditorScreenState extends State<EditorScreen> {
     final size = c.biggest;
     return DecoratedBox(
       decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .10), blurRadius: 18, offset: const Offset(0, 8))]),
-      child: RepaintBoundary(key: _shotKey, child: Stack(key: _canvasKey, clipBehavior: Clip.none, children: [
+      child: PhotoCapture(key: _shotKey, child: Stack(key: _canvasKey, clipBehavior: Clip.none, children: [
         Positioned.fill(child: GestureDetector(
           onTap: () => setState(() => _selectedSticker = null),
           child: _artwork(size),
@@ -799,6 +799,7 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _setFilter(PhotoFilter f, {bool all = false}) => setState(() {
+    if (_saving) return;
     for (var i = 0; i < _filters.length; i++) {
       if (all || i == _selectedCell) _filters[i] = f;
     }

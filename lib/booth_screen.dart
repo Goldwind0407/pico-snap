@@ -691,7 +691,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
         child: Stack(alignment: Alignment.center, children: [
           FittedBox(child: DecoratedBox(
             decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .12), blurRadius: 18, offset: const Offset(0, 8))]),
-            child: RepaintBoundary(key: _stripKey, child: PhotoStrip(
+            child: PhotoCapture(key: _stripKey, child: PhotoStrip(
               template: _t, photos: _playing ?? _providers, filters: List.filled(_shots, _filter),
             )),
           )),
@@ -702,7 +702,9 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   }
 
   List<Widget> _filterControls() => [
-    SizedBox(height: 86, child: FilterThumbs(image: _providers.first, selected: _filter.id, onPick: (f) => setState(() => _filter = f))),
+    SizedBox(height: 86, child: FilterThumbs(image: _providers.first, selected: _filter.id, onPick: (f) {
+      if (!_saving) setState(() => _filter = f);
+    })),
     Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
       child: Row(children: [

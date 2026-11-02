@@ -55,20 +55,22 @@ void main() {
   vec2 px = FlutterFragCoord().xy;
   vec4 c0 = src(px);
   // Straight colour; the camera is opaque, but keep edges right.
-  vec3 c = c0.a > 0.0 ? c0.rgb / c0.a : vec3(0.0);
+  vec3 c = grade(c0.a > 0.0 ? c0.rgb / c0.a : vec3(0.0));
   if (uFx.x > 0.0) {
-    // A small blur mixed in, like the photo's box blur.
+    // Soften graded colour, matching the saved photo's processing order.
     float r = max(1.0, max(uSize.x, uSize.y) / 1100.0);
-    vec3 b = c0.rgb;
+    vec3 b = c;
     for (int y = -1; y <= 1; y++) {
       for (int x = -1; x <= 1; x++) {
-        if (x != 0 || y != 0) b += src(px + vec2(float(x), float(y)) * r).rgb;
+        if (x != 0 || y != 0) {
+          vec4 sampleColor = src(px + vec2(float(x), float(y)) * r);
+          b += grade(sampleColor.a > 0.0 ? sampleColor.rgb / sampleColor.a : vec3(0.0));
+        }
       }
     }
     b /= 9.0;
-    c = mix(c, c0.a > 0.0 ? b / c0.a : b, uFx.x * .55);
+    c = mix(c, b, uFx.x * .55);
   }
-  c = grade(c);
   if (uFx.y > 0.0) {
     // Bright parts of the original spread out in rings, then screen-blended.
     float reach = .035 * min(uSize.x, uSize.y);

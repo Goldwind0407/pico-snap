@@ -37,10 +37,12 @@ class _FittedPhotoState extends State<FittedPhoto> {
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, c) {
     final fit = widget.fit;
+    final exportSide = PhotoResolution.of(context);
+    final image = exportSide == null ? widget.image : exportPhoto(widget.image, exportSide);
     Widget photo = ClipRect(child: Transform.scale(
       scale: fit.scale,
       alignment: fit.align,
-      child: Image(image: filtered(widget.image, widget.filter), fit: BoxFit.cover, alignment: fit.align, gaplessPlayback: true, width: c.maxWidth, height: c.maxHeight),
+      child: Image(image: filtered(image, widget.filter, maxSide: exportSide ?? 2048), fit: BoxFit.cover, alignment: fit.align, gaplessPlayback: true, width: c.maxWidth, height: c.maxHeight),
     ));
     final filter = widget.filter;
     if (filter != null) photo = SizedBox(width: c.maxWidth, height: c.maxHeight, child: FilterEffects(filter: filter, child: photo));

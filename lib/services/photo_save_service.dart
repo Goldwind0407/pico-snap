@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:gal/gal.dart';
 
+import '../filters.dart';
 import 'my_works.dart';
 
 /// 把做好的作品存到手機相簿。
@@ -32,7 +33,17 @@ class PhotoSaveService {
   }) async {
     if (kIsWeb) return '網頁版不能存到相簿，請用手機 App';
     final ui.Image shot;
+    final element = key.currentContext;
+    final state = element is StatefulElement ? element.state : null;
+    final capture = state is PhotoCaptureState ? state : null;
     try {
+      capture?.setExportSide(longSide.ceil());
+      await WidgetsBinding.instance.endOfFrame;
+      final context = key.currentContext;
+      if (context == null || !context.mounted) throw StateError('Photo is no longer visible');
+      await waitForPhotoImages(context);
+      await WidgetsBinding.instance.endOfFrame;
+      if (!context.mounted) throw StateError('Photo is no longer visible');
       final boundary = key.currentContext!.findRenderObject()! as RenderRepaintBoundary;
       final size = boundary.size;
       final ratio = (longSide / (size.width > size.height ? size.width : size.height)).clamp(1.0, 12.0);
@@ -40,6 +51,8 @@ class PhotoSaveService {
     } catch (e) {
       debugPrint('[SAVE] 截圖失敗: $e');
       return '產生圖片失敗，請再試一次';
+    } finally {
+      capture?.setExportSide(null);
     }
     // Full-size pictures: freed on every path, errors included.
     ui.Image? flat;

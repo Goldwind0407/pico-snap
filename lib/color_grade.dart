@@ -357,12 +357,12 @@ void finishFilm(Uint8List rgba, Uint8List source, int w, int h,
     // Mix in a small blur; the radius follows the image size so a full
     // photo and its thumbnail look alike.
     final r = math.max(1, (math.max(w, h) / 1100).round());
+    final ch = Float32List(n), tmp = Float32List(n), blurred = Float32List(n);
     for (var c = 0; c < 3; c++) {
-      final ch = Float32List(n);
       for (var i = 0; i < n; i++) {
         ch[i] = rgba[i * 4 + c].toDouble();
       }
-      final b = _boxBlur(ch, w, h, r);
+      final b = _boxBlur(ch, w, h, r, scratch: tmp, output: blurred);
       final k = soften * .55;
       for (var i = 0; i < n; i++) {
         rgba[i * 4 + c] = (ch[i] + (b[i] - ch[i]) * k).round().clamp(0, 255);
@@ -428,8 +428,9 @@ double _noise(int x, int y) {
 }
 
 /// Separable box blur with radius [r].
-Float32List _boxBlur(Float32List src, int w, int h, int r) {
-  final tmp = Float32List(w * h), out = Float32List(w * h);
+Float32List _boxBlur(Float32List src, int w, int h, int r,
+    {Float32List? scratch, Float32List? output}) {
+  final tmp = scratch ?? Float32List(w * h), out = output ?? Float32List(w * h);
   final d = 2 * r + 1;
   for (var y = 0; y < h; y++) {
     var s = 0.0;

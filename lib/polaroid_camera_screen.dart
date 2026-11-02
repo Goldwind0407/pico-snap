@@ -11,6 +11,7 @@ import 'package:sensors_plus/sensors_plus.dart';
 
 import 'editor_screen.dart';
 import 'filters.dart';
+import 'lut_files.dart';
 import 'live_filter.dart';
 import 'models.dart';
 import 'services/my_works.dart';
@@ -571,7 +572,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         child: FittedBox(child: DecoratedBox(
           decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .1 + .15 * l), blurRadius: 8 + 14 * l, offset: Offset(0, 3 + 7 * l))]),
           child: Stack(children: [
-            RepaintBoundary(key: _printKey, child: InstantPrint(
+            PhotoCapture(key: _printKey, child: InstantPrint(
               image: print.image, film: print.film, filter: print.filter, develop: _develop.value, caption: '',
               handwriting: print.handwriting, handwritingVersion: _inkVersion, handwritingRepaint: _inkTick,
               onCaption: _stage == _Stage.done ? _startWriting : null,
@@ -645,7 +646,9 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   }
 
   /// Filter chips; the viewfinder shows the chosen one live.
-  Widget _filterRow() => SizedBox(height: 32, child: ListView.separated(
+  Widget _filterRow() => ValueListenableBuilder<int>(
+    valueListenable: LutFiles.changes,
+    builder: (_, version, child) => SizedBox(height: 32, child: ListView.separated(
     controller: _filterController(),
     scrollDirection: Axis.horizontal,
     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -668,7 +671,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         ),
       );
     },
-  ));
+  )));
 
   // Scrolls sideways once there are more films than fit.
   Widget _options() => SizedBox(height: 34, child: Center(child: SingleChildScrollView(
