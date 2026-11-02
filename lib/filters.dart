@@ -76,6 +76,16 @@ final photoFilters = <PhotoFilter>[
           Hue.green: Hsl(hue: 22, sat: -.45, lum: -.35), Hue.aqua: Hsl(sat: .15), Hue.blue: Hsl(hue: -10, sat: .12)},
     shadowTone: (-.03, .02, .05), highlightTone: (-.025, .015, .025),
   ), grain: .25, vignette: .14, soften: .3, halation: .15),
+  // Cyan street film: the scene goes teal-blue with purple-black shadows,
+  // while skin and lamps stay warm (cooled by mid tones and shadows, not a
+  // white balance that would turn faces grey). Deep blacks, warm glow.
+  const PhotoFilter('cyan_street', '青紫街頭', Grade(
+    exposure: .08, temp: -.08, tint: .03, contrast: -.04, saturation: .9,
+    curve: [(0, .02), (.25, .235), (.75, .79), (1, .975)],
+    hsl: {Hue.red: Hsl(sat: .05), Hue.orange: Hsl(hue: -3, sat: .12, lum: .06), Hue.yellow: Hsl(hue: -8, sat: .05),
+          Hue.green: Hsl(hue: 30, sat: -.4, lum: -.25), Hue.aqua: Hsl(hue: -5, sat: .15), Hue.blue: Hsl(hue: -8, sat: .12)},
+    shadowTone: (.03, -.02, .06), midTone: (-.04, .01, .03), highlightTone: (.015, .005, -.015),
+  ), grain: .34, vignette: .1, soften: .12, halation: .25),
 ];
 
 PhotoFilter filterById(String? id) => photoFilters.firstWhere((f) => f.id == id, orElse: () => photoFilters.first);
