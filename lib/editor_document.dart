@@ -118,8 +118,9 @@ class EditorDocument {
 
   factory EditorDocument.fromJson(
       Map<String, dynamic> json, List<Uint8List?> photos, Uint8List? subject) {
-    if (json['version'] != 1)
+    if (json['version'] != 1) {
       throw const FormatException('Unsupported draft version');
+    }
     final mode = EditorMode.values.byName(json['mode'] as String);
     final cells = mode == EditorMode.sticker ? 1 : 4;
     if (photos.length != cells ||

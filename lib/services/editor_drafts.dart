@@ -73,8 +73,9 @@ abstract final class EditorDrafts {
   }
 
   static Directory _directory(String id) {
-    if (!RegExp(r'^\d+_\d+$').hasMatch(id))
+    if (!RegExp(r'^\d+_\d+$').hasMatch(id)) {
       throw ArgumentError('Invalid draft id');
+    }
     return Directory('${_root!.path}/$id');
   }
 
@@ -123,8 +124,9 @@ abstract final class EditorDrafts {
         Future<Uint8List?> asset(Object? value) async {
           if (value == null) return null;
           final name = value as String;
-          if (!RegExp(r'^image_\d+_\d+\.bin$').hasMatch(name))
+          if (!RegExp(r'^image_\d+_\d+\.bin$').hasMatch(name)) {
             throw const FormatException('Invalid draft asset');
+          }
           final bytes = await File('${dir.path}/$name').readAsBytes();
           _assets.putIfAbsent(id, () => Map.identity())[bytes] = name;
           return bytes;
