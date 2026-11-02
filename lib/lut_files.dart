@@ -32,6 +32,18 @@ class LutFiles {
 
   static Future<void>? _loading;
 
+  /// [lutLooks] order first, then any other file by name.
+  static int _byRank(String a, String b) {
+    int rank(String path) {
+      final file = Uri.decodeComponent(path.substring(folder.length));
+      final i = lutLooks.keys.toList().indexOf(file.substring(0, file.lastIndexOf('.')));
+      return i < 0 ? lutLooks.length : i;
+    }
+
+    final r = rank(a).compareTo(rank(b));
+    return r != 0 ? r : a.compareTo(b);
+  }
+
   static Future<void> load() => _loading ??= _load();
 
   static Future<void> _load() async {
@@ -41,7 +53,7 @@ class LutFiles {
       paths = manifest.listAssets()
           .where((p) => p.startsWith(folder) && (_isCube(p) || p.toLowerCase().endsWith('.png')))
           .toList()
-        ..sort();
+        ..sort(_byRank);
     } catch (e) {
       debugPrint('[LUT] 讀不到濾鏡檔清單: $e');
       return;
@@ -79,24 +91,20 @@ class LutLook {
 
 /// 濾鏡檔的中文名字和底片效果（key 是檔名，不含副檔名）。
 const lutLooks = <String, LutLook>{
-  // Fujifilm's own F-Log2 LUTs (GFX ETERNA 55) applied straight to the
-  // photo: far more contrast and colour than the camera look, a loud style of
-  // its own. For testing only: not ours to ship.
-  'fuji_classic_chrome_raw': LutLook('濃烈正片'),
+  // Fujifilm's own F-Log2 LUT (GFX ETERNA 55) applied straight to the photo:
+  // far more contrast and colour than the camera look, a loud style of its
+  // own. For testing only: not ours to ship.
   'fuji_classic_neg_raw': LutLook('濃烈負片'),
-  // Teal shadows, warm amber highlights, faded blacks, muted greens. The file
-  // is colour only, so the instant-film texture comes from here.
-  'teal_warm_film': LutLook('青暖底片', grain: .25, vignette: .14, soften: .3, halation: .15),
   // Warm amber skin against cool teal backgrounds, like Japanese street snaps.
   'teal_amber_street': LutLook('日系街拍', grain: .2, vignette: .12, soften: .2, halation: .1),
-  // Washed-out colour and grey-brown blacks: an old roll of 400 film.
-  'vintage_film_400': LutLook('復古膠卷', grain: .35, vignette: .18, soften: .35, halation: .2),
-  // RocketStock's free LUT pack (2017): fine for our own photos, but the
-  // licence doesn't let us hand the files out inside an app. For testing only:
-  // not ours to ship.
-  'rs_faded_47': LutLook('黃褪舊照', grain: .3, vignette: .15),
-  'rs_pitaya_15': LutLook('火龍果', grain: .15),
-  'rs_tweed_71': LutLook('柔霧淡調', grain: .15, soften: .2),
+  // Our own grades, made on design/hald/hald_identity_8.png in a photo app
+  // (exported as JPEG, so smoothed a touch before saving as PNG).
+  'cool': LutLook('冷調'),
+  'warm': LutLook('暖調'),
+  'soft': LutLook('柔軟'),
+  'late_autumn': LutLook('深秋'),
+  'film': LutLook('膠片'),
+  'teal_orange': LutLook('青橙'),
 };
 
 /// A LUT as read from a file: [size]³ entries of r, g, b (0–1), blue

@@ -84,7 +84,7 @@ void main() {
     await t.tap(find.text('原圖').first);
     await wait(t, 1500);
     await watch(() async => wait(t, 3000), reportKey: '2a_idle_no_filter');
-    await t.tap(find.text('霧青底片').first);
+    await t.tap(find.text('日系街拍').first);
     await wait(t, 2500);
     await watch(() async => wait(t, 3000), reportKey: '2b_idle_film_filter');
 
