@@ -11,7 +11,7 @@ void main() {
   test('連續快速寫 100 次：檔案一定是最後一次的內容', () async {
     final writer = FileWriter();
     final file = File('${tmp.path}/templates.json');
-    await Future.wait([for (var i = 0; i < 100; i++) writer.writeString(file, '{"n":$i}' + ' ' * (100 - i) * 50)]);
+    await Future.wait([for (var i = 0; i < 100; i++) writer.writeString(file, '{"n":$i}${' ' * (100 - i) * 50}')]);
     expect(file.readAsStringSync().trim(), '{"n":99}');
     expect(File('${file.path}.tmp').existsSync(), isFalse, reason: '暫存檔換上去了');
   });
