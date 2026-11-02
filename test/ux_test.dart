@@ -46,7 +46,7 @@ void main() {
 
   testWidgets('照片：點有照片的格子可以拖曳移動、置中、移除', (t) async {
     final photo = (await t.runAsync(_photo))!;
-    await _phone(t, EditorScreen(mode: EditorMode.polaroid, photos: [photo]));
+    await _phone(t, EditorScreen(key: UniqueKey(), mode: EditorMode.polaroid, photos: [photo]));
     await _settleImages(t);
     InstantPrint first() => t.widget<InstantPrint>(find.byType(InstantPrint).first);
     // The selected print is drawn last; the first print is the one with the photo.
@@ -174,5 +174,15 @@ void main() {
     nav.maybePop();
     await t.pumpAndSettle();
     expect(find.text('還沒儲存的作品會不見喔。'), findsOneWidget);
+  });
+
+  testWidgets('空白作品先引導選照片；有照片之後就不再擋著', (t) async {
+    await _phone(t, const EditorScreen(mode: EditorMode.sticker));
+    expect(find.text('先選一張照片'), findsOneWidget);
+    await _phone(t, EditorScreen(key: UniqueKey(), mode: EditorMode.fourCut, template: 0));
+    expect(find.text('選照片（一次可以選 4 張）'), findsOneWidget);
+    final photo = (await t.runAsync(_photo))!;
+    await _phone(t, EditorScreen(key: UniqueKey(), mode: EditorMode.polaroid, photos: [photo]));
+    expect(find.textContaining('選照片'), findsNothing);
   });
 }

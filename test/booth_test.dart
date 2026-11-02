@@ -122,4 +122,75 @@ void main() {
     await t.pumpAndSettle();
     expect(t.widget<EditorScreen>(find.byType(EditorScreen)).template, 2);
   });
+
+  testWidgets('拍貼機：只重拍其中一張，其他的留著', (t) async {
+    final photos = <Uint8List>[];
+    for (final c in [0xFFF08030, 0xFF30A0F0, 0xFF40C060, 0xFFC040C0, 0xFF202020]) {
+      photos.add((await t.runAsync(() async {
+        final r = ui.PictureRecorder();
+        ui.Canvas(r).drawRect(const Rect.fromLTWH(0, 0, 160, 120), Paint()..color = Color(c));
+        final img = await r.endRecording().toImage(160, 120);
+        return (await img.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+      }))!);
+    }
+    var shots = 0;
+    await _phone(t, BoothScreen(template: 1, shoot: () async => photos[shots++]));
+    await t.tap(find.text('3 秒'));
+    await t.pump();
+    await t.tap(find.text('開始拍照（4 張）'));
+    await t.pump();
+    for (var i = 0; i < 4; i++) {
+      await t.pump(const Duration(seconds: 3));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 1500));
+    }
+    await t.pump(const Duration(milliseconds: 500));
+    expect(find.text('挑濾鏡'), findsOneWidget);
+    List<ImageProvider?> strip() => t.widget<PhotoStrip>(find.byType(PhotoStrip)).photos;
+    final before = strip();
+
+    await t.tap(find.text('重拍'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('第 2 張'));
+    await t.pump();
+    expect(find.text('重拍第 2 張'), findsOneWidget);
+    await t.pump(const Duration(seconds: 3));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 1500));
+    await t.pump(const Duration(milliseconds: 500));
+    expect(shots, 5, reason: '只多拍一張');
+    expect(find.text('挑濾鏡'), findsOneWidget, reason: '拍完直接回到挑濾鏡');
+    final after = strip();
+    expect(after[0], before[0]);
+    expect(after[1], isNot(before[1]), reason: '第 2 張換成新拍的');
+    expect([after[2], after[3]], [before[2], before[3]]);
+  });
+
+  testWidgets('拍貼機：重拍一張時按返回，回到原本的照片', (t) async {
+    final photo = (await t.runAsync(_photo))!;
+    var shots = 0;
+    await _phone(t, BoothScreen(template: 1, shoot: () async {
+      shots++;
+      return photo;
+    }));
+    await t.tap(find.text('3 秒'));
+    await t.pump();
+    await t.tap(find.text('開始拍照（4 張）'));
+    await t.pump();
+    for (var i = 0; i < 4; i++) {
+      await t.pump(const Duration(seconds: 3));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 1500));
+    }
+    await t.pump(const Duration(milliseconds: 500));
+    await t.tap(find.text('重拍'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('第 3 張'));
+    await t.pump();
+    await t.tap(find.byIcon(Icons.arrow_back_rounded));
+    await t.pump();
+    await t.pump(const Duration(seconds: 4));
+    expect(find.text('挑濾鏡'), findsOneWidget);
+    expect(shots, 4, reason: '倒數中取消，沒有拍');
+  });
 }

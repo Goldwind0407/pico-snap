@@ -204,6 +204,35 @@ class _EditorScreenState extends State<EditorScreen> {
     _tool = _tools.first;
   });
 
+  /// How many photo windows the piece shows.
+  int get _slots => switch (widget.mode) {
+    EditorMode.fourCut => min(_cells, allStripTemplates[_template].art?.cells.length ?? 4),
+    EditorMode.polaroid => 4,
+    EditorMode.sticker => 1,
+  };
+
+  /// Pick photos for every empty window at once, filled in order.
+  Future<void> _pickMany() async {
+    final empty = [for (var i = 0; i < _slots; i++) if (_photos[i] == null) i];
+    if (empty.length < 2) return _pickPhoto(empty.firstOrNull);
+    final files = await _picker.pickMultiImage(imageQuality: 95, limit: empty.length);
+    if (files.isEmpty) return;
+    final bytes = await Future.wait([for (final f in files.take(empty.length)) f.readAsBytes()]);
+    if (!mounted) return;
+    setState(() {
+      for (final (k, b) in bytes.indexed) {
+        final i = empty[k];
+        _photos[i] = photoImage(b);
+        _photoBytes[i] = b;
+        _fits[i] = const PhotoFit();
+        _aspects[i] = null;
+      }
+    });
+    for (var k = 0; k < bytes.length; k++) {
+      _measure(empty[k]);
+    }
+  }
+
   Future<void> _pickPhoto([int? index]) async {
     final i = index ?? _selectedCell;
     final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 95);
@@ -468,6 +497,17 @@ class _EditorScreenState extends State<EditorScreen> {
         ],
         Positioned.fill(child: Padding(padding: const EdgeInsets.fromLTRB(28, 12, 28, 16), child: _canvas())),
         Positioned(right: 18, bottom: 16, child: _RoundButton(icon: Icons.undo_rounded, onTap: _history.isEmpty ? null : _undo)),
+        // A blank piece: photos first, then decorating.
+        if (!_capturing && _photos.every((p) => p == null))
+          Positioned(left: 0, right: 0, bottom: 28, child: Center(child: FilledButton.icon(
+            onPressed: _pickMany,
+            icon: const Icon(Icons.photo_library_outlined, size: 20),
+            label: Text(_slots > 1 ? '選照片（一次可以選 $_slots 張）' : '先選一張照片', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+            style: FilledButton.styleFrom(
+              backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+              shape: const StadiumBorder(), elevation: 3, shadowColor: ink.withValues(alpha: .3),
+            ),
+          ))),
       ])),
       _sheet(),
     ])),
@@ -479,7 +519,7 @@ class _EditorScreenState extends State<EditorScreen> {
       IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
       Expanded(child: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
       if (widget.mode == EditorMode.fourCut) ...[
-        _TopButton(label: '匯入', onTap: () => _pickPhoto()),
+        _TopButton(label: '匯入', onTap: _pickMany),
         const SizedBox(width: 8),
       ],
       _TopButton(label: _saving ? '儲存中…' : '儲存', filled: true, onTap: _askSave),

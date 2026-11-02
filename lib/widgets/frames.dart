@@ -118,7 +118,7 @@ class AddPhotoHint extends StatelessWidget {
   Widget build(BuildContext context) => Column(mainAxisSize: MainAxisSize.min, children: [
     Icon(Icons.add_circle_outline_rounded, size: 26 * scale, color: outline.withValues(alpha: .55)),
     SizedBox(height: 2 * scale),
-    Text('tap to add', style: hand(17 * scale, color: outline.withValues(alpha: .6))),
+    Text('放照片', style: TextStyle(fontSize: 12 * scale, color: outline.withValues(alpha: .7), fontWeight: FontWeight.w800)),
   ]);
 }
 

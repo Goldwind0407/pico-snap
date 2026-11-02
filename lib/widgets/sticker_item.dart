@@ -10,7 +10,9 @@ import 'frames.dart';
 /// and rotate it; drag the bottom-right handle to scale and rotate with one
 /// finger; tap the top-right handle to flip it and the trash handle to delete it.
 class StickerItem extends StatefulWidget {
-  static const baseFraction = .2, handle = 13.0;
+  /// [handle] is half the handles' touch area (44 px, a fingertip); they
+  /// are drawn smaller ([_Handle.dot]).
+  static const baseFraction = .2, handle = 22.0;
   final StickerData data;
   final Size canvas;
   final bool selected;
@@ -83,17 +85,20 @@ class _StickerItemState extends State<StickerItem> {
         if (widget.selected) ...[
           const Positioned(left: h - 5, bottom: h - 5, child: _CornerDot()),
           Positioned(left: 0, top: 0, child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: widget.onDelete,
-            child: const _Handle(child: Icon(Icons.delete_outline_rounded, size: 15, color: ink)),
+            child: const _Handle(label: '刪除貼紙', delete: true, child: Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFB4483C))),
           )),
           Positioned(right: 0, top: 0, child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: widget.onFlip,
-            child: const _Handle(child: Icon(Icons.flip_rounded, size: 15, color: ink)),
+            child: const _Handle(label: '左右翻轉', child: Icon(Icons.flip_rounded, size: 15, color: ink)),
           )),
           Positioned(right: 0, bottom: 0, child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onPanStart: (_) => widget.onEditStart(),
             onPanUpdate: (d) => _onHandleUpdate(d, pi / 4),
-            child: const _Handle(child: Icon(Icons.open_in_full_rounded, size: 12, color: ink)),
+            child: const _Handle(label: '拖曳縮放、旋轉', child: Icon(Icons.open_in_full_rounded, size: 12, color: ink)),
           )),
         ],
       ])),
@@ -102,19 +107,26 @@ class _StickerItemState extends State<StickerItem> {
 }
 
 class _Handle extends StatelessWidget {
+  static const dot = 28.0;
+  final String label;
+  final bool delete;
   final Widget child;
-  const _Handle({required this.child});
+  const _Handle({required this.label, required this.child, this.delete = false});
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: StickerItem.handle * 2, height: StickerItem.handle * 2,
-    decoration: BoxDecoration(
-      color: Colors.white,
-      shape: BoxShape.circle,
-      border: Border.all(color: outline.withValues(alpha: .5)),
-      boxShadow: [BoxShadow(color: ink.withValues(alpha: .15), blurRadius: 4, offset: const Offset(0, 1))],
-    ),
-    child: child,
+  Widget build(BuildContext context) => Semantics(
+    button: true, label: label,
+    child: SizedBox.square(dimension: StickerItem.handle * 2, child: Center(child: Container(
+      width: dot, height: dot,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        // Delete is set apart so it isn't mistaken for the others.
+        border: Border.all(color: delete ? const Color(0xFFB4483C).withValues(alpha: .6) : outline.withValues(alpha: .5), width: delete ? 1.4 : 1),
+        boxShadow: [BoxShadow(color: ink.withValues(alpha: .15), blurRadius: 4, offset: const Offset(0, 1))],
+      ),
+      child: child,
+    ))),
   );
 }
 

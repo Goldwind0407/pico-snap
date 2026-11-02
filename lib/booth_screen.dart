@@ -94,6 +94,8 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   ({Uint8List bytes, bool mirror})? _frozen;
   /// Bumped when shooting stops, so a countdown in progress gives up.
   int _session = 0;
+  /// Shooting just this window again; the others are kept.
+  int? _redo;
   late final _flash = AnimationController(vsync: this, duration: const Duration(milliseconds: 450));
   late final _pop = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
   final _finderKey = GlobalKey();
@@ -215,6 +217,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
     _dropClips();
     setState(() {
       _stage = _Stage.shooting;
+      _redo = null;
       _photos.clear();
       _takes.clear();
       _ready.clear();
@@ -258,15 +261,26 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
       if (_alive(session)) _shootNext(session);
       return;
     }
-    _takes.add(take);
-    _ready.add(take.mirror ? _mirror(take.bytes) : Future.value(take.bytes));
-    _clips.add(_clip);
+    final ready = take.mirror ? _mirror(take.bytes) : Future.value(take.bytes);
+    if (_redo case final i?) {
+      _takes[i] = take;
+      _ready[i] = ready;
+      for (final f in _clips[i]) {
+        f.dispose();
+      }
+      _clips[i] = _clip;
+    } else {
+      _takes.add(take);
+      _ready.add(ready);
+      _clips.add(_clip);
+    }
     _clip = [];
     setState(() => _frozen = take);
     await Future<void>.delayed(const Duration(milliseconds: 1400));
     if (!_alive(session)) return;
     setState(() => _frozen = null);
-    if (_takes.length < _shots) return _shootNext(session);
+    if (_redo == null && _takes.length < _shots) return _shootNext(session);
+    _redo = null;
     // Step 5: done shooting, pick a filter.
     _serial(_closeCamera);
     final photos = await Future.wait(_ready);
@@ -370,6 +384,8 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
         setState(() => _stage = _Stage.filter);
       case _Stage.done:
         Navigator.pop(context);
+      case _Stage.shooting when _redo != null:
+        _cancelRedo();
       case _Stage.shooting:
       case _Stage.filter:
         final navigator = Navigator.of(context);
@@ -383,6 +399,78 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   void _retake() {
     _stopShooting();
     _start();
+  }
+
+  /// Shoot window [i] again and keep the others.
+  Future<void> _retakeOne(int i) async {
+    setState(() {
+      _redo = i;
+      _stage = _Stage.shooting;
+      _frozen = null;
+      _count = null;
+      _cameraError = null;
+    });
+    if (widget.shoot == null) await _serial(_openCamera);
+    if (!mounted || _stage != _Stage.shooting) return;
+    if (_camera == null && widget.shoot == null) return; // the error is on screen
+    _shootNext(_session);
+  }
+
+  /// Stop retaking a window: back to the photos as they were.
+  void _cancelRedo() {
+    _stopShooting();
+    for (final f in _clip) {
+      f.dispose();
+    }
+    _clip = [];
+    setState(() {
+      _redo = null;
+      _count = null;
+      _frozen = null;
+      _stage = _Stage.filter;
+    });
+  }
+
+  /// Which photo to shoot again: one of them, or all.
+  Future<void> _askRetake() async {
+    final pick = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: cream,
+      showDragHandle: true,
+      builder: (context) => SafeArea(child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('點一張重拍，其他的會留著', style: TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 14),
+          SizedBox(height: 110, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            for (var k = 0; k < _takes.length; k++)
+              Flexible(child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                child: Semantics(button: true, label: '重拍第 ${k + 1} 張', child: GestureDetector(
+                  onTap: () => Navigator.pop(context, k),
+                  child: Column(children: [
+                    Expanded(child: AspectRatio(aspectRatio: cellAspect(_t, k), child: Container(
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: line, width: 1.3)),
+                      clipBehavior: Clip.antiAlias,
+                      child: Transform.flip(flipX: _takes[k].mirror, child: Image.memory(_takes[k].bytes, fit: BoxFit.cover, gaplessPlayback: true, cacheWidth: 200)),
+                    ))),
+                    const SizedBox(height: 4),
+                    Text('第 ${k + 1} 張', style: const TextStyle(fontSize: 12, color: ink, fontWeight: FontWeight.w700)),
+                  ]),
+                )),
+              )),
+          ])),
+          const SizedBox(height: 14),
+          SizedBox(width: double.infinity, child: OutlinedButton(
+            onPressed: () => Navigator.pop(context, -1),
+            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 13), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+            child: const Text('全部重拍', style: TextStyle(color: ink, fontWeight: FontWeight.w800)),
+          )),
+        ]),
+      )),
+    );
+    if (pick == null || !mounted) return;
+    pick < 0 ? _retake() : _retakeOne(pick);
   }
 
   /// Step 6: save the strip, and the live video if wanted.
@@ -578,9 +666,9 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   Widget _shootingView() {
     final frozen = _frozen;
     // While the photo just taken is held, stay on its window.
-    final i = frozen != null ? _takes.length - 1 : min(_takes.length, _shots - 1);
+    final i = _redo ?? (frozen != null ? _takes.length - 1 : min(_takes.length, _shots - 1));
     return Column(children: [
-      _topBar('第 ${i + 1} / $_shots 張', actions: [
+      _topBar(_redo != null ? '重拍第 ${i + 1} 張' : '第 ${i + 1} / $_shots 張', actions: [
         if (_canFlip && widget.shoot == null)
           IconButton(onPressed: _flipCamera, icon: const Icon(Icons.cameraswitch_outlined), color: ink),
       ]),
@@ -607,7 +695,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
             child: AspectRatio(aspectRatio: cellAspect(_t, k), child: Container(
               decoration: BoxDecoration(
                 color: _t.cell, borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: k == _takes.length ? coral : line, width: k == _takes.length ? 2.5 : 1.3),
+                border: Border.all(color: k == i ? coral : line, width: k == i ? 2.5 : 1.3),
               ),
               clipBehavior: Clip.antiAlias,
               child: k < _takes.length
@@ -709,9 +797,9 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
       child: Row(children: [
         OutlinedButton(
-          onPressed: _retake,
+          onPressed: _askRetake,
           style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-          child: const Text('全部重拍', style: TextStyle(color: ink, fontWeight: FontWeight.w800)),
+          child: const Text('重拍', style: TextStyle(color: ink, fontWeight: FontWeight.w800)),
         ),
         const SizedBox(width: 12),
         Expanded(child: FilledButton(
