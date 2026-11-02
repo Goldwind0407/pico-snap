@@ -87,8 +87,22 @@ class _EditorScreenState extends State<EditorScreen> {
   Uint8List? _subject;
   /// While saving: hide hints, selection outlines and sticker handles.
   bool _capturing = false, _saving = false;
+  /// What the piece looked like when opened or last saved.
+  Object? _savedKey;
+  /// What the timelapse last recorded.
+  Object? _recordedKey;
+
+  /// Everything that ends up in the saved picture. Changed parts are always
+  /// replaced (new lists entries, new objects), so identity is enough; the
+  /// stroke being drawn grows in place, hence its length.
+  Object _contentKey() => Object.hashAll([
+    Object.hashAll(_photos), Object.hashAll(_fits), Object.hashAll(_films), Object.hashAll([for (final f in _filters) f.id]),
+    _template, _format, _pattern, _backdrop, _stripCaption, Object.hashAll(_polaroidCaptions), _bubble, _subject,
+    Object.hashAll(_stickers), Object.hashAll(_strokes), _strokes.isEmpty ? 0 : _strokes.last.points.length,
+  ]);
+
   /// Something was changed since opening or the last save.
-  bool _edited = false;
+  bool get _edited => _contentKey() != _savedKey;
   /// Records the editing for the timelapse video.
   final _recorder = TimelapseRecorder();
   bool _withVideo = true;
@@ -138,7 +152,6 @@ class _EditorScreenState extends State<EditorScreen> {
   };
 
   void _setText(String value) => setState(() {
-    _edited = true;
     switch (widget.mode) {
       case EditorMode.fourCut: _stripCaption = value;
       case EditorMode.polaroid: _polaroidCaptions[_selectedCell] = value;
@@ -157,6 +170,7 @@ class _EditorScreenState extends State<EditorScreen> {
     for (var i = 0; i < widget.captions.length && i < _polaroidCaptions.length; i++) {
       _polaroidCaptions[i] = widget.captions[i];
     }
+    _savedKey = _contentKey();
   }
 
   @override
@@ -187,7 +201,6 @@ class _EditorScreenState extends State<EditorScreen> {
     _fits[i] = const PhotoFit();
     _aspects[i] = null;
     if (widget.mode == EditorMode.sticker) _subject = null;
-    _edited = true;
     _tool = _tools.first;
   });
 
@@ -199,7 +212,6 @@ class _EditorScreenState extends State<EditorScreen> {
     if (!mounted) return;
     if (widget.mode != EditorMode.sticker) _tool = _Tool.photo;
     setState(() {
-      _edited = true;
       _photos[i] = photoImage(bytes);
       _photoBytes[i] = bytes;
       _fits[i] = const PhotoFit();
@@ -221,7 +233,6 @@ class _EditorScreenState extends State<EditorScreen> {
     if (png != null && mounted) {
       setState(() {
         _subject = png;
-        _edited = true;
       });
     }
   }
@@ -314,7 +325,7 @@ class _EditorScreenState extends State<EditorScreen> {
     setState(() {
       _saving = false;
       _capturing = false;
-      if (error == null) _edited = false;
+      if (error == null) _savedKey = _contentKey();
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(error ?? saved),
@@ -354,7 +365,6 @@ class _EditorScreenState extends State<EditorScreen> {
 
   void _setFit(int i, PhotoFit fit) => setState(() {
     _fits[i] = fit;
-    _edited = true;
   });
 
   void _selectTool(_Tool tool) => setState(() {
@@ -364,7 +374,6 @@ class _EditorScreenState extends State<EditorScreen> {
   });
 
   void _remember() {
-    _edited = true;
     _history.add((List.of(_stickers), List.of(_strokes)));
     if (_history.length > 30) _history.removeAt(0);
   }
@@ -425,8 +434,13 @@ class _EditorScreenState extends State<EditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Every rebuild means something changed: record it for the timelapse.
-    if (!_capturing) WidgetsBinding.instance.addPostFrameCallback((_) => _recorder.request(_snapshot));
+    // Record the piece for the timelapse when it changed, not on every
+    // rebuild (picking a tool, selecting a sticker).
+    final key = _contentKey();
+    if (!_capturing && key != _recordedKey) {
+      _recordedKey = key;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _recorder.request(_snapshot));
+    }
     return _scaffold();
   }
 
@@ -506,7 +520,7 @@ class _EditorScreenState extends State<EditorScreen> {
         // Always there: adding it on the first line would rebuild the input below mid-stroke.
         Positioned.fill(child: InkLayer(strokes: _strokes, repaint: _inkTick)),
         if (_tool == _Tool.brush && !_capturing)
-          Positioned.fill(child: DoodleInput(onStart: _penDown, onMove: _penMove, onEnd: () => _erased = false)),
+          Positioned.fill(child: DoodleInput(onStart: _penDown, onMove: _penMove, onEnd: () => setState(() => _erased = false))),
       ])),
     );
   })));
@@ -705,7 +719,6 @@ class _EditorScreenState extends State<EditorScreen> {
                     for (var i = 0; i < _films.length; i++) {
                       _films[i] = f;
                     }
-                    _edited = true;
                   }),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
@@ -803,7 +816,6 @@ class _EditorScreenState extends State<EditorScreen> {
     for (var i = 0; i < _filters.length; i++) {
       if (all || i == _selectedCell) _filters[i] = f;
     }
-    _edited = true;
   });
 
   Widget _filterTool() {

@@ -37,9 +37,11 @@ class MyLibrary {
     try {
       final files = Directory('${dir.path}/stickers').listSync().whereType<File>().where((f) => f.path.endsWith('.png')).toList()
         ..sort((a, b) => a.path.compareTo(b.path));
-      for (final f in files) {
+      // Read together, off the UI thread's back: startup waits for this.
+      final bytes = await Future.wait([for (final f in files) f.readAsBytes()]);
+      for (final (i, f) in files.indexed) {
         final name = f.uri.pathSegments.last;
-        customStickers['my:${name.substring(0, name.length - 4)}'] = f.readAsBytesSync();
+        customStickers['my:${name.substring(0, name.length - 4)}'] = bytes[i];
       }
     } catch (e) {
       debugPrint('[LIBRARY] 讀取貼紙失敗: $e');

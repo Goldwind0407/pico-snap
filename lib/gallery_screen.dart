@@ -164,7 +164,8 @@ class _WorkViewerState extends State<WorkViewer> {
     }
     if (!mounted) return;
     setState(() => _busy = false);
-    showMessage(context, error ?? '已存到相簿 ♡', error: error != null);
+    // The App keeps a smaller copy (PhotoSaveService._keepSide); say so.
+    showMessage(context, error ?? '已存到相簿 ♡ 這是 App 裡留的較小版本，原圖在第一次存的時候就在相簿了', error: error != null);
   }
 
   Future<void> _delete() async {

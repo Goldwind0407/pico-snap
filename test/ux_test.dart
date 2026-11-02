@@ -148,4 +148,31 @@ void main() {
     expect(t.widget<BoothScreen>(find.byType(BoothScreen)).template, stripTemplates.length);
     expect(find.text('mine!'), findsWidgets);
   });
+
+  testWidgets('換底紋、背景這類設定也算修改：返回時會問', (t) async {
+    await _phone(t, Builder(builder: (context) => TextButton(
+      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditorScreen(mode: EditorMode.sticker))),
+      child: const Text('open'),
+    )));
+    await t.tap(find.text('open'));
+    await t.pumpAndSettle();
+    final nav = t.state<NavigatorState>(find.byType(Navigator));
+
+    // 只是點工具、沒有改東西：直接離開
+    await t.tap(find.text('底紋'));
+    await t.pumpAndSettle();
+    nav.maybePop();
+    await t.pumpAndSettle();
+    expect(find.text('open'), findsOneWidget);
+
+    await t.tap(find.text('open'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('底紋'));
+    await t.pumpAndSettle();
+    await t.tap(find.text(ginghamPatterns[2].name));
+    await t.pumpAndSettle();
+    nav.maybePop();
+    await t.pumpAndSettle();
+    expect(find.text('還沒儲存的作品會不見喔。'), findsOneWidget);
+  });
 }
