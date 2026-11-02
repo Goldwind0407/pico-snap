@@ -32,6 +32,9 @@ void main() {
     testWidgets('booth $s', (t) async {
       await pump(t, s, const BoothScreen());
       for (final c in stripCategories) {
+        // The chips scroll sideways; later ones start off screen.
+        await t.ensureVisible(find.text(c));
+        await t.pumpAndSettle();
         await t.tap(find.text(c));
         await t.pumpAndSettle();
       }

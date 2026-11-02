@@ -79,7 +79,7 @@ class StripTemplate {
   Size get designSize => Size(200, art == null ? 620 : 200 / art!.aspect);
 }
 
-const stripCategories = ['精選', '可愛', '經典', '生日', '應援'];
+const stripCategories = ['精選', '日常可愛', '底片復古', '黑白', '生日派對', '婚禮', '畢業', '節慶', 'Y2K'];
 
 const _navy = Color(0xFF1F1D2B);
 
@@ -117,6 +117,81 @@ const stripTemplates = [
     name: 'Classic Film', category: '精選', caption: '', frame: Color(0xFF6C6A78), cell: Color(0xFF3A3746),
     art: ArtFrame('assets/templates/t8-classic-film.webp', 0.3306, [Rect.fromLTWH(0.1588, 0.0262, 0.6824, 0.2089), Rect.fromLTWH(0.1588, 0.2577, 0.6824, 0.2075), Rect.fromLTWH(0.1588, 0.4881, 0.6824, 0.1985), Rect.fromLTWH(0.1588, 0.7079, 0.6824, 0.198)]),
   ),
+  // Themed strips, each in a bold (illustrated) and a paper (quieter)
+  // version, drawn with Gemini.
+  // 日常可愛
+  StripTemplate(name: 'Picnic Day', category: '日常可愛', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/picnic-day-a.webp', 0.5, [Rect.fromLTWH(0.1826, 0.0372, 0.6347, 0.19), Rect.fromLTWH(0.1826, 0.2351, 0.6347, 0.1798), Rect.fromLTWH(0.1826, 0.4222, 0.6347, 0.1798), Rect.fromLTWH(0.1826, 0.6099, 0.6347, 0.1849)])),
+  StripTemplate(name: 'Picnic Day Paper', category: '日常可愛', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/picnic-day-b.webp', 0.3673, [Rect.fromLTWH(0.2086, 0.0415, 0.5829, 0.1867), Rect.fromLTWH(0.2108, 0.2573, 0.5785, 0.1859), Rect.fromLTWH(0.213, 0.4718, 0.5741, 0.1855), Rect.fromLTWH(0.2097, 0.6863, 0.5807, 0.1859)])),
+  StripTemplate(name: 'Bestie', category: '日常可愛', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/bestie-a.webp', 0.5, [Rect.fromLTWH(0.1838, 0.0372, 0.6325, 0.19), Rect.fromLTWH(0.1838, 0.2345, 0.6325, 0.1804), Rect.fromLTWH(0.1838, 0.4222, 0.6325, 0.1798), Rect.fromLTWH(0.1838, 0.6099, 0.6325, 0.1843)])),
+  StripTemplate(name: 'Bestie Paper', category: '日常可愛', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/bestie-b.webp', 0.3668, [Rect.fromLTWH(0.2066, 0.0423, 0.5857, 0.187), Rect.fromLTWH(0.2088, 0.2576, 0.5813, 0.1866), Rect.fromLTWH(0.2099, 0.472, 0.5791, 0.1862), Rect.fromLTWH(0.2077, 0.6864, 0.5846, 0.1862)])),
+  // 底片復古
+  StripTemplate(name: 'Vintage Film', category: '底片復古', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/vintage-film-a.webp', 0.5, [Rect.fromLTWH(0.1421, 0.0209, 0.7373, 0.226), Rect.fromLTWH(0.1421, 0.2638, 0.7373, 0.2182), Rect.fromLTWH(0.1421, 0.5068, 0.7373, 0.2221), Rect.fromLTWH(0.1421, 0.7497, 0.7373, 0.2221)])),
+  StripTemplate(name: 'Vintage Film Paper', category: '底片復古', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/vintage-film-b.webp', 0.4444, [Rect.fromLTWH(0.1577, 0.0196, 0.673, 0.2194), Rect.fromLTWH(0.1577, 0.2626, 0.673, 0.2162), Rect.fromLTWH(0.1586, 0.5016, 0.6721, 0.2166), Rect.fromLTWH(0.1586, 0.741, 0.6721, 0.217)])),
+  StripTemplate(name: 'Kodak Yellow', category: '底片復古', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/kodak-yellow-a.webp', 0.5, [Rect.fromLTWH(0.2086, 0.0474, 0.602, 0.186), Rect.fromLTWH(0.2086, 0.2463, 0.6032, 0.1781), Rect.fromLTWH(0.2086, 0.4357, 0.602, 0.1793), Rect.fromLTWH(0.2097, 0.6167, 0.602, 0.1809)])),
+  StripTemplate(name: 'Kodak Yellow Paper', category: '底片復古', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/kodak-yellow-b.webp', 0.3678, [Rect.fromLTWH(0.2059, 0.0407, 0.586, 0.1882), Rect.fromLTWH(0.2081, 0.2562, 0.5827, 0.1873), Rect.fromLTWH(0.2081, 0.4706, 0.5816, 0.1873), Rect.fromLTWH(0.207, 0.6853, 0.5838, 0.1873)])),
+  // 黑白
+  StripTemplate(name: 'Darkroom', category: '黑白', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4), mono: true,
+    art: ArtFrame('assets/templates/darkroom-a.webp', 0.5, [Rect.fromLTWH(0.1905, 0.0457, 0.6223, 0.1928), Rect.fromLTWH(0.1905, 0.252, 0.6223, 0.186), Rect.fromLTWH(0.1905, 0.451, 0.6223, 0.1843), Rect.fromLTWH(0.1905, 0.6483, 0.6223, 0.1838)])),
+  StripTemplate(name: 'Darkroom Paper', category: '黑白', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4), mono: true,
+    art: ArtFrame('assets/templates/darkroom-b.webp', 0.3664, [Rect.fromLTWH(0.214, 0.0464, 0.571, 0.1812), Rect.fromLTWH(0.2151, 0.26, 0.5677, 0.1816), Rect.fromLTWH(0.2172, 0.4728, 0.5633, 0.18), Rect.fromLTWH(0.2151, 0.6848, 0.5677, 0.1812)])),
+  StripTemplate(name: 'Paper Mono', category: '黑白', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4), mono: true,
+    art: ArtFrame('assets/templates/paper-mono-a.webp', 0.5, [Rect.fromLTWH(0.1894, 0.0457, 0.6234, 0.1917), Rect.fromLTWH(0.1894, 0.2514, 0.6234, 0.186), Rect.fromLTWH(0.1894, 0.4515, 0.6234, 0.1832), Rect.fromLTWH(0.1894, 0.6488, 0.6234, 0.1838)])),
+  StripTemplate(name: 'Paper Mono Paper', category: '黑白', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4), mono: true,
+    art: ArtFrame('assets/templates/paper-mono-b.webp', 0.3693, [Rect.fromLTWH(0.2061, 0.0415, 0.5812, 0.1869), Rect.fromLTWH(0.2061, 0.2557, 0.5812, 0.1865), Rect.fromLTWH(0.2061, 0.47, 0.5812, 0.1865), Rect.fromLTWH(0.2072, 0.6843, 0.5823, 0.1865)])),
+  // 生日派對
+  StripTemplate(name: 'Pastel Party', category: '生日派對', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/pastel-party-a.webp', 0.5, [Rect.fromLTWH(0.1849, 0.0395, 0.6313, 0.1883), Rect.fromLTWH(0.1849, 0.2368, 0.6313, 0.1787), Rect.fromLTWH(0.1849, 0.4245, 0.6313, 0.1776), Rect.fromLTWH(0.1849, 0.6116, 0.6313, 0.1826)])),
+  StripTemplate(name: 'Pastel Party Paper', category: '生日派對', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/pastel-party-b.webp', 0.3643, [Rect.fromLTWH(0.2073, 0.0422, 0.5854, 0.1867), Rect.fromLTWH(0.2106, 0.257, 0.5788, 0.1855), Rect.fromLTWH(0.2117, 0.4699, 0.5766, 0.1847), Rect.fromLTWH(0.2095, 0.6823, 0.581, 0.1855)])),
+  StripTemplate(name: 'Gold Balloon', category: '生日派對', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/gold-balloon-a.webp', 0.5, [Rect.fromLTWH(0.1838, 0.0383, 0.6325, 0.19), Rect.fromLTWH(0.1838, 0.2362, 0.6325, 0.1798), Rect.fromLTWH(0.1838, 0.4239, 0.6325, 0.1787), Rect.fromLTWH(0.1826, 0.6116, 0.6336, 0.1826)])),
+  StripTemplate(name: 'Gold Balloon Paper', category: '生日派對', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/gold-balloon-b.webp', 0.3684, [Rect.fromLTWH(0.2099, 0.0429, 0.578, 0.1846), Rect.fromLTWH(0.2121, 0.2591, 0.5736, 0.1838), Rect.fromLTWH(0.2132, 0.4733, 0.5725, 0.183), Rect.fromLTWH(0.211, 0.6874, 0.578, 0.1842)])),
+  // 婚禮
+  StripTemplate(name: 'Ivory Lace', category: '婚禮', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/ivory-lace-a.webp', 0.5, [Rect.fromLTWH(0.1849, 0.0428, 0.6268, 0.1804), Rect.fromLTWH(0.1849, 0.2396, 0.6268, 0.1708), Rect.fromLTWH(0.186, 0.4262, 0.6257, 0.1702), Rect.fromLTWH(0.186, 0.6127, 0.6257, 0.1793)])),
+  StripTemplate(name: 'Ivory Lace Paper', category: '婚禮', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/ivory-lace-b.webp', 0.3674, [Rect.fromLTWH(0.2068, 0.0457, 0.5842, 0.1783), Rect.fromLTWH(0.209, 0.2607, 0.5809, 0.1807), Rect.fromLTWH(0.2101, 0.4766, 0.5776, 0.1807), Rect.fromLTWH(0.209, 0.6932, 0.5831, 0.1807)])),
+  StripTemplate(name: 'Garden Bloom', category: '婚禮', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/garden-bloom-a.webp', 0.5, [Rect.fromLTWH(0.1838, 0.0383, 0.6313, 0.1894), Rect.fromLTWH(0.1838, 0.2362, 0.6313, 0.1793), Rect.fromLTWH(0.1838, 0.4239, 0.6313, 0.1787), Rect.fromLTWH(0.1838, 0.611, 0.6313, 0.1838)])),
+  StripTemplate(name: 'Garden Bloom Paper', category: '婚禮', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/garden-bloom-b.webp', 0.3681, [Rect.fromLTWH(0.2057, 0.0411, 0.5842, 0.1877), Rect.fromLTWH(0.2079, 0.2565, 0.581, 0.1873), Rect.fromLTWH(0.209, 0.4712, 0.5788, 0.1869), Rect.fromLTWH(0.2079, 0.6855, 0.5821, 0.1869)])),
+  // 畢業
+  StripTemplate(name: 'Class Of', category: '畢業', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/class-of-a.webp', 0.5, [Rect.fromLTWH(0.1826, 0.0389, 0.6336, 0.1883), Rect.fromLTWH(0.1826, 0.2356, 0.6347, 0.1793), Rect.fromLTWH(0.1826, 0.4233, 0.6347, 0.1787), Rect.fromLTWH(0.1826, 0.6105, 0.6347, 0.1838)])),
+  StripTemplate(name: 'Class Of Paper', category: '畢業', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/class-of-b.webp', 0.3893, [Rect.fromLTWH(0.2112, 0.03, 0.5776, 0.1944), Rect.fromLTWH(0.2145, 0.2587, 0.5732, 0.1944), Rect.fromLTWH(0.2156, 0.4861, 0.571, 0.194), Rect.fromLTWH(0.2134, 0.7135, 0.5776, 0.1953)])),
+  // 節慶
+  StripTemplate(name: 'Cozy Christmas', category: '節慶', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/cozy-christmas-a.webp', 0.5, [Rect.fromLTWH(0.1826, 0.0383, 0.6336, 0.1888), Rect.fromLTWH(0.1826, 0.2356, 0.6347, 0.1793), Rect.fromLTWH(0.1826, 0.4228, 0.6347, 0.1793), Rect.fromLTWH(0.1826, 0.6099, 0.6347, 0.1843)])),
+  StripTemplate(name: 'Cozy Christmas Paper', category: '節慶', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/cozy-christmas-b.webp', 0.3738, [Rect.fromLTWH(0.2075, 0.0431, 0.5829, 0.1892), Rect.fromLTWH(0.2097, 0.2626, 0.5785, 0.1888), Rect.fromLTWH(0.2108, 0.4813, 0.5752, 0.1883), Rect.fromLTWH(0.2097, 0.6992, 0.5796, 0.1888)])),
+  StripTemplate(name: 'New Year Red', category: '節慶', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/new-year-red-a.webp', 0.5, [Rect.fromLTWH(0.1838, 0.0383, 0.6325, 0.1888), Rect.fromLTWH(0.1826, 0.2356, 0.6336, 0.1793), Rect.fromLTWH(0.1838, 0.4228, 0.6325, 0.1793), Rect.fromLTWH(0.1838, 0.6099, 0.6325, 0.1843)])),
+  StripTemplate(name: 'New Year Red Paper', category: '節慶', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/new-year-red-b.webp', 0.3707, [Rect.fromLTWH(0.2118, 0.0417, 0.5753, 0.1833), Rect.fromLTWH(0.214, 0.2574, 0.571, 0.1837), Rect.fromLTWH(0.2151, 0.4719, 0.5677, 0.1833), Rect.fromLTWH(0.2129, 0.6868, 0.5731, 0.1845)])),
+  // Y2K
+  StripTemplate(name: 'Jelly Pink', category: 'Y2K', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/jelly-pink-a.webp', 0.5, [Rect.fromLTWH(0.1838, 0.0383, 0.6325, 0.1888), Rect.fromLTWH(0.1838, 0.2356, 0.6325, 0.1787), Rect.fromLTWH(0.1838, 0.4228, 0.6325, 0.1787), Rect.fromLTWH(0.1849, 0.6099, 0.6313, 0.1843)])),
+  StripTemplate(name: 'Jelly Pink Paper', category: 'Y2K', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/jelly-pink-b.webp', 0.3696, [Rect.fromLTWH(0.2199, 0.0469, 0.5711, 0.182), Rect.fromLTWH(0.221, 0.2645, 0.5678, 0.1803), Rect.fromLTWH(0.2221, 0.4792, 0.5656, 0.1795), Rect.fromLTWH(0.2199, 0.6935, 0.5711, 0.1799)])),
+  StripTemplate(name: 'Cyber Blue', category: 'Y2K', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/cyber-blue-a.webp', 0.5, [Rect.fromLTWH(0.168, 0.0631, 0.6618, 0.1601), Rect.fromLTWH(0.168, 0.261, 0.6618, 0.1539), Rect.fromLTWH(0.1691, 0.4515, 0.6607, 0.1522), Rect.fromLTWH(0.1691, 0.6415, 0.6607, 0.1539)])),
+  StripTemplate(name: 'Cyber Blue Paper', category: 'Y2K', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
+    art: ArtFrame('assets/templates/cyber-blue-b.webp', 0.3689, [Rect.fromLTWH(0.216, 0.0639, 0.5691, 0.1606), Rect.fromLTWH(0.216, 0.2795, 0.568, 0.161), Rect.fromLTWH(0.216, 0.4947, 0.5691, 0.161), Rect.fromLTWH(0.216, 0.71, 0.5691, 0.1606)])),
+];
+
+/// Strips drawn in code: where the user's own templates start from, and the
+/// home page's sample. Not offered as templates themselves any more.
+const drawnTemplates = [
   // Cute
   StripTemplate(name: 'Peach', category: '可愛', caption: 'cute caption ♡', frame: Color(0xFFF9CACB), cell: sky, tape: true),
   StripTemplate(name: 'Coral', category: '可愛', caption: 'little moments', frame: Color(0xFFF2867B), cell: Color(0xFFF8D0D4), captionColor: Colors.white),

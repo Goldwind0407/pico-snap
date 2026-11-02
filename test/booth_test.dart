@@ -32,7 +32,7 @@ void main() {
   useTestFilters();
 
   test('取景框跟模板的照片格一樣比例', () {
-    final drawn = stripTemplates.firstWhere((t) => t.art == null);
+    final drawn = drawnTemplates.first;
     expect(cellAspect(drawn, 0), closeTo(176 / 128, 1e-9));
     final art = stripTemplates.firstWhere((t) => t.art != null);
     final r = art.art!.cells[1], s = art.designSize;

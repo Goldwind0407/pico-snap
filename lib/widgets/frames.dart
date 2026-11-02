@@ -214,7 +214,11 @@ class PhotoStrip extends StatelessWidget {
       for (var i = 0; i < art.cells.length; i++)
         Positioned.fromRect(rect: px(art.cells[i]), child: GestureDetector(
           onTap: onTapCell == null ? null : () => onTapCell!(i),
-          child: ColoredBox(color: template.cell, child: SizedBox.expand(child: _photo(i) ?? Center(child: placeholder ?? const SizedBox.shrink()))),
+          child: ColoredBox(color: template.cell, child: SizedBox.expand(child: switch (_photo(i)) {
+            final photo? when template.mono => ColorFiltered(colorFilter: _grayscale, child: photo),
+            final photo? => photo,
+            null => Center(child: placeholder ?? const SizedBox.shrink()),
+          })),
         )),
       // The illustration sits on top so its decorations overlap the photos.
       Positioned.fill(child: IgnorePointer(child: Image.asset(art.asset, fit: BoxFit.fill, filterQuality: FilterQuality.medium))),

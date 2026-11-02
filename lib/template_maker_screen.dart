@@ -218,7 +218,7 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
 
   /// Start from one of the built-in drawn templates.
   Widget _startTool() {
-    final starts = [for (final t in stripTemplates) if (t.art == null) t];
+    const starts = drawnTemplates;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _hint('從內建樣式開始，再慢慢改成自己的'),
       Expanded(child: ListView.separated(
