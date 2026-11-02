@@ -35,21 +35,21 @@ class MyLibrary {
     _dir = dir;
     // 檔名是建立時間，排序之後就是做的順序
     try {
-      final files = Directory('${dir.path}/stickers').listSync().whereType<File>().where((f) => f.path.endsWith('.png')).toList()
+      final files = (await Directory('${dir.path}/stickers').list().toList()).whereType<File>().where((f) => f.path.endsWith('.png')).toList()
         ..sort((a, b) => a.path.compareTo(b.path));
-      // Read together, off the UI thread's back: startup waits for this.
-      final bytes = await Future.wait([for (final f in files) f.readAsBytes()]);
-      for (final (i, f) in files.indexed) {
+      for (final f in files) {
         final name = f.uri.pathSegments.last;
-        customStickers['my:${name.substring(0, name.length - 4)}'] = bytes[i];
+        final id = 'my:${name.substring(0, name.length - 4)}';
+        customStickerPaths[id] = f.path;
+        customStickers.putIfAbsent(id, () => null);
       }
     } catch (e) {
       debugPrint('[LIBRARY] 讀取貼紙失敗: $e');
     }
     final json = File('${dir.path}/templates.json');
     try {
-      if (json.existsSync()) {
-        final list = jsonDecode(json.readAsStringSync()) as List;
+      if (await json.exists()) {
+        final list = jsonDecode(await json.readAsString()) as List;
         customTemplates
           ..clear()
           ..addAll([for (final t in list) CustomTemplate.fromJson((t as Map).cast<String, Object?>())]);
@@ -81,6 +81,7 @@ class MyLibrary {
 
   static void removeSticker(String id) {
     customStickers.remove(id);
+    customStickerPaths.remove(id);
     changes.value++;
     _write(() => _writer.run(() => File('${_dir!.path}/stickers/${id.substring(3)}.png').delete()));
   }

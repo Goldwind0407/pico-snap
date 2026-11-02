@@ -27,11 +27,19 @@ class Work {
   /// 放在檔案裡的話是 [file]，拿不到檔案系統（網頁版、測試）就是 [bytes]。
   final File? file;
   final Uint8List? bytes;
-  const Work({required this.id, required this.kind, required this.created, this.file, this.bytes});
+  final File? originalFile;
+  final Uint8List? originalBytes;
+  const Work({required this.id, required this.kind, required this.created, this.file, this.bytes,
+    this.originalFile, this.originalBytes});
+
+  bool get hasOriginal => originalFile != null || originalBytes != null;
+  Future<Uint8List> exportBytes() async => originalBytes ??
+      await (originalFile ?? file)?.readAsBytes() ?? bytes!;
 
   ImageProvider get image => file != null ? FileImage(file!) as ImageProvider : MemoryImage(bytes!);
 
-  Map<String, Object?> toJson() => {'id': id, 'kind': kind.name, 't': created.millisecondsSinceEpoch};
+  Map<String, Object?> toJson() => {'id': id, 'kind': kind.name, 't': created.millisecondsSinceEpoch,
+    if (originalFile != null) 'original': true};
 }
 
 /// 「作品集」和「日記」的資料：每次存到相簿就收一份進來，另外每天可以寫一句日記。
@@ -72,7 +80,9 @@ class MyWorks {
             for (final w in jsonDecode(list.readAsStringSync()) as List)
               if (WorkKind.values.asNameMap()[(w as Map)['kind']] case final kind?)
                 if (File('${dir.path}/${w['id']}.png') case final f when f.existsSync())
-                  Work(id: '${w['id']}', kind: kind, created: DateTime.fromMillisecondsSinceEpoch(w['t'] as int), file: f),
+                  Work(id: '${w['id']}', kind: kind, created: DateTime.fromMillisecondsSinceEpoch(w['t'] as int), file: f,
+                    originalFile: w['original'] == true && File('${dir.path}/${w['id']}_original.png').existsSync()
+                        ? File('${dir.path}/${w['id']}_original.png') : null),
           ]);
       }
     } catch (e) {
@@ -105,16 +115,18 @@ class MyWorks {
   static int _last = 0;
 
   /// 收進一件作品（[png] 是給 App 裡看的縮小版）。
-  static Future<Work> add(Uint8List png, WorkKind kind, {DateTime? at}) async {
+  static Future<Work> add(Uint8List png, WorkKind kind, {DateTime? at, Uint8List? original}) async {
     _last = max(_last + 1, DateTime.now().microsecondsSinceEpoch);
     final id = '$_last';
     final created = at ?? DateTime.now();
-    Work work = Work(id: id, kind: kind, created: created, bytes: png);
+    Work work = Work(id: id, kind: kind, created: created, bytes: png, originalBytes: original);
     if (_dir case final dir?) {
       try {
         final f = File('${dir.path}/$id.png');
+        final full = original == null ? null : File('${dir.path}/${id}_original.png');
+        if (full != null) await _writer.writeBytes(full, original!);
         await _writer.writeBytes(f, png);
-        work = Work(id: id, kind: kind, created: created, file: f);
+        work = Work(id: id, kind: kind, created: created, file: f, originalFile: full);
       } catch (e) {
         debugPrint('[WORKS] 存作品失敗，這次只放在記憶體裡: $e');
       }
@@ -134,6 +146,7 @@ class MyWorks {
     await _saveList();
     try {
       await work.file?.delete();
+      await work.originalFile?.delete();
     } catch (e) {
       debugPrint('[WORKS] 刪作品檔失敗: $e');
     }

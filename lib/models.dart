@@ -234,7 +234,9 @@ final stickerPacks = <(String, String, List<String>)>[
 
 /// Stickers the user cut out of their own photos on the 我的素材 page, keyed
 /// by sticker id (`my:<key>`) → PNG. Managed (and saved) by MyLibrary.
-final customStickers = <String, Uint8List>{};
+// Null means an on-disk sticker: decode it only when a view needs it.
+final customStickers = <String, Uint8List?>{};
+final customStickerPaths = <String, String>{};
 
 /// Templates the user designed on the 我的素材 page. Managed by MyLibrary.
 final customTemplates = <CustomTemplate>[];

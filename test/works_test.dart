@@ -80,13 +80,13 @@ void main() {
 
     await t.tap(find.byType(WorkTile));
     await t.pumpAndSettle();
-    expect(find.text('再存一次到相簿'), findsOneWidget);
+    expect(find.text('儲存預覽版（1400px 內）'), findsOneWidget);
     await t.tap(find.text('刪除'));
     await t.pumpAndSettle();
     await t.tap(find.widgetWithText(TextButton, '刪除'));
     await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
     await t.pumpAndSettle();
-    expect(find.text('再存一次到相簿'), findsNothing, reason: '最後一件刪掉就回到作品集');
+    expect(find.text('儲存預覽版（1400px 內）'), findsNothing, reason: '最後一件刪掉就回到作品集');
     expect(MyWorks.works.single.kind, WorkKind.fourCut);
     expect(find.byType(WorkTile), findsOneWidget, reason: '只剩一種就不用篩選，顯示全部');
   });

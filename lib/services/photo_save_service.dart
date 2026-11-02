@@ -66,7 +66,7 @@ class PhotoSaveService {
       final data = await flat.toByteData(format: ui.ImageByteFormat.png);
       if (data == null) return '產生圖片失敗，請再試一次';
       final error = await saveBytes(data.buffer.asUint8List());
-      if (error == null && keep != null) await _keep(flat, keep);
+      if (error == null && keep != null) await _keep(flat, keep, data.buffer.asUint8List());
       return error;
     } catch (e) {
       debugPrint('[SAVE] 產生圖片失敗: $e');
@@ -80,7 +80,7 @@ class PhotoSaveService {
   /// 作品集裡的那份：最長邊 [_keepSide]，夠在 App 裡全螢幕看。
   static const _keepSide = 1400;
 
-  static Future<void> _keep(ui.Image image, WorkKind kind) async {
+  static Future<void> _keep(ui.Image image, WorkKind kind, Uint8List original) async {
     try {
       final scale = min(1.0, _keepSide / max(image.width, image.height));
       final w = max(1, (image.width * scale).round()), h = max(1, (image.height * scale).round());
@@ -98,7 +98,7 @@ class PhotoSaveService {
       } finally {
         small.dispose();
       }
-      if (data != null) await MyWorks.add(data.buffer.asUint8List(), kind);
+      if (data != null) await MyWorks.add(data.buffer.asUint8List(), kind, original: original);
     } catch (e) {
       // 相簿已經存好了，作品集少一張不影響
       debugPrint('[SAVE] 收進作品集失敗: $e');

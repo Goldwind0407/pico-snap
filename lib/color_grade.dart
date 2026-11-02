@@ -270,18 +270,30 @@ Float32List? _table(List<(double, double)> points) {
 /// Grade RGBA pixels (alpha kept) through a [n]³ [lut] with trilinear
 /// interpolation.
 Uint8List applyLut(Uint8List rgba, Float32List lut, int n) {
+  if (n < 2 || lut.length != n * n * n * 3 || rgba.length % 4 != 0) {
+    throw ArgumentError('Invalid LUT or RGBA dimensions');
+  }
   final out = Uint8List(rgba.length);
   final s = (n - 1) / 255;
+  // Byte inputs have only 256 possible coordinates. Prepare cell indices and
+  // weights once, instead of flooring and rebuilding eight addresses per RGB.
+  final cells = Int32List(256);
+  final fractions = Float64List(256);
+  for (var v = 0; v < 256; v++) {
+    cells[v] = math.min((v * s).floor(), n - 2);
+    fractions[v] = v * s - cells[v];
+  }
+  final dr = n * n * 3, dg = n * 3;
   for (var i = 0; i < rgba.length; i += 4) {
-    final fr = rgba[i] * s, fg = rgba[i + 1] * s, fb = rgba[i + 2] * s;
-    final r0 = math.min(fr.floor(), n - 2), g0 = math.min(fg.floor(), n - 2), b0 = math.min(fb.floor(), n - 2);
-    final tr = fr - r0, tg = fg - g0, tb = fb - b0;
+    final r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
+    final o = cells[r] * dr + cells[g] * dg + cells[b] * 3;
+    final tr = fractions[r], tg = fractions[g], tb = fractions[b];
     for (var c = 0; c < 3; c++) {
-      double at(int r, int g, int b) => lut[((r * n + g) * n + b) * 3 + c];
-      final c00 = at(r0, g0, b0) * (1 - tb) + at(r0, g0, b0 + 1) * tb;
-      final c01 = at(r0, g0 + 1, b0) * (1 - tb) + at(r0, g0 + 1, b0 + 1) * tb;
-      final c10 = at(r0 + 1, g0, b0) * (1 - tb) + at(r0 + 1, g0, b0 + 1) * tb;
-      final c11 = at(r0 + 1, g0 + 1, b0) * (1 - tb) + at(r0 + 1, g0 + 1, b0 + 1) * tb;
+      final p = o + c;
+      final c00 = lut[p] * (1 - tb) + lut[p + 3] * tb;
+      final c01 = lut[p + dg] * (1 - tb) + lut[p + dg + 3] * tb;
+      final c10 = lut[p + dr] * (1 - tb) + lut[p + dr + 3] * tb;
+      final c11 = lut[p + dr + dg] * (1 - tb) + lut[p + dr + dg + 3] * tb;
       final v = (c00 * (1 - tg) + c01 * tg) * (1 - tr) + (c10 * (1 - tg) + c11 * tg) * tr;
       out[i + c] = (v * 255).round().clamp(0, 255);
     }
@@ -353,33 +365,57 @@ List<double> fitMatrix(Float32List lut, int n) {
 void finishFilm(Uint8List rgba, Uint8List source, int w, int h,
     {double soften = 0, double halation = 0, (double, double, double) halationColor = (1, .38, .18), double grain = 0}) {
   final n = w * h;
+  if (w < 1 || h < 1 || rgba.length != n * 4 || source.length != n * 4) {
+    throw ArgumentError('Invalid film image dimensions');
+  }
   if (soften > 0) {
     // Mix in a small blur; the radius follows the image size so a full
     // photo and its thumbnail look alike.
     final r = math.max(1, (math.max(w, h) / 1100).round());
     final ch = Float32List(n), tmp = Float32List(n), blurred = Float32List(n);
+    // Weight hidden RGB by coverage: transparent cutout pixels must not bleed
+    // black (or arbitrary RGB) into a visible edge. Opaque photos need no mask.
+    Float32List? alpha;
+    for (var i = 0; i < n; i++) {
+      if (rgba[i * 4 + 3] != 255) {
+        alpha = Float32List(n);
+        for (var j = 0; j < n; j++) { ch[j] = rgba[j * 4 + 3] / 255; }
+        _boxBlur(ch, w, h, r, scratch: tmp, output: alpha);
+        break;
+      }
+    }
     for (var c = 0; c < 3; c++) {
       for (var i = 0; i < n; i++) {
-        ch[i] = rgba[i * 4 + c].toDouble();
+        ch[i] = rgba[i * 4 + c] * (alpha == null ? 1.0 : rgba[i * 4 + 3] / 255);
       }
       final b = _boxBlur(ch, w, h, r, scratch: tmp, output: blurred);
       final k = soften * .55;
       for (var i = 0; i < n; i++) {
-        rgba[i * 4 + c] = (ch[i] + (b[i] - ch[i]) * k).round().clamp(0, 255);
+        final original = rgba[i * 4 + c];
+        final blurred = alpha == null ? b[i] : alpha[i] > 1e-6 ? b[i] / alpha[i] : original.toDouble();
+        rgba[i * 4 + c] = (original + (blurred - original) * k).round().clamp(0, 255);
       }
     }
   }
   if (halation > 0) {
     // Bright parts of the original, on a quarter-size grid, spread out.
     const f = 4;
-    final sw = math.max(1, w ~/ f), sh = math.max(1, h ~/ f);
+    final sw = (w + f - 1) ~/ f, sh = (h + f - 1) ~/ f;
     final m = Float32List(sw * sh);
     for (var y = 0; y < sh; y++) {
       for (var x = 0; x < sw; x++) {
-        final sx = math.min(w - 1, x * f + f ~/ 2), sy = math.min(h - 1, y * f + f ~/ 2);
-        final j = (sy * w + sx) * 4;
-        final l = (.2126 * source[j] + .7152 * source[j + 1] + .0722 * source[j + 2]) / 255;
-        m[y * sw + x] = _smooth(.7, .97, l);
+        var sum = 0.0, count = 0;
+        // Area-average the highlight mask; sampling only one pixel in each
+        // block made small lights disappear when the photo shifted a pixel.
+        for (var sy = y * f; sy < math.min(h, (y + 1) * f); sy++) {
+          for (var sx = x * f; sx < math.min(w, (x + 1) * f); sx++) {
+            final j = (sy * w + sx) * 4;
+            final l = (.2126 * source[j] + .7152 * source[j + 1] + .0722 * source[j + 2]) / 255;
+            sum += _smooth(.7, .97, l) * source[j + 3] / 255;
+            count++;
+          }
+        }
+        m[y * sw + x] = sum / count;
       }
     }
     final r = math.max(2, (math.min(sw, sh) * .035).round());
@@ -392,10 +428,13 @@ void finishFilm(Uint8List rgba, Uint8List source, int w, int h,
       for (var x = 0; x < w; x++) {
         final fx = ((x + .5) / f - .5).clamp(0.0, sw - 1.0);
         final x0 = fx.floor(), x1 = math.min(sw - 1, x0 + 1), tx = fx - x0;
-        final g = ((b[y0 * sw + x0] * (1 - tx) + b[y0 * sw + x1] * tx) * (1 - ty) + (b[y1 * sw + x0] * (1 - tx) + b[y1 * sw + x1] * tx) * ty) *
-            halation * 1.6;
-        if (g < .002) continue;
         final i = (y * w + x) * 4;
+        final local = (.2126 * source[i] + .7152 * source[i + 1] + .0722 * source[i + 2]) / 255;
+        final spread = (b[y0 * sw + x0] * (1 - tx) + b[y0 * sw + x1] * tx) * (1 - ty) +
+            (b[y1 * sw + x0] * (1 - tx) + b[y1 * sw + x1] * tx) * ty;
+        // Keep highlight interiors neutral; colour the surrounding darker edge.
+        final g = spread * (1 - _smooth(.7, .97, local)) * halation * 1.6;
+        if (g < .002 || rgba[i + 3] == 0) continue;
         // Screen blend: glows over dark areas, can't push whites past white.
         rgba[i] = (255 - (255 - rgba[i]) * (1 - (g * hr).clamp(0.0, 1.0))).round();
         rgba[i + 1] = (255 - (255 - rgba[i + 1]) * (1 - (g * hg).clamp(0.0, 1.0))).round();

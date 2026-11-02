@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
@@ -606,6 +607,12 @@ class StickerVisual extends StatelessWidget {
     if (sticker.startsWith('text:')) return SizedBox.square(dimension: size, child: FittedBox(child: TextSticker(sticker.substring(5))));
     if (sticker.startsWith('my:')) {
       final custom = customStickers[sticker];
+      final path = customStickerPaths[sticker];
+      if (custom == null && path != null && customStickers.containsKey(sticker)) {
+        return Image.file(File(path), width: size, height: size, gaplessPlayback: true,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (_, error, stack) => const Icon(Icons.broken_image_outlined));
+      }
       // Deleted while still referenced somewhere: draw nothing.
       if (custom == null) return SizedBox.square(dimension: size);
       return Image.memory(custom, width: size, height: size, gaplessPlayback: true, filterQuality: FilterQuality.medium);

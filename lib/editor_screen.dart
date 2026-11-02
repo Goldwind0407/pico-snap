@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -10,6 +11,8 @@ import 'package:image_picker/image_picker.dart';
 
 import 'cutout/cutout_page.dart';
 import 'filters.dart';
+import 'editor_document.dart';
+import 'services/editor_drafts.dart';
 import 'models.dart';
 import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
@@ -50,6 +53,8 @@ const _tapes = [
 ];
 
 class EditorScreen extends StatefulWidget {
+  final EditorDocument? draft;
+  final String? draftId;
   final EditorMode mode;
   final int template;
   /// Photos (and Polaroid captions and film) to start with, e.g. from the
@@ -60,13 +65,13 @@ class EditorScreen extends StatefulWidget {
   final List<List<Stroke>> handwriting;
   final List<FilmStock> films;
   final List<PhotoFilter> filters;
-  const EditorScreen({super.key, this.mode = EditorMode.fourCut, this.template = 0, this.photos = const [], this.captions = const [], this.handwriting = const [], this.films = const [], this.filters = const []});
+  const EditorScreen({super.key, this.draft, this.draftId, this.mode = EditorMode.fourCut, this.template = 0, this.photos = const [], this.captions = const [], this.handwriting = const [], this.films = const [], this.filters = const []});
 
   @override
   State<EditorScreen> createState() => _EditorScreenState();
 }
 
-class _EditorScreenState extends State<EditorScreen> {
+class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver {
   final _picker = ImagePicker();
   final _canvasKey = GlobalKey();
   /// What gets saved: the canvas without the shadow around it.
@@ -92,13 +97,12 @@ class _EditorScreenState extends State<EditorScreen> {
   /// What the timelapse last recorded.
   Object? _recordedKey;
 
-  /// Everything that ends up in the saved picture. Changed parts are always
-  /// replaced (new lists entries, new objects), so identity is enough; the
-  /// stroke being drawn grows in place, hence its length.
+  /// Compare edit values so restoring a checkpoint also restores the saved
+  /// state. Immutable photo bytes retain their identity across checkpoints.
   Object _contentKey() => Object.hashAll([
-    Object.hashAll(_photos), Object.hashAll(_fits), Object.hashAll(_films), Object.hashAll([for (final f in _filters) f.id]),
+    Object.hashAll(_photoBytes), Object.hashAll(_fits.map((f) => Object.hash(f.scale, f.align))), Object.hashAll(_films), Object.hashAll([for (final f in _filters) f.id]),
     _template, _format, _pattern, _backdrop, _stripCaption, Object.hashAll(_polaroidCaptions), _bubble, _subject,
-    Object.hashAll(_stickers), Object.hashAll(_strokes), _strokes.isEmpty ? 0 : _strokes.last.points.length,
+    Object.hashAll(_stickers.map((s) => Object.hash(s.sticker, s.center, s.scale, s.rotation, s.flipped))), Object.hashAll(_strokes.map((s) => Object.hash(s.color, s.width, s.style, Object.hashAll(s.points)))), _strokes.isEmpty ? 0 : _strokes.last.points.length,
   ]);
 
   /// Something was changed since opening or the last save.
@@ -123,7 +127,53 @@ class _EditorScreenState extends State<EditorScreen> {
   int _penWidth = 1;
   /// The eraser already saved an undo step for this swipe.
   bool _erased = false;
-  final List<(List<StickerData>, List<Stroke>)> _history = [];
+  final List<EditorDocument> _history = [], _redoHistory = [];
+  late List<List<Stroke>> _handwriting = widget.handwriting;
+  late final String _draftId = widget.draftId ?? EditorDrafts.newId();
+  Timer? _draftTimer;
+  Object? _draftKey;
+  String? _historyGroup;
+  DateTime? _historyAt;
+  bool _exported = false;
+
+  EditorDocument _document() => EditorDocument(mode: widget.mode, photos: _photoBytes,
+    fits: _fits, films: _films, filters: [for (final f in _filters) f.id],
+    captions: _polaroidCaptions, stickers: _stickers, strokes: _strokes,
+    handwriting: _handwriting, templateKey: EditorDocument.keyForTemplate(_template),
+    format: _format, pattern: _pattern, backdrop: _backdrop, bubble: _bubble,
+    stripCaption: _stripCaption, subject: _subject);
+
+  void _restore(EditorDocument d) {
+    _photoBytes.setAll(0, d.photos);
+    _photos.setAll(0, d.photos.map((b) => b == null ? null : photoImage(b)));
+    _fits.setAll(0, d.fits); _films.setAll(0, d.films);
+    _filters.setAll(0, d.filters.map((id) => photoFilters.where((f) => f.id == id).firstOrNull ?? photoFilters.first));
+    _polaroidCaptions.setAll(0, d.captions);
+    _stickers = List.of(d.stickers); _strokes = EditorDocument.copyStrokes(d.strokes);
+    _handwriting = d.handwriting; _template = d.templateIndex;
+    _category = allStripTemplates[_template].category;
+    _format = d.format; _pattern = d.pattern; _backdrop = d.backdrop;
+    _bubble = d.bubble; _stripCaption = d.stripCaption; _subject = d.subject;
+    _selectedSticker = null; _textCtrl.text = _text;
+    for (var i = 0; i < _cells; i++) { _aspects[i] = null; _measure(i); }
+    _inkTick.value++;
+  }
+
+  Future<bool> _writeDraft() async {
+    _draftTimer?.cancel();
+    if (!EditorDrafts.enabled || (_exported && !_edited)) return true;
+    if (!_edited && _photoBytes.every((p) => p == null)) return true;
+    final key = _contentKey();
+    if (_draftKey == key) return true;
+    final saved = await EditorDrafts.save(_draftId, _document());
+    if (saved) _draftKey = key;
+    return saved;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) unawaited(_writeDraft());
+  }
   int? _selectedSticker;
   late _Tool _tool = _tools.first;
 
@@ -152,6 +202,7 @@ class _EditorScreenState extends State<EditorScreen> {
   };
 
   void _setText(String value) => setState(() {
+    _remember(group: "text:$_selectedCell");
     switch (widget.mode) {
       case EditorMode.fourCut: _stripCaption = value;
       case EditorMode.polaroid: _polaroidCaptions[_selectedCell] = value;
@@ -162,6 +213,7 @@ class _EditorScreenState extends State<EditorScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     for (var i = 0; i < widget.photos.length && i < _cells; i++) {
       _photoBytes[i] = widget.photos[i];
       _photos[i] = photoImage(widget.photos[i]);
@@ -170,11 +222,15 @@ class _EditorScreenState extends State<EditorScreen> {
     for (var i = 0; i < widget.captions.length && i < _polaroidCaptions.length; i++) {
       _polaroidCaptions[i] = widget.captions[i];
     }
-    _savedKey = _contentKey();
+    if (widget.draft case final draft?) _restore(draft);
+    _savedKey = widget.draft == null ? _contentKey() : null;
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _draftTimer?.cancel();
+    unawaited(_writeDraft().whenComplete(() => EditorDrafts.release(_draftId)));
     _recorder.dispose();
     _inkTick.dispose();
     _textCtrl.dispose();
@@ -190,11 +246,13 @@ class _EditorScreenState extends State<EditorScreen> {
     listener = ImageStreamListener((info, _) {
       stream.removeListener(listener);
       if (mounted && _photos[i] == image) setState(() => _aspects[i] = info.image.width / info.image.height);
+      info.dispose();
     }, onError: (_, __) => stream.removeListener(listener));
     stream.addListener(listener);
   }
 
   void _removePhoto() => setState(() {
+    _remember();
     final i = _selectedCell;
     _photos[i] = null;
     _photoBytes[i] = null;
@@ -220,6 +278,7 @@ class _EditorScreenState extends State<EditorScreen> {
     final bytes = await Future.wait([for (final f in files.take(empty.length)) f.readAsBytes()]);
     if (!mounted) return;
     setState(() {
+      _remember();
       for (final (k, b) in bytes.indexed) {
         final i = empty[k];
         _photos[i] = photoImage(b);
@@ -241,6 +300,7 @@ class _EditorScreenState extends State<EditorScreen> {
     if (!mounted) return;
     if (widget.mode != EditorMode.sticker) _tool = _Tool.photo;
     setState(() {
+      _remember();
       _photos[i] = photoImage(bytes);
       _photoBytes[i] = bytes;
       _fits[i] = const PhotoFit();
@@ -261,6 +321,7 @@ class _EditorScreenState extends State<EditorScreen> {
     final png = await CutoutPage.open(context, bytes, recorder: _recorder);
     if (png != null && mounted) {
       setState(() {
+        _remember();
         _subject = png;
       });
     }
@@ -350,6 +411,11 @@ class _EditorScreenState extends State<EditorScreen> {
       error = path == null ? '圖片已存好，但縮時影片做不出來' : await PhotoSaveService.saveVideo(path);
       if (error == null) saved = '已存到相簿 ♡ 圖片和縮時影片';
     }
+    if (error == null) {
+      _exported = true;
+      _draftTimer?.cancel();
+      try { await EditorDrafts.remove(_draftId); } catch (e) { debugPrint('[DRAFT] cleanup failed: $e'); }
+    }
     if (!mounted) return;
     setState(() {
       _saving = false;
@@ -393,6 +459,7 @@ class _EditorScreenState extends State<EditorScreen> {
   int? get _adjusting => !_capturing && _tool == _Tool.photo && _photos[_selectedCell] != null ? _selectedCell : null;
 
   void _setFit(int i, PhotoFit fit) => setState(() {
+    _remember(group: "fit:$i");
     _fits[i] = fit;
   });
 
@@ -402,9 +469,14 @@ class _EditorScreenState extends State<EditorScreen> {
     if (tool == _Tool.brush) _selectedSticker = null;
   });
 
-  void _remember() {
-    _history.add((List.of(_stickers), List.of(_strokes)));
-    if (_history.length > 30) _history.removeAt(0);
+  void _remember({String? group}) {
+    final now = DateTime.now();
+    if (group == null || group != _historyGroup || _historyAt == null || now.difference(_historyAt!).inMilliseconds > 700) {
+      _history.add(_document());
+      if (_history.length > 30) _history.removeAt(0);
+    }
+    _historyGroup = group; _historyAt = now;
+    _redoHistory.clear();
   }
 
   void _penDown(Offset at, Size size) => setState(() {
@@ -453,10 +525,13 @@ class _EditorScreenState extends State<EditorScreen> {
   });
 
   void _undo() => setState(() {
-    final (stickers, strokes) = _history.removeLast();
-    _stickers = stickers;
-    _strokes = strokes;
-    _selectedSticker = null;
+    if (_history.isEmpty) return;
+    _redoHistory.add(_document()); _restore(_history.removeLast()); _historyGroup = null;
+  });
+
+  void _redo() => setState(() {
+    if (_redoHistory.isEmpty) return;
+    _history.add(_document()); _restore(_redoHistory.removeLast()); _historyGroup = null;
   });
 
   Offset _toCanvas(Offset global) => (_canvasKey.currentContext!.findRenderObject()! as RenderBox).globalToLocal(global);
@@ -466,6 +541,10 @@ class _EditorScreenState extends State<EditorScreen> {
     // Record the piece for the timelapse when it changed, not on every
     // rebuild (picking a tool, selecting a sticker).
     final key = _contentKey();
+    if (EditorDrafts.enabled && key != _draftKey && !(_exported && !_edited)) {
+      _draftTimer?.cancel();
+      _draftTimer = Timer(const Duration(milliseconds: 700), () { unawaited(_writeDraft()); });
+    }
     if (!_capturing && key != _recordedKey) {
       _recordedKey = key;
       WidgetsBinding.instance.addPostFrameCallback((_) => _recorder.request(_snapshot));
@@ -474,13 +553,17 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   Widget _scaffold() => PopScope(
-    canPop: !_edited,
+    canPop: !_saving && !_edited,
     onPopInvokedWithResult: (didPop, _) async {
-      if (didPop) return;
+      if (didPop || _saving) return;
       final navigator = Navigator.of(context);
-      if (await confirmLeave(context, '還沒儲存的作品會不見喔。')) navigator.pop();
+      if (await confirmLeave(context, EditorDrafts.enabled ? '作品會保留為草稿，下次可以繼續編輯。' : '還沒儲存的作品會不見喔。')) {
+        final saved = await _writeDraft();
+        if (!mounted) return;
+        if (saved) { navigator.pop(); } else { showMessage(context, '草稿儲存失敗，請稍後再試'); }
+      }
     },
-    child: _page(),
+    child: AbsorbPointer(absorbing: _saving, child: _page()),
   );
 
   Widget _page() => Scaffold(
@@ -496,7 +579,11 @@ class _EditorScreenState extends State<EditorScreen> {
           Positioned(left: 58, bottom: 96, child: DoodleHeart(size: 13, color: Color(0xFFE8C6F0))),
         ],
         Positioned.fill(child: Padding(padding: const EdgeInsets.fromLTRB(28, 12, 28, 16), child: _canvas())),
-        Positioned(right: 18, bottom: 16, child: _RoundButton(icon: Icons.undo_rounded, onTap: _history.isEmpty ? null : _undo)),
+        Positioned(right: 18, top: 12, child: Row(children: [
+          Tooltip(message: '復原', child: _RoundButton(icon: Icons.undo_rounded, onTap: _history.isEmpty ? null : _undo)),
+          const SizedBox(width: 8),
+          Tooltip(message: '重做', child: _RoundButton(icon: Icons.redo_rounded, onTap: _redoHistory.isEmpty ? null : _redo)),
+        ])),
         // A blank piece: photos first, then decorating.
         if (!_capturing && _photos.every((p) => p == null))
           Positioned(left: 0, right: 0, bottom: 28, child: Center(child: FilledButton.icon(
@@ -601,7 +688,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .16), blurRadius: 10, offset: const Offset(0, 4))]),
                   child: InstantPrint(
                     image: _photos[i], film: _films[i], caption: _polaroidCaptions[i],
-                    handwriting: i < widget.handwriting.length ? widget.handwriting[i] : const [],
+                    handwriting: i < _handwriting.length ? _handwriting[i] : const [],
                     placeholder: _capturing ? null : const AddPhotoHint(scale: 1.3),
                     selected: _showCell && _selectedCell == i, onTap: () => _tapCell(i),
                     onCaption: () => setState(() {
@@ -702,7 +789,7 @@ class _EditorScreenState extends State<EditorScreen> {
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (_, k) {
           final i = visible[k];
-          return _TemplateThumb(template: allStripTemplates[i], selected: _template == i, onTap: () => setState(() => _template = i));
+          return _TemplateThumb(template: allStripTemplates[i], selected: _template == i, onTap: () => setState(() { _remember(); _template = i; }));
         },
       )),
     ]);
@@ -719,7 +806,7 @@ class _EditorScreenState extends State<EditorScreen> {
         child: Row(children: [
           for (var i = 0; i < formats.length; i++)
             Expanded(child: GestureDetector(
-              onTap: () => setState(() => _format = i),
+              onTap: () => setState(() { _remember(); _format = i; }),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
                 padding: const EdgeInsets.symmetric(vertical: 9),
@@ -738,7 +825,7 @@ class _EditorScreenState extends State<EditorScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 10),
             child: GestureDetector(
-              onTap: () => setState(() => _backdrop = i),
+              onTap: () => setState(() { _remember(); _backdrop = i; }),
               child: Container(
                 width: 36, height: 36, padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: _backdrop == i ? outline.withValues(alpha: .6) : Colors.transparent, width: 2)),
@@ -756,6 +843,7 @@ class _EditorScreenState extends State<EditorScreen> {
                 padding: const EdgeInsets.only(right: 8),
                 child: GestureDetector(
                   onTap: () => setState(() {
+                    _remember();
                     for (var i = 0; i < _films.length; i++) {
                       _films[i] = f;
                     }
@@ -788,7 +876,7 @@ class _EditorScreenState extends State<EditorScreen> {
       final p = ginghamPatterns[i];
       final selected = _pattern == i;
       return GestureDetector(
-        onTap: () => setState(() => _pattern = i),
+        onTap: () => setState(() { _remember(); _pattern = i; }),
         child: Column(children: [
           Container(
             width: 56, height: 56,
@@ -852,6 +940,7 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _setFilter(PhotoFilter f, {bool all = false}) => setState(() {
+    _remember();
     if (_saving) return;
     for (var i = 0; i < _filters.length; i++) {
       if (all || i == _selectedCell) _filters[i] = f;
@@ -937,7 +1026,7 @@ class _EditorScreenState extends State<EditorScreen> {
           if (_subject != null) ...[
             const SizedBox(width: 10),
             Expanded(child: OutlinedButton.icon(
-              onPressed: () => setState(() => _subject = null),
+              onPressed: () => setState(() { _remember(); _subject = null; }),
               icon: const Icon(Icons.image_outlined, size: 18),
               label: const Text('還原照片', style: TextStyle(fontWeight: FontWeight.w800)),
               style: OutlinedButton.styleFrom(
@@ -980,7 +1069,7 @@ class _EditorScreenState extends State<EditorScreen> {
         ]),
         const SizedBox(height: 10),
         SizedBox(height: 34, child: erasing
-          ? Align(alignment: Alignment.centerLeft, child: Text('在線上抹過去就會擦掉，擦錯了按右下角的復原',
+          ? Align(alignment: Alignment.centerLeft, child: Text('在線上抹過去就會擦掉，擦錯了按右上角的復原',
               style: TextStyle(fontSize: 12, color: muted.withValues(alpha: .95), fontWeight: FontWeight.w600)))
           : ListView.separated(
               scrollDirection: Axis.horizontal,

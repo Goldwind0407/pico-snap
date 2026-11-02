@@ -161,14 +161,13 @@ class _WorkViewerState extends State<WorkViewer> {
     final work = _work;
     String? error;
     try {
-      error = await PhotoSaveService.saveBytes(work.bytes ?? await work.file!.readAsBytes());
+      error = await PhotoSaveService.saveBytes(await work.exportBytes());
     } catch (e) {
       error = '讀不到這件作品，請再試一次';
     }
     if (!mounted) return;
     setState(() => _busy = false);
-    // The App keeps a smaller copy (PhotoSaveService._keepSide); say so.
-    showMessage(context, error ?? '已存到相簿 ♡ 這是 App 裡留的較小版本，原圖在第一次存的時候就在相簿了', error: error != null);
+    showMessage(context, error ?? (work.hasOriginal ? '原尺寸作品已存到相簿 ♡' : '預覽版本已存到相簿 ♡'), error: error != null);
   }
 
   Future<void> _delete() async {
@@ -231,7 +230,7 @@ class _WorkViewerState extends State<WorkViewer> {
           Expanded(flex: 2, child: FilledButton.icon(
             onPressed: _busy ? null : _saveAgain,
             icon: const Icon(Icons.download_rounded, size: 18),
-            label: Text(_busy ? '儲存中…' : '再存一次到相簿', style: const TextStyle(fontWeight: FontWeight.w800)),
+            label: Text(_busy ? '儲存中…' : _work.hasOriginal ? '再存一次到相簿' : '儲存預覽版（1400px 內）', style: const TextStyle(fontWeight: FontWeight.w800)),
             style: FilledButton.styleFrom(
               backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 13),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),

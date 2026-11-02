@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'booth_screen.dart';
 import 'diary_screen.dart';
 import 'editor_screen.dart';
+import 'services/editor_drafts.dart';
+import 'lut_files.dart';
 import 'gallery_screen.dart';
 import 'library_screen.dart';
 import 'polaroid_camera_screen.dart';
@@ -50,6 +52,38 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _home(BuildContext context) => SafeArea(bottom: false, child: ListView(padding: const EdgeInsets.fromLTRB(0, 10, 0, 120), children: [
       _pad(const _Header()),
+      ValueListenableBuilder<int>(valueListenable: EditorDrafts.changes, builder: (context, _, child) {
+        if (EditorDrafts.entries.isEmpty) return const SizedBox.shrink();
+        return _pad(ExpansionTile(title: Text('繼續編輯草稿（${EditorDrafts.entries.length}）'),
+          leading: const Icon(Icons.edit_note_rounded), children: [
+          for (final draft in List.of(EditorDrafts.entries)) ListTile(
+            title: Text(draft.label), subtitle: Text('${draft.updated.month}/${draft.updated.day} ${draft.updated.hour.toString().padLeft(2, '0')}:${draft.updated.minute.toString().padLeft(2, '0')}'),
+            onTap: () async {
+              try {
+                await LutFiles.load();
+                final document = await EditorDrafts.read(draft.id);
+                if (!context.mounted) return;
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => EditorScreen(mode: document.mode, draft: document, draftId: draft.id)));
+              } catch (_) {
+                EditorDrafts.release(draft.id);
+                if (context.mounted) showMessage(context, '無法讀取這份草稿');
+              }
+            },
+            trailing: IconButton(tooltip: '刪除草稿', icon: const Icon(Icons.delete_outline), onPressed: () async {
+              final remove = await showDialog<bool>(context: context, builder: (c) => AlertDialog(
+                title: const Text('刪除這份草稿？'), actions: [
+                  TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
+                  TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('刪除')),
+                ]));
+              if (remove == true) {
+                try { await EditorDrafts.remove(draft.id); } catch (_) {
+                  if (context.mounted) showMessage(context, '草稿刪除失敗');
+                }
+              }
+            }),
+          ),
+        ]));
+      }),
       const SizedBox(height: 22),
       _pad(_HeroCard(onStart: () => _open(context, EditorMode.fourCut))),
       const SizedBox(height: 30),

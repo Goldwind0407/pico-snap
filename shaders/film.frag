@@ -59,16 +59,18 @@ void main() {
   if (uFx.x > 0.0) {
     // Soften graded colour, matching the saved photo's processing order.
     float r = max(1.0, max(uSize.x, uSize.y) / 1100.0);
-    vec3 b = c;
+    vec3 b = c * c0.a;
+    float coverage = c0.a;
     for (int y = -1; y <= 1; y++) {
       for (int x = -1; x <= 1; x++) {
         if (x != 0 || y != 0) {
           vec4 sampleColor = src(px + vec2(float(x), float(y)) * r);
-          b += grade(sampleColor.a > 0.0 ? sampleColor.rgb / sampleColor.a : vec3(0.0));
+          b += grade(sampleColor.a > 0.0 ? sampleColor.rgb / sampleColor.a : vec3(0.0)) * sampleColor.a;
+          coverage += sampleColor.a;
         }
       }
     }
-    b /= 9.0;
+    b = coverage > .000001 ? b / coverage : c;
     c = mix(c, b, uFx.x * .55);
   }
   if (uFx.y > 0.0) {
@@ -84,7 +86,8 @@ void main() {
         w += wt;
       }
     }
-    vec3 g = clamp(m / w * uFx.y * 1.6 * uGlow, 0.0, 1.0);
+    float local = luma(c0.a > 0.0 ? c0.rgb / c0.a : vec3(0.0));
+    vec3 g = clamp(m / w * (1.0 - smoothstep(.7, .97, local)) * uFx.y * 1.6 * uGlow, 0.0, 1.0);
     c = 1.0 - (1.0 - c) * (1.0 - g);
   }
   if (uFx.z > 0.0) {
