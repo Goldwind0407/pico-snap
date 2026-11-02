@@ -18,7 +18,7 @@ enum FilmStock {
   filmFrame('底片框', 'assets/instant/frame_film.png', _frameWindow, Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A), aspect: _frameAspect),
   keroroFrame('Keroro 框', 'assets/instant/frame_keroro.png', Rect.fromLTWH(.09667, .07833, .78222, .71167), ink, Colors.white, ink, aspect: .75, overlay: true),
   pokemonFrame('寶可夢框', 'assets/instant/frame_pokemon.png', Rect.fromLTWH(.16889, .11612, .66333, .68121), Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A), aspect: .66568, overlay: true),
-  rakutenFrame('樂天桃猿框', 'assets/instant/frame_rakuten.png', Rect.fromLTWH(.09778, .08622, .8, .69156), ink, Colors.white, Color(0xFF9E1B32), aspect: .8, overlay: true);
+  rakutenFrame('樂天桃猿框', 'assets/instant/frame_rakuten.png', Rect.fromLTWH(.09793, .07728, .81941, .6834), ink, Colors.white, Color(0xFF9E1B32), aspect: .79646, overlay: true);
 
   final String label, asset;
   /// The photo window, as fractions of the print.
