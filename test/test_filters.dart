@@ -14,8 +14,7 @@ const fadedFilter = PhotoFilter('test_faded', '測試褪色', Grade(
   temp: .3, curve: [(0, .1), (.5, .52), (1, .95)],
 ), grain: .4, vignette: .2, soften: .4, halation: .3);
 
-/// The app ships no filters of its own; tests that need some add these to
-/// [photoFilters] for their duration.
+/// Additional deterministic fixtures, independent of the shipped looks.
 void useTestFilters() {
   setUp(() => photoFilters.addAll([tealFilter, fadedFilter]));
   tearDown(() => photoFilters.removeWhere((f) => f.id.startsWith('test_')));

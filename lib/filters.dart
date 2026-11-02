@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'color_grade.dart';
+import 'filter_recipes.dart';
 
 /// LUT size: 33³ like the .cube files photo apps ship.
 const lutSize = 33;
@@ -80,10 +81,11 @@ class PhotoFilter {
   return (lut, fitMatrix(lut, lutSize));
 }
 
-/// Every filter in the app: 原圖 first, then the ones from lookup files
+/// Every filter in the app: 原圖 and built-in recipes, then lookup files
 /// ([LutFiles]) as they load, in [lutLooks] order.
 final photoFilters = <PhotoFilter>[
   const PhotoFilter('none', '原圖', Grade.none),
+  const PhotoFilter('korean_cream', '韓系奶油', koreanCreamGrade, soften: .18),
 ];
 
 PhotoFilter filterById(String? id) => photoFilters.firstWhere((f) => f.id == id, orElse: () => photoFilters.first);

@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'filters.dart';
+import 'color_grade.dart';
+import 'filter_recipes.dart';
 
 /// 從檔案來的濾鏡：放在 assets/luts/ 的調色檔，重新建置 App 就會出現在濾鏡列表最後面。
 ///
@@ -63,11 +65,22 @@ class LutFiles {
       final base = file.substring(0, file.lastIndexOf('.'));
       if (photoFilters.any((f) => f.id == 'lut:$base')) continue;
       try {
+        final look = lutLooks[base];
+        // Keep saved filter IDs, but replace a Log conversion with a recipe
+        // intended for the sRGB photos the editor actually receives.
+        if (look?.grade case final grade?) {
+          final filter = PhotoFilter('lut:$base', look!.name, grade,
+            grain: look.grain, vignette: look.vignette, soften: look.soften,
+            halation: look.halation, halationColor: look.halationColor);
+          await filter.prepare();
+          photoFilters.add(filter);
+          changes.value++;
+          continue;
+        }
         // A .cube is a megabyte of text: parse it off the UI thread.
         final lut = _isCube(path)
             ? await compute(_cube33, await rootBundle.loadString(path, cache: false))
             : await parseHald(await rootBundle.load(path));
-        final look = lutLooks[base];
         photoFilters.add(PhotoFilter.lut(
           'lut:$base', look?.name ?? lut.title ?? base, resampleLut(lut.table, lut.size, lutSize),
           grain: look?.grain ?? 0, vignette: look?.vignette ?? 0, soften: look?.soften ?? 0,
@@ -84,26 +97,25 @@ class LutFiles {
 /// A lookup file's name in the app and the film effects drawn with it.
 class LutLook {
   final String name;
+  final Grade? grade;
   final double grain, vignette, soften, halation;
   final (double, double, double) halationColor;
-  const LutLook(this.name, {this.grain = 0, this.vignette = 0, this.soften = 0, this.halation = 0, this.halationColor = (1, .38, .18)});
+  const LutLook(this.name, {this.grade, this.grain = 0, this.vignette = 0, this.soften = 0, this.halation = 0, this.halationColor = (1, .38, .18)});
 }
 
 /// 濾鏡檔的中文名字和底片效果（key 是檔名，不含副檔名）。
 const lutLooks = <String, LutLook>{
-  // Fujifilm's own F-Log2 LUT (GFX ETERNA 55) applied straight to the photo:
-  // far more contrast and colour than the camera look, a loud style of its
-  // own. For testing only: not ours to ship.
-  'fuji_classic_neg_raw': LutLook('濃烈負片'),
+  // Historical asset ID retained so existing drafts still resolve this look.
+  'fuji_classic_neg_raw': LutLook('濃烈負片', grade: negativeGrade, grain: .12),
   // Warm amber skin against cool teal backgrounds, like Japanese street snaps.
   'teal_amber_street': LutLook('日系街拍', grain: .2, vignette: .12, soften: .2, halation: .1),
   // Our own grades, made on design/hald/hald_identity_8.png in a photo app
   // (exported as JPEG, so smoothed a touch before saving as PNG).
   'cool': LutLook('冷調'),
   'warm': LutLook('暖調'),
-  'soft': LutLook('柔軟'),
+  'soft': LutLook('柔軟', soften: .32),
   'late_autumn': LutLook('深秋'),
-  'film': LutLook('膠片'),
+  'film': LutLook('膠片', grain: .22, soften: .12, halation: .08),
   'teal_orange': LutLook('青橙'),
 };
 
@@ -151,11 +163,21 @@ LutData parseCube(String text) {
         if (k >= n * n * n) throw const FormatException('資料比 LUT_3D_SIZE 多');
         final o = _ours(k++, n);
         for (var c = 0; c < 3; c++) {
-          table[o + c] = ((v[c]! - lo[c]) / (hi[c] - lo[c])).clamp(0.0, 1.0);
+          table[o + c] = v[c]!.clamp(0.0, 1.0);
         }
     }
   }
   if (table == null || k != n * n * n) throw FormatException('LUT 資料不完整：$k / ${n * n * n}');
+  if (lo.length != 3 || hi.length != 3 ||
+      List.generate(3, (c) => !lo[c].isFinite || !hi[c].isFinite || hi[c] <= lo[c]).any((v) => v)) {
+    throw const FormatException('Invalid LUT input domain');
+  }
+  // DOMAIN describes input coordinates, never output RGB. Bake a custom
+  // domain into the standard 0–1 grid used by both CPU and shader sampling.
+  if (lo.any((v) => v != 0) || hi.any((v) => v != 1)) {
+    final size = math.max(n, lutSize);
+    return (table: resampleLut(table, n, size, domainMin: lo, domainMax: hi), size: size, title: title);
+  }
   return (table: table, size: n, title: title);
 }
 
@@ -186,15 +208,20 @@ LutData haldFromPixels(Uint8List rgba, int w, int h) {
 }
 
 /// Resample an [n]³ LUT to [m]³ (trilinear).
-Float32List resampleLut(Float32List src, int n, int m) {
-  if (n == m) return src;
+Float32List resampleLut(Float32List src, int n, int m, {
+  List<double> domainMin = const [0, 0, 0],
+  List<double> domainMax = const [1, 1, 1],
+}) {
+  if (n == m && domainMin.every((v) => v == 0) && domainMax.every((v) => v == 1)) return src;
+  double coordinate(int i, int c) =>
+      ((i / (m - 1) - domainMin[c]) / (domainMax[c] - domainMin[c])).clamp(0.0, 1.0) * (n - 1);
   final out = Float32List(m * m * m * 3);
   double at(int r, int g, int b, int c) => src[((r * n + g) * n + b) * 3 + c];
   var o = 0;
   for (var ri = 0; ri < m; ri++) {
     for (var gi = 0; gi < m; gi++) {
       for (var bi = 0; bi < m; bi++) {
-        final fr = ri * (n - 1) / (m - 1), fg = gi * (n - 1) / (m - 1), fb = bi * (n - 1) / (m - 1);
+        final fr = coordinate(ri, 0), fg = coordinate(gi, 1), fb = coordinate(bi, 2);
         final r0 = math.min(fr.floor(), n - 2), g0 = math.min(fg.floor(), n - 2), b0 = math.min(fb.floor(), n - 2);
         final tr = fr - r0, tg = fg - g0, tb = fb - b0;
         for (var c = 0; c < 3; c++) {

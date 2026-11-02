@@ -19,6 +19,15 @@ String _swapCube({String header = ''}) {
 }
 
 void main() {
+  test('custom cube domains map input channels before the lookup', () {
+    final lut = parseCube(_swapCube(header: 'DOMAIN_MIN 0 -1 0\nDOMAIN_MAX 2 1 1\n'));
+    final out = applyLut(Uint8List.fromList([255, 0, 64, 255]), lut.table, lut.size);
+    // R input becomes .5, G becomes .5, B stays 64/255; then swap R/B.
+    expect(out, [64, 128, 128, 255]);
+    expect(() => parseCube(_swapCube(header: 'DOMAIN_MAX 0 1 1\n')), throwsFormatException);
+    expect(() => parseCube(_swapCube(header: 'DOMAIN_MIN 0 0\n')), throwsFormatException);
+  });
+
   test('.cube：讀出標題、紅色最快的順序換成我們的順序', () {
     final lut = parseCube(_swapCube());
     expect(lut.title, 'Swap RB');
