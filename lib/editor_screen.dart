@@ -896,28 +896,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     },
   );
 
-  Widget _stickerTool() {
-    final mine = customStickers.keys.toList();
-    return StickerBookView(
-      onPick: _addSticker,
-      mine: mine.isEmpty
-        ? const Center(child: Text('還沒有自己的貼紙\n可以到首頁下方的「素材」把照片做成貼紙', textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, height: 1.6, color: muted, fontWeight: FontWeight.w600)))
-        : GridView.builder(
-            padding: EdgeInsets.zero,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 6),
-            itemCount: mine.length,
-            itemBuilder: (_, k) => InkWell(
-              onTap: () => _addSticker(mine[k]),
-              child: Container(
-                decoration: const BoxDecoration(border: Border(top: BorderSide(color: line), right: BorderSide(color: line))),
-                padding: const EdgeInsets.all(9),
-                child: StickerVisual(mine[k]),
-              ),
-            ),
-          ),
-    );
-  }
+  Widget _stickerTool() => StickerBookView(onPick: _addSticker);
 
   void _setFilter(PhotoFilter f, {bool all = false}) => setState(() {
     _remember();

@@ -319,28 +319,7 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
     ]),
   );
 
-  Widget _stickerTool() {
-    final mine = customStickers.keys.toList();
-    return StickerBookView(
-      onPick: _addSticker,
-      mine: mine.isEmpty
-        ? const Center(child: Text('還沒有自己的貼紙', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)))
-        : ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            itemCount: mine.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 6),
-            itemBuilder: (_, i) => GestureDetector(
-              onTap: () => _addSticker(mine[i]),
-              child: Container(
-                width: 60, padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: cream, borderRadius: BorderRadius.circular(12), border: Border.all(color: line)),
-                child: StickerVisual(mine[i]),
-              ),
-            ),
-          ),
-    );
-  }
+  Widget _stickerTool() => StickerBookView(onPick: _addSticker);
 }
 
 class _Swatch extends StatelessWidget {

@@ -270,6 +270,40 @@ const formats = <(String, double)>[('9:16', 9 / 16), ('1:1', 1), ('4:5', 4 / 5),
 /// by sticker id (`my:<key>`) → PNG. Managed (and saved) by MyLibrary.
 // Null means an on-disk sticker: decode it only when a view needs it.
 final customStickers = <String, Uint8List?>{};
+
+/// The user's own sticker sheets: named groups of their stickers, shown as
+/// pages of the sticker book. A sticker in no sheet goes on [unsortedSheet].
+class MySheet {
+  final String id;
+  final String name;
+  /// Sticker ids, in the order they sit on the sheet.
+  final List<String> stickers;
+  const MySheet({required this.id, required this.name, this.stickers = const []});
+
+  MySheet copyWith({String? name, List<String>? stickers}) => MySheet(id: id, name: name ?? this.name, stickers: stickers ?? this.stickers);
+
+  Map<String, Object?> toJson() => {'id': id, 'name': name, 'stickers': stickers};
+  factory MySheet.fromJson(Map<String, Object?> j) =>
+      MySheet(id: j['id'] as String, name: j['name'] as String, stickers: [for (final s in j['stickers'] as List) s as String]);
+}
+
+const unsortedSheet = '未分類';
+
+/// The user's sheets, in order (see MyLibrary).
+final mySheets = <MySheet>[];
+
+/// Names the user gave their stickers, by sticker id.
+final stickerNames = <String, String>{};
+
+/// The sheets as shown: the user's, then 未分類 for stickers in none (if any).
+List<MySheet> get shownSheets {
+  final placed = {for (final s in mySheets) ...s.stickers};
+  final loose = [for (final id in customStickers.keys) if (!placed.contains(id)) id];
+  return [
+    for (final s in mySheets) s.copyWith(stickers: [for (final id in s.stickers) if (customStickers.containsKey(id)) id]),
+    if (loose.isNotEmpty) MySheet(id: '', name: unsortedSheet, stickers: loose),
+  ];
+}
 final customStickerPaths = <String, String>{};
 
 /// Templates the user designed on the 我的素材 page. Managed by MyLibrary.

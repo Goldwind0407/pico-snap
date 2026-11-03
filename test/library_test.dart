@@ -7,6 +7,7 @@ import 'package:pico_snap/library_screen.dart';
 import 'package:pico_snap/models.dart';
 import 'package:pico_snap/services/my_library.dart';
 import 'package:pico_snap/template_maker_screen.dart';
+import 'package:pico_snap/theme.dart';
 import 'package:pico_snap/widgets/frames.dart';
 import 'package:pico_snap/widgets/sticker_item.dart';
 
@@ -22,6 +23,8 @@ final _tinyPng = Uint8List.fromList([
 void main() {
   setUp(() {
     customStickers.clear();
+    mySheets.clear();
+    stickerNames.clear();
     customTemplates.clear();
   });
 
@@ -33,26 +36,75 @@ void main() {
     await t.pumpAndSettle();
   }
 
-  testWidgets('我的素材：刪除貼紙要先確認', (t) async {
+  Finder visual(String id) => find.byWidgetPredicate((w) => w is StickerVisual && w.sticker == id);
+
+  testWidgets('我的素材：長按選貼紙，刪除要先確認', (t) async {
     final a = MyLibrary.addSticker(_tinyPng);
     final b = MyLibrary.addSticker(_tinyPng);
     expect(a, isNot(b));
     await phone(t, const LibraryScreen());
     expect(find.text('照片去背'), findsOneWidget);
-    expect(find.byIcon(Icons.close_rounded), findsNWidgets(2));
+    expect(find.text(unsortedSheet), findsOneWidget, reason: '還沒分類的貼紙放在未分類');
 
-    await t.tap(find.byIcon(Icons.close_rounded).first);
+    await t.longPress(visual(a));
+    await t.pumpAndSettle();
+    expect(find.text('已選 1 張'), findsOneWidget);
+    await t.tap(find.byTooltip('刪除'));
     await t.pumpAndSettle();
     await t.tap(find.text('取消'));
     await t.pumpAndSettle();
     expect(customStickers, hasLength(2));
 
-    await t.tap(find.byIcon(Icons.close_rounded).first);
+    await t.tap(find.byTooltip('刪除'));
     await t.pumpAndSettle();
-    await t.tap(find.text('刪除'));
+    await t.tap(find.descendant(of: find.byType(GlassDialog), matching: find.text('刪除')));
     await t.pumpAndSettle();
-    expect(customStickers, hasLength(1));
-    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
+    expect(customStickers.keys, [b]);
+    expect(find.text('已選 1 張'), findsNothing);
+  });
+
+  testWidgets('我的素材：一次選很多張移到同一張貼紙紙，取名字、搜尋', (t) async {
+    final a = MyLibrary.addSticker(_tinyPng);
+    final b = MyLibrary.addSticker(_tinyPng);
+    final c = MyLibrary.addSticker(_tinyPng);
+    final cats = MyLibrary.addSheet('我家貓咪');
+    MyLibrary.renameSticker(c, '早餐');
+    await phone(t, const LibraryScreen());
+
+    // 長按一張開始選，之後點一下就加選
+    await t.longPress(visual(a));
+    await t.pumpAndSettle();
+    await t.tap(visual(b));
+    await t.pumpAndSettle();
+    expect(find.text('已選 2 張'), findsOneWidget);
+    await t.tap(find.byTooltip('移到貼紙紙'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('我家貓咪').last);
+    await t.pumpAndSettle();
+    expect(mySheets.single.id, cats);
+    expect(mySheets.single.stickers, [a, b]);
+    expect(shownSheets.map((s) => s.name), ['我家貓咪', unsortedSheet]);
+
+    // 單選一張可以取名字
+    await t.longPress(visual(a));
+    await t.pumpAndSettle();
+    await t.tap(find.byTooltip('取名字'));
+    await t.pumpAndSettle();
+    await t.enterText(find.descendant(of: find.byType(GlassDialog), matching: find.byType(TextField)), '橘貓');
+    await t.tap(find.text('好'));
+    await t.pumpAndSettle();
+    expect(stickerNames[a], '橘貓');
+
+    // 搜尋貼紙名或貼紙紙名
+    await t.enterText(find.byType(TextField), '早餐');
+    await t.pumpAndSettle();
+    expect(visual(c), findsOneWidget);
+    expect(visual(a), findsNothing);
+    await t.enterText(find.byType(TextField), '貓咪');
+    await t.pumpAndSettle();
+    expect(visual(a), findsOneWidget);
+    expect(visual(b), findsOneWidget);
+    expect(visual(c), findsNothing);
   });
 
   testWidgets('設計模板：選項會存進模板，模板頁可以刪除', (t) async {
@@ -76,11 +128,8 @@ void main() {
     await tab('大標題');
     await t.enterText(find.byType(TextField), 'BEST DAY');
     await tab('貼紙');
-    await t.ensureVisible(find.text('📷 我的'));
-    await t.pumpAndSettle();
-    await t.tap(find.text('📷 我的'));
-    await t.pumpAndSettle();
-    await t.tap(find.byWidgetPredicate((w) => w is StickerVisual && w.sticker == sticker).last);
+    // 有自己的貼紙時，貼紙本先翻到自己的那一頁
+    await t.tap(visual(sticker).last);
     await t.pumpAndSettle();
     // 貼紙直接在預覽上：拖一下、翻轉
     expect(find.byType(StickerItem), findsOneWidget);
@@ -135,16 +184,13 @@ void main() {
     await t.pumpAndSettle();
     expect(find.byType(TextField), findsOneWidget);
 
-    // 貼紙：「我的」只能貼，沒有新增、刪除
+    // 貼紙：自己的貼紙紙在貼紙本最前面，只能貼，沒有新增、刪除
     await t.tap(find.text('貼紙').last);
     await t.pumpAndSettle();
-    await t.ensureVisible(find.text('📷 我的'));
-    await t.pumpAndSettle();
-    await t.tap(find.text('📷 我的'));
-    await t.pumpAndSettle();
+    expect(find.text(unsortedSheet), findsOneWidget);
     expect(find.text('照片去背'), findsNothing);
-    expect(find.byIcon(Icons.close_rounded), findsNothing);
-    await t.tap(find.byWidgetPredicate((w) => w is StickerVisual && w.sticker == sticker));
+    expect(find.byTooltip('刪除'), findsNothing);
+    await t.tap(visual(sticker));
     await t.pumpAndSettle();
     expect(find.byType(StickerItem), findsOneWidget);
   });

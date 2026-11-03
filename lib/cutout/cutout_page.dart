@@ -96,6 +96,7 @@ class _CutoutPageState extends State<CutoutPage> {
   ShapeFit _fit = const ShapeFit();
   ShapeFit _fitStart = const ShapeFit();
   int _border = 1;
+  StickerFinish _finish = StickerFinish.matte;
   Timer? _previewTimer;
   final _shotKey = GlobalKey();
 
@@ -626,11 +627,11 @@ class _CutoutPageState extends State<CutoutPage> {
   Future<({Uint8List rgba, int w, int h})?> _bake(ui.Image photo, Uint8List rgba, int w, int h, Uint8List mask) async {
     if (_shape == StickerShape.contour) {
       if (!mask.any((v) => v > 127)) return null;
-      return compute(bakeStickerWith, (rgba: rgba, mask: mask, w: w, h: h, border: _borders[_border].$2));
+      return compute(bakeStickerWith, (rgba: rgba, mask: mask, w: w, h: h, border: _borders[_border].$2, finish: _finish));
     }
     final size = math.max(w, h);
     final s = await renderShape(photo, _shape, _fit, size);
-    return compute(bakeStickerWith, (rgba: s.rgba, mask: s.mask, w: s.w, h: s.h, border: _borders[_border].$2));
+    return compute(bakeStickerWith, (rgba: s.rgba, mask: s.mask, w: s.w, h: s.h, border: _borders[_border].$2, finish: _finish));
   }
 
   Future<void> _renderPreview() async {
@@ -975,6 +976,19 @@ class _CutoutPageState extends State<CutoutPage> {
               const SizedBox(width: 6),
             ],
           ]),
+          const SizedBox(height: 8),
+          SizedBox(height: 36, child: ListView(scrollDirection: Axis.horizontal, children: [
+            const Center(child: Text('材質', style: TextStyle(fontSize: 13, color: ink, fontWeight: FontWeight.w800))),
+            const SizedBox(width: 10),
+            for (final f in StickerFinish.values) ...[
+              _IconChip(icon: f.icon, label: f.label, selected: _finish == f, onTap: () {
+                setState(() => _finish = f);
+                _edited = true;
+                _schedulePreview();
+              }),
+              const SizedBox(width: 6),
+            ],
+          ])),
           const SizedBox(height: 6),
           _tip(_shape == StickerShape.contour ? '沿著去好背的輪廓做成貼紙' : '拖曳照片調整位置，兩指放大縮小'),
         ],
@@ -1203,11 +1217,11 @@ Future<ui.Image> _imageFromRgba(Uint8List rgba, int w, int h) {
 /// 回傳預乘 alpha 的 RGBA（decodeImageFromPixels 把像素當成預乘過的）。
 @visibleForTesting
 ({Uint8List rgba, int w, int h}) bakeSticker(({Uint8List rgba, Uint8List mask, int w, int h}) a) =>
-    bakeStickerWith((rgba: a.rgba, mask: a.mask, w: a.w, h: a.h, border: .022));
+    bakeStickerWith((rgba: a.rgba, mask: a.mask, w: a.w, h: a.h, border: .022, finish: StickerFinish.matte));
 
 /// [bakeSticker] with the white border [border] × the photo's long side
-/// (0 = no border).
-({Uint8List rgba, int w, int h}) bakeStickerWith(({Uint8List rgba, Uint8List mask, int w, int h, double border}) a) {
+/// (0 = no border), the picture printed with [finish].
+({Uint8List rgba, int w, int h}) bakeStickerWith(({Uint8List rgba, Uint8List mask, int w, int h, double border, StickerFinish finish}) a) {
   final w = a.w, h = a.h, n = w * h;
   final r = a.border <= 0 ? 0 : math.max(4, (math.max(w, h) * a.border).round());
   // 到主體的距離（3-4 倒角距離，除以 3 約等於像素）
@@ -1257,6 +1271,8 @@ Future<ui.Image> _imageFromRgba(Uint8List rgba, int w, int h) {
     }
   }
   final cw = x1 - x0 + 1, ch = y1 - y0 + 1;
+  // The gem finish shades by how far inside the picture a pixel is.
+  final inside = a.finish == StickerFinish.gem ? _insideDistance(a.mask, w, h) : null;
   final out = Uint8List(cw * ch * 4);
   for (var y = 0; y < ch; y++) {
     for (var x = 0; x < cw; x++) {
@@ -1266,11 +1282,50 @@ Future<ui.Image> _imageFromRgba(Uint8List rgba, int w, int h) {
       final o = (r + .5 - dist).clamp(0.0, 1.0); // 白邊覆蓋率
       final alpha = m + (1 - m) * o;
       final j = (y * cw + x) * 4;
+      final (fr, fg, fb) = m == 0
+        ? (0.0, 0.0, 0.0)
+        : applyFinish(a.finish, a.rgba[i * 4] / 255, a.rgba[i * 4 + 1] / 255, a.rgba[i * 4 + 2] / 255, x, y, cw, ch, inside == null ? 0 : inside[i] / 3);
+      final art = [fr, fg, fb];
       for (var c = 0; c < 3; c++) {
-        out[j + c] = (a.rgba[i * 4 + c] * m + 255 * (1 - m) * o).round().clamp(0, 255);
+        out[j + c] = (art[c] * 255 * m + 255 * (1 - m) * o).round().clamp(0, 255);
       }
       out[j + 3] = (alpha * 255).round().clamp(0, 255);
     }
   }
   return (rgba: out, w: cw, h: ch);
+}
+
+/// For each pixel of [mask], the distance to its edge from inside (chamfer
+/// 3-4, so about 3 per pixel); 0 outside.
+Int32List _insideDistance(Uint8List mask, int w, int h) {
+  const inf = 1 << 28;
+  final d = Int32List(w * h);
+  for (var i = 0; i < w * h; i++) {
+    d[i] = mask[i] > 127 ? inf : 0;
+  }
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      final i = y * w + x;
+      var v = d[i];
+      if (v == 0) continue;
+      v = math.min(v, x > 0 ? d[i - 1] + 3 : 3);
+      v = math.min(v, y > 0 ? d[i - w] + 3 : 3);
+      if (x > 0 && y > 0) v = math.min(v, d[i - w - 1] + 4);
+      if (x < w - 1 && y > 0) v = math.min(v, d[i - w + 1] + 4);
+      d[i] = v;
+    }
+  }
+  for (var y = h - 1; y >= 0; y--) {
+    for (var x = w - 1; x >= 0; x--) {
+      final i = y * w + x;
+      var v = d[i];
+      if (v == 0) continue;
+      v = math.min(v, x < w - 1 ? d[i + 1] + 3 : 3);
+      v = math.min(v, y < h - 1 ? d[i + w] + 3 : 3);
+      if (x < w - 1 && y < h - 1) v = math.min(v, d[i + w + 1] + 4);
+      if (x > 0 && y < h - 1) v = math.min(v, d[i + w - 1] + 4);
+      d[i] = v;
+    }
+  }
+  return d;
 }

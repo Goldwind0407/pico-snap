@@ -46,6 +46,21 @@ class MyLibrary {
     } catch (e) {
       debugPrint('[LIBRARY] 讀取貼紙失敗: $e');
     }
+    final sheets = File('${dir.path}/sheets.json');
+    try {
+      if (await sheets.exists()) {
+        final j = (jsonDecode(await sheets.readAsString()) as Map).cast<String, Object?>();
+        mySheets
+          ..clear()
+          ..addAll([for (final t in j['sheets'] as List) MySheet.fromJson((t as Map).cast<String, Object?>())]);
+        stickerNames
+          ..clear()
+          ..addAll((j['names'] as Map).cast<String, String>());
+      }
+    } catch (e) {
+      debugPrint('[LIBRARY] 貼紙紙檔壞掉了，先收到旁邊: $e');
+      keepAside(sheets);
+    }
     final json = File('${dir.path}/templates.json');
     try {
       if (await json.exists()) {
@@ -69,21 +84,78 @@ class MyLibrary {
     return '$_last';
   }
 
-  /// 新增貼紙，回傳它的 id。
-  static String addSticker(Uint8List png) {
+  /// 新增貼紙，回傳它的 id。有 [sheet] 就放到那張貼紙紙最後面。
+  static String addSticker(Uint8List png, {String? sheet, String name = ''}) {
     final key = newKey();
     final id = 'my:$key';
     customStickers[id] = png;
-    changes.value++;
+    if (name.trim().isNotEmpty) stickerNames[id] = name.trim();
+    final i = mySheets.indexWhere((s) => s.id == sheet);
+    if (i >= 0) mySheets[i] = mySheets[i].copyWith(stickers: [...mySheets[i].stickers, id]);
     _write(() => _writer.writeBytes(File('${_dir!.path}/stickers/$key.png'), png));
+    _saveSheets();
     return id;
   }
 
-  static void removeSticker(String id) {
-    customStickers.remove(id);
-    customStickerPaths.remove(id);
+  static void removeSticker(String id) => removeStickers([id]);
+
+  static void removeStickers(Iterable<String> ids) {
+    final gone = ids.toSet();
+    for (final id in gone) {
+      customStickers.remove(id);
+      customStickerPaths.remove(id);
+      stickerNames.remove(id);
+      _write(() => _writer.run(() => File('${_dir!.path}/stickers/${id.substring(3)}.png').delete()));
+    }
+    for (var i = 0; i < mySheets.length; i++) {
+      mySheets[i] = mySheets[i].copyWith(stickers: [for (final s in mySheets[i].stickers) if (!gone.contains(s)) s]);
+    }
+    _saveSheets();
+  }
+
+  static void renameSticker(String id, String name) {
+    name.trim().isEmpty ? stickerNames.remove(id) : stickerNames[id] = name.trim();
+    _saveSheets();
+  }
+
+  /// 新增一張貼紙紙，回傳它的 id。
+  static String addSheet(String name) {
+    final id = newKey();
+    mySheets.add(MySheet(id: id, name: name.trim()));
+    _saveSheets();
+    return id;
+  }
+
+  static void renameSheet(String id, String name) {
+    final i = mySheets.indexWhere((s) => s.id == id);
+    if (i < 0) return;
+    mySheets[i] = mySheets[i].copyWith(name: name.trim());
+    _saveSheets();
+  }
+
+  /// 刪掉貼紙紙；上面的貼紙不刪，回到「未分類」。
+  static void removeSheet(String id) {
+    mySheets.removeWhere((s) => s.id == id);
+    _saveSheets();
+  }
+
+  /// 把 [ids] 移到貼紙紙 [sheet] 最後面（null：移回未分類）。
+  static void moveStickers(Iterable<String> ids, String? sheet) {
+    final move = ids.toSet();
+    for (var i = 0; i < mySheets.length; i++) {
+      mySheets[i] = mySheets[i].copyWith(stickers: [for (final s in mySheets[i].stickers) if (!move.contains(s)) s]);
+    }
+    final i = mySheets.indexWhere((s) => s.id == sheet);
+    if (i >= 0) {
+      mySheets[i] = mySheets[i].copyWith(stickers: [...mySheets[i].stickers, for (final id in ids) if (move.contains(id)) id]);
+    }
+    _saveSheets();
+  }
+
+  static void _saveSheets() {
     changes.value++;
-    _write(() => _writer.run(() => File('${_dir!.path}/stickers/${id.substring(3)}.png').delete()));
+    final json = jsonEncode({'sheets': [for (final s in mySheets) s.toJson()], 'names': stickerNames});
+    _write(() => _writer.writeString(File('${_dir!.path}/sheets.json'), json));
   }
 
   static void addTemplate(CustomTemplate template) {

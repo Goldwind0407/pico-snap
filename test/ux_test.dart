@@ -41,6 +41,8 @@ Future<void> _settleImages(WidgetTester t) async {
 void main() {
   setUp(() {
     customStickers.clear();
+    mySheets.clear();
+    stickerNames.clear();
     customTemplates.clear();
   });
 
