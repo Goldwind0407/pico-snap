@@ -145,7 +145,7 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
       child: Stack(key: _canvasKey, clipBehavior: Clip.none, children: [
         Positioned.fill(child: GestureDetector(
           onTap: () => setState(() => _selected = null),
-          child: FittedBox(child: PhotoStrip(template: strip, photos: samplePhotos)),
+          child: FittedBox(child: PhotoStrip(template: strip)),
         )),
         for (var i = 0; i < _t.stickers.length; i++)
           StickerItem(

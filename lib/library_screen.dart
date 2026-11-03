@@ -272,7 +272,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       for (final (i, t) in customTemplates.indexed.toList().reversed)
         _ItemTile(onDelete: () => _deleteTemplate(t.id), onTap: () => _useTemplate(i), onEdit: () => _editTemplate(t), child: Padding(
           padding: const EdgeInsets.all(10),
-          child: FittedBox(child: PhotoStrip(template: t.template, photos: samplePhotos)),
+          child: FittedBox(child: PhotoStrip(template: t.template)),
         )),
     ],
   );
