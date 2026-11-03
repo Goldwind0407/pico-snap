@@ -8,6 +8,7 @@ import 'package:pico_snap/gallery_screen.dart';
 import 'package:pico_snap/home_screen.dart';
 import 'package:pico_snap/models.dart';
 import 'package:pico_snap/services/my_works.dart';
+import 'package:pico_snap/theme.dart';
 import 'package:pico_snap/widgets/doodle.dart';
 import 'package:pico_snap/widgets/frames.dart';
 
@@ -83,7 +84,7 @@ void main() {
     expect(find.text('儲存預覽版（1400px 內）'), findsOneWidget);
     await t.tap(find.text('刪除'));
     await t.pumpAndSettle();
-    await t.tap(find.widgetWithText(TextButton, '刪除'));
+    await t.tap(find.descendant(of: find.byType(GlassDialog), matching: find.text('刪除')));
     await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
     await t.pumpAndSettle();
     expect(find.text('儲存預覽版（1400px 內）'), findsNothing, reason: '最後一件刪掉就回到作品集');

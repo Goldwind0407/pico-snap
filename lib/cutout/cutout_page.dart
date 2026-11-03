@@ -993,47 +993,35 @@ class _CutoutPageState extends State<CutoutPage> {
 }
 
 /// 去背小技巧。第一次進去背頁會自動跳出來，之後按「？」再看。
-Future<void> showCutoutTips(BuildContext context) => showDialog<void>(
-  context: context,
-  builder: (context) {
+Future<void> showCutoutTips(BuildContext context) => showGlassDialog<void>(
+  context,
+  (context) {
     Widget row(IconData icon, String title, String text) => Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(
           width: 34, height: 34,
-          decoration: const BoxDecoration(color: blush, shape: BoxShape.circle),
-          child: Icon(icon, size: 18, color: coral),
+          decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), shape: BoxShape.circle),
+          child: Icon(icon, size: 18, color: blush),
         ),
         const SizedBox(width: 10),
         Expanded(child: Text.rich(TextSpan(children: [
-          TextSpan(text: '$title\n', style: const TextStyle(fontWeight: FontWeight.w900, color: ink)),
+          TextSpan(text: '$title\n', style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
           TextSpan(text: text),
-        ]), style: const TextStyle(fontSize: 13, height: 1.45, color: muted))),
+        ]), style: const TextStyle(fontSize: 13, height: 1.45, color: GlassDialog.subtle))),
       ]),
     );
-    return Dialog(
-      backgroundColor: cream,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('去背小技巧', style: TextStyle(fontSize: 19, color: ink, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 14),
-          row(Icons.touch_app_outlined, '選主體', '點一下選或不選，可以多選；長按只留按到的那一個。'),
-          row(Icons.content_cut_rounded, '黏在一起', '在兩個人中間畫一條線就能切開。'),
-          row(Icons.auto_fix_off_rounded, '多出來的東西', '選「擦掉」，在上面畫一筆或點一下，會沿著邊緣整塊擦掉。'),
-          row(Icons.brush_rounded, '少了的地方', '選「補回」畫一筆。'),
-          row(Icons.zoom_in_rounded, '細的地方', '兩指放大，打開「細修」用筆刷慢慢修；按住「原圖」對照。'),
-          row(Icons.interests_outlined, '外框', '也可以做成方形、圓形、星形、愛心貼紙。'),
-          const SizedBox(height: 2),
-          SizedBox(width: double.infinity, child: FilledButton(
-            onPressed: () => Navigator.pop(context),
-            style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-            child: const Text('知道了', style: TextStyle(fontWeight: FontWeight.w800)),
-          )),
-        ]),
-      ),
+    return GlassDialog(
+      title: '去背小技巧',
+      actions: [GlassAction('知道了', () => Navigator.pop(context))],
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        row(Icons.touch_app_outlined, '選主體', '點一下選或不選，可以多選；長按只留按到的那一個。'),
+        row(Icons.content_cut_rounded, '黏在一起', '在兩個人中間畫一條線就能切開。'),
+        row(Icons.auto_fix_off_rounded, '多出來的東西', '選「擦掉」，在上面畫一筆或點一下，會沿著邊緣整塊擦掉。'),
+        row(Icons.brush_rounded, '少了的地方', '選「補回」畫一筆。'),
+        row(Icons.zoom_in_rounded, '細的地方', '兩指放大，打開「細修」用筆刷慢慢修；按住「原圖」對照。'),
+        row(Icons.interests_outlined, '外框', '也可以做成方形、圓形、星形、愛心貼紙。'),
+      ]),
     );
   },
 );

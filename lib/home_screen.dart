@@ -70,12 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             },
             trailing: IconButton(tooltip: '刪除草稿', icon: const Icon(Icons.delete_outline), onPressed: () async {
-              final remove = await showDialog<bool>(context: context, builder: (c) => AlertDialog(
-                title: const Text('刪除這份草稿？'), actions: [
-                  TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('取消')),
-                  TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('刪除')),
-                ]));
-              if (remove == true) {
+              if (await confirmDelete(context, '刪除這份草稿？', '刪掉之後就不能再接著編輯了。')) {
                 try { await EditorDrafts.remove(draft.id); } catch (_) {
                   if (context.mounted) showMessage(context, '草稿刪除失敗');
                 }
