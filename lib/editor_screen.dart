@@ -22,6 +22,7 @@ import 'widgets/doodle.dart';
 import 'widgets/filter_thumbs.dart';
 import 'widgets/frames.dart';
 import 'widgets/instant_print.dart';
+import 'widgets/sticker_book_view.dart';
 import 'widgets/sticker_item.dart';
 
 enum _Tool {
@@ -115,7 +116,6 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   late String _category = allStripTemplates[widget.template].category;
   String? _stripCaption;
   String _bubble = 'DREAM';
-  int _pack = 1;
   int _pattern = 0, _backdrop = 1, _format = 3, _selectedCell = 0;
   List<StickerData> _stickers = [];
   /// Brush lines, drawn over everything.
@@ -517,10 +517,10 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     _strokes = [];
   });
 
-  void _addSticker(String sticker) => setState(() {
+  void _addSticker(String sticker, [double scale = 1]) => setState(() {
     _remember();
     final n = _stickers.length;
-    _stickers = [..._stickers, StickerData(sticker: sticker, center: Offset(.5 + (n % 3 - 1) * .14, .4 + (n % 2) * .12))];
+    _stickers = [..._stickers, StickerData(sticker: sticker, scale: scale, center: Offset(.5 + (n % 3 - 1) * .14, .4 + (n % 2) * .12))];
     _selectedSticker = _stickers.length - 1;
   });
 
@@ -751,7 +751,10 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     child: Column(mainAxisSize: MainAxisSize.min, children: [
       const SizedBox(height: 8),
       Container(width: 38, height: 4, decoration: BoxDecoration(color: line, borderRadius: BorderRadius.circular(2))),
-      SizedBox(height: 168, child: switch (_tool) {
+      // The sticker book wants room to show a good part of a sheet; not on
+      // the narrow four-cut strip, which would get so thin that a sticker's
+      // handles stick out past it, where they can't be tapped.
+      SizedBox(height: _tool == _Tool.sticker && widget.mode != EditorMode.fourCut ? max(168.0, MediaQuery.sizeOf(context).height * .36) : 168, child: switch (_tool) {
         _Tool.template => _templateTool(),
         _Tool.layout => _layoutTool(),
         _Tool.pattern => _patternTool(),
@@ -894,49 +897,26 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   );
 
   Widget _stickerTool() {
-    final packs = [('📷', '我的', customStickers.keys.toList()), ...stickerPacks];
-    final mine = _pack == 0;
-    final pack = packs[_pack].$3;
-    return Column(children: [
-      SizedBox(height: 46, child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-        itemCount: packs.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) {
-          final (icon, label, _) = packs[i];
-          final selected = _pack == i;
-          return GestureDetector(
-            onTap: () => setState(() => _pack = i),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: selected ? blush : cream, borderRadius: BorderRadius.circular(17),
-                border: Border.all(color: selected ? blushLine : line),
+    final mine = customStickers.keys.toList();
+    return StickerBookView(
+      onPick: _addSticker,
+      mine: mine.isEmpty
+        ? const Center(child: Text('還沒有自己的貼紙\n可以到首頁下方的「素材」把照片做成貼紙', textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, height: 1.6, color: muted, fontWeight: FontWeight.w600)))
+        : GridView.builder(
+            padding: EdgeInsets.zero,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 6),
+            itemCount: mine.length,
+            itemBuilder: (_, k) => InkWell(
+              onTap: () => _addSticker(mine[k]),
+              child: Container(
+                decoration: const BoxDecoration(border: Border(top: BorderSide(color: line), right: BorderSide(color: line))),
+                padding: const EdgeInsets.all(9),
+                child: StickerVisual(mine[k]),
               ),
-              child: Text('$icon $label', style: TextStyle(fontSize: 13, color: ink, fontWeight: selected ? FontWeight.w800 : FontWeight.w600)),
             ),
-          );
-        },
-      )),
-      if (mine && pack.isEmpty)
-        const Expanded(child: Center(child: Text('還沒有自己的貼紙\n可以到首頁下方的「素材」把照片做成貼紙', textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12, height: 1.6, color: muted, fontWeight: FontWeight.w600))))
-      else Expanded(child: GridView.builder(
-        padding: EdgeInsets.zero,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 6),
-        itemCount: pack.length,
-        itemBuilder: (_, k) => InkWell(
-          onTap: () => _addSticker(pack[k]),
-          child: Container(
-            decoration: const BoxDecoration(border: Border(top: BorderSide(color: line), right: BorderSide(color: line))),
-            padding: const EdgeInsets.all(9),
-            child: StickerVisual(pack[k]),
           ),
-        ),
-      )),
-    ]);
+    );
   }
 
   void _setFilter(PhotoFilter f, {bool all = false}) => setState(() {

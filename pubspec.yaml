@@ -26,6 +26,7 @@ flutter:
     - assets/samples/
     - assets/stickers/
     - assets/templates/
+    - assets/sticker_sheets/
     - assets/instant/
     - assets/luts/
   fonts:

@@ -4,7 +4,9 @@ import 'package:pico_snap/booth_screen.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/home_screen.dart';
 import 'package:pico_snap/models.dart';
-import 'package:pico_snap/widgets/frames.dart';
+import 'package:pico_snap/sticker_book.dart';
+import 'package:pico_snap/widgets/doodle.dart';
+import 'package:pico_snap/widgets/sticker_book_view.dart';
 import 'package:pico_snap/widgets/sticker_item.dart';
 
 void main() {
@@ -48,17 +50,21 @@ void main() {
           await t.tap(f.last);
           await t.pumpAndSettle();
         }
-        // Every sticker pack, then add a hand-drawn sticker from the first one.
-        // Chips may be scrolled off narrow screens; scroll each into view first.
-        final chips = find.ancestor(of: find.text('📷 我的'), matching: find.byType(Scrollable));
-        for (final p in [...stickerPacks.reversed, stickerPacks.first]) {
-          final chip = find.text('${p.$1} ${p.$2}');
-          await t.dragUntilVisible(chip, chips, Offset(p == stickerPacks.first ? 120 : -120, 0));
-          await t.tap(chip);
+        // Every page of the sticker book, then peel the first sticker off the
+        // first sheet. Chips may be scrolled off narrow screens.
+        final chips = find.descendant(of: find.byType(StickerBookView), matching: find.byType(Scrollable)).first;
+        for (final label in [...stickerBooks.reversed.map((b) => b.label), stickerBooks.first.label]) {
+          // Out to the last page, then back towards the first.
+          final back = label != stickerBooks.last.label;
+          await t.dragUntilVisible(find.text(label), chips, Offset(back ? 120 : -120, 0));
+          await t.pumpAndSettle();
+          await t.tap(find.text(label));
           await t.pumpAndSettle();
         }
-        await t.pumpAndSettle();
-        await t.tap(find.byType(StickerVisual).first);
+        final sheet = stickerBooks.first;
+        final page = t.getRect(find.byWidgetPredicate((w) => w is Image && w.image is AssetImage && (w.image as AssetImage).assetName == sheet.sheet));
+        final r = sheet.stickers.first.rect;
+        await t.tapAt(Offset(page.left + r.center.dx * page.width, page.top + r.center.dy * page.height));
         await t.pumpAndSettle();
         expect(find.byType(StickerItem), findsOneWidget);
         await t.drag(find.byType(StickerItem), const Offset(30, 20));
@@ -72,6 +78,11 @@ void main() {
         await t.pumpAndSettle();
         expect(mirrored(), isTrue);
         await t.tap(find.byIcon(Icons.undo_rounded));
+        await t.pumpAndSettle();
+        // To the middle of the canvas, so its handles are on it too (the
+        // four-cut strip is narrow).
+        final canvas = t.getRect(find.byType(DoodleInput).evaluate().isEmpty ? find.byType(InkLayer) : find.byType(DoodleInput));
+        await t.drag(find.byType(StickerItem), canvas.center - t.getCenter(find.byType(StickerItem)));
         await t.pumpAndSettle();
         await t.tap(find.byType(StickerItem));
         await t.pumpAndSettle();

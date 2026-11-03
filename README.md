@@ -76,7 +76,9 @@
 
 ### 貼紙
 
-- 16 款手繪貼紙和一些 emoji，加上自己做的貼紙（「📷 我的」）。
+- **貼紙本**：下方是一本貼紙本，一頁一張貼紙紙（亮片、甜點、日本風、吉伊卡哇、寶可夢、Keroro、中職），左右滑或點上方標籤換頁，貼紙紙可以上下滑。點一張貼紙，它會從紙上浮起來貼到作品上；紙上比較大的貼紙，貼上去也比較大。最前面一頁「📷 我的」是自己做的貼紙。
+- 貼紙紙是生成的整張圖（灰色底紙、白色模切邊），用程式把每張貼紙切下來（`assets/sticker_sheets/`、`lib/sticker_book.dart`）。新增一本：照同樣規格生一張 3:4 的貼紙紙，切好之後加進 `stickerBooks`。
+- 四格拍貼的拍貼條很窄，貼紙放在靠邊的地方時，把手可能超出拍貼條、點不到，要先把貼紙拖回中間。
 - 拖曳、兩指縮放和旋轉；右下角把手調整大小和角度，右上角左右翻轉，左上角（紅框）刪除。把手的觸控範圍是 44 點，比畫出來的圓大，不容易按不到。
 
 ### 濾鏡
@@ -187,6 +189,7 @@
 
 - 拍立得底片的 **Keroro 框、寶可夢框、樂天桃猿框**：用了別人的角色、名字、吉祥物和商標（`lib/widgets/instant_print.dart` 的 `FilmStock`、`assets/instant/frame_*.png`）。
 - `assets/luts/fuji_classic_neg_raw.cube`：濃烈負片已經改用自己的配方，但這個 Fujifilm 檔案還打包在 App 裡（只是借它的檔名當 id）。上架前要把 id 改成不靠檔案、再刪掉它。
+- 貼紙本：「亮片」幾乎照抄 Pico Cam 的付費貼紙；「日本風」裡有哥吉拉；「吉伊卡哇」、「寶可夢」、「Keroro」是別人的角色；「中職」是球隊商標（`lib/sticker_book.dart`）。只有「甜點」可以直接上架。
 - `assets/samples/` 的佔位人物照片、很像 instax mini 7 的相機外型（見「素材來源」）。
 
 ## 專案結構
@@ -212,6 +215,7 @@
 | `lib/widgets/frames.dart` | 拍貼條、照片格（移動縮放）、紙膠帶、格紋等元件 |
 | `lib/widgets/instant_print.dart` | 拍立得底片與顯影（相機和拼貼共用） |
 | `lib/widgets/sticker_item.dart` | 可拖曳、縮放、旋轉、翻轉的貼紙 |
+| `lib/sticker_book.dart`、`lib/widgets/sticker_book_view.dart` | 貼紙本的資料和畫面 |
 | `lib/widgets/doodle.dart` | 畫筆：線條、筆的樣式、橡皮擦 |
 | `lib/cutout/` | 去背：頁面、手機內建 AI、GrabCut、筆刷、外框形狀（部分移植自 color_pic） |
 | `lib/services/photo_save_service.dart` | 存圖片、影片到相簿 |
@@ -222,7 +226,8 @@
 | `lib/services/file_store.dart` | 一次寫一個檔案、先寫暫存檔再換上去 |
 | `android/app/src/main/kotlin/com/goldwind/picosnap/` | Android 原生：ML Kit 主體分割、影片編碼 |
 | `ios/Runner/AppDelegate.swift` | iPhone 原生：Vision 主體分割、影片編碼 |
-| `assets/stickers/` | 手繪貼紙 PNG |
+| `assets/stickers/` | 舊的手繪貼紙 PNG（模板的裝飾和自己設計模板用） |
+| `assets/sticker_sheets/` | 貼紙本：整張貼紙紙和切下來的每一張貼紙 |
 | `assets/templates/` | 拍貼機模板（照片格已去背的 WebP） |
 | `assets/instant/` | 拍立得相機（5 色）和 6 種底片（3:4，照片格透明） |
 | `assets/luts/` | 濾鏡檔（`.cube`、Hald PNG） |
