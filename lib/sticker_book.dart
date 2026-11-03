@@ -71,7 +71,7 @@ const stickerBooks = <StickerSheet>[
     SheetSticker('assets/sticker_sheets/sweets_16.webp', Rect.fromLTWH(0.5073, 0.8037, 0.2165, 0.1575)),
     SheetSticker('assets/sticker_sheets/sweets_17.webp', Rect.fromLTWH(0.7556, 0.7296, 0.1897, 0.23)),
   ]),
-  StickerSheet('word', '文字', 'assets/sticker_sheets/word.webp', 0.7467, [
+  StickerSheet('word', '英文字', 'assets/sticker_sheets/word.webp', 0.7467, [
     SheetSticker('assets/sticker_sheets/word_01.webp', Rect.fromLTWH(0.6468, 0.0667, 0.0999, 0.0704)),
     SheetSticker('assets/sticker_sheets/word_02.webp', Rect.fromLTWH(0.8164, 0.0437, 0.1233, 0.0867)),
     SheetSticker('assets/sticker_sheets/word_03.webp', Rect.fromLTWH(0.0597, 0.0442, 0.5262, 0.1617)),
