@@ -265,16 +265,6 @@ const backdrops = <(String, Color)>[
 
 const formats = <(String, double)>[('9:16', 9 / 16), ('1:1', 1), ('4:5', 4 / 5), ('3:4', 3 / 4)];
 
-String _hand(String name) => 'assets/stickers/$name.png';
-
-/// Sticker packs: hand-drawn stickers are asset paths, the rest are emoji.
-/// Each entry is (chip icon, label, stickers).
-final stickerPacks = <(String, String, List<String>)>[
-  ('✨', '最愛', [for (final n in ['bunny', 'bear', 'ice_cream', 'strawberry', 'egg', 'tulip', 'daisy', 'cloud', 'star', 'heart', 'bow', 'sparkle', 'cherry', 'cake', 'camera', 'letter']) _hand(n)]),
-  ('🐱', '動物', [_hand('bunny'), _hand('bear'), '🐱', '🐶', '🐥', '🐹', '🦄', '🐼', '🐨', '🐸', '🐧', '🦊']),
-  ('🌸', '裝飾', [_hand('star'), _hand('heart'), _hand('bow'), _hand('sparkle'), _hand('cloud'), _hand('letter'), _hand('camera'), _hand('daisy'), _hand('tulip'), '🌈', '💌', '🫧']),
-  ('🍰', '食物', [_hand('ice_cream'), _hand('strawberry'), _hand('egg'), _hand('cherry'), _hand('cake'), '🧁', '🍩', '🍑', '🧋', '🍪', '🍭', '🥞']),
-];
 
 /// Stickers the user cut out of their own photos on the 我的素材 page, keyed
 /// by sticker id (`my:<key>`) → PNG. Managed (and saved) by MyLibrary.

@@ -4,6 +4,7 @@ import 'models.dart';
 import 'services/my_library.dart';
 import 'theme.dart';
 import 'widgets/frames.dart';
+import 'widgets/sticker_book_view.dart';
 import 'widgets/sticker_item.dart';
 
 const _palette = [
@@ -54,7 +55,6 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
   late final _caption = TextEditingController(text: _t.caption);
   final _canvasKey = GlobalKey();
   _Tab _tab = _Tab.color;
-  int _pack = 0;
   int? _selected;
   bool _edited = false;
 
@@ -96,9 +96,9 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
     _update(c.copyWith(id: _t.id));
   }
 
-  void _addSticker(String id) {
+  void _addSticker(String id, [double scale = 1]) {
     final n = _t.stickers.length;
-    _update(_t.copyWith(stickers: [..._t.stickers, StickerData(sticker: id, center: Offset(.5 + (n % 3 - 1) * .2, .3 + (n % 4) * .12))]));
+    _update(_t.copyWith(stickers: [..._t.stickers, StickerData(sticker: id, scale: scale, center: Offset(.5 + (n % 3 - 1) * .2, .3 + (n % 4) * .12))]));
     _selected = _t.stickers.length - 1;
   }
 
@@ -173,7 +173,8 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
       boxShadow: [BoxShadow(color: ink.withValues(alpha: .07), blurRadius: 20, offset: const Offset(0, -4))],
     ),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
-      SizedBox(height: 150, child: switch (_tab) {
+      // The sticker book wants room to show part of a sheet.
+      SizedBox(height: _tab == _Tab.sticker ? 230 : 150, child: switch (_tab) {
         _Tab.start => _startTool(),
         _Tab.color => _colorTool(),
         _Tab.pattern => _chips([for (final (p, l) in _patterns) (l, _t.pattern == p, () => _update(_t.copyWith(pattern: p)))]),
@@ -319,33 +320,26 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
   );
 
   Widget _stickerTool() {
-    final mine = customStickers.isNotEmpty;
-    // The user's own stickers come last so a built-in pack is shown first.
-    final packs = [...stickerPacks, if (mine) ('📷', '我的', customStickers.keys.toList())];
-    final pack = packs[_pack.clamp(0, packs.length - 1)].$3;
-    return Column(children: [
-      SizedBox(height: 44, child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-        itemCount: packs.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) => _Chip(label: '${packs[i].$1} ${packs[i].$2}', selected: _pack == i, onTap: () => setState(() => _pack = i)),
-      )),
-      Expanded(child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        itemCount: pack.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 6),
-        itemBuilder: (_, i) => GestureDetector(
-          onTap: () => _addSticker(pack[i]),
-          child: Container(
-            width: 60, padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: cream, borderRadius: BorderRadius.circular(12), border: Border.all(color: line)),
-            child: StickerVisual(pack[i]),
+    final mine = customStickers.keys.toList();
+    return StickerBookView(
+      onPick: _addSticker,
+      mine: mine.isEmpty
+        ? const Center(child: Text('還沒有自己的貼紙', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)))
+        : ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            itemCount: mine.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 6),
+            itemBuilder: (_, i) => GestureDetector(
+              onTap: () => _addSticker(mine[i]),
+              child: Container(
+                width: 60, padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: cream, borderRadius: BorderRadius.circular(12), border: Border.all(color: line)),
+                child: StickerVisual(mine[i]),
+              ),
+            ),
           ),
-        ),
-      )),
-    ]);
+    );
   }
 }
 
