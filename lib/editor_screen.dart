@@ -185,7 +185,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
 
   String get _title => switch (widget.mode) {
     EditorMode.fourCut => 'Four Cuts',
-    EditorMode.polaroid => 'Polaroid',
+    EditorMode.polaroid => 'Collage',
     EditorMode.sticker => 'Sticker',
   };
 

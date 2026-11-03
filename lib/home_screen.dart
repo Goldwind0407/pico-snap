@@ -84,6 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
       const SizedBox(height: 30),
       _pad(const _SectionTitle(title: 'Create', note: '選一種玩法')),
       const SizedBox(height: 14),
+      // Two by two; each row's cards share a height and grow with large text.
       _pad(IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Expanded(child: _ModeCard(
           label: '四格拍貼', sub: 'Four Cuts', color: blush, border: blushLine,
@@ -93,6 +94,13 @@ class _HomeScreenState extends State<HomeScreen> {
         Expanded(child: _ModeCard(
           label: '拍立得', sub: 'Polaroid', color: lilac, border: lilacLine,
           art: const _PolaroidArt(), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolaroidCameraScreen())),
+        )),
+      ]))),
+      const SizedBox(height: 12),
+      _pad(IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Expanded(child: _ModeCard(
+          label: '拍立得拼貼', sub: 'Collage', color: sky, border: const Color(0xFF9DC0D6),
+          art: const _CollageArt(), onTap: () => _open(context, EditorMode.polaroid),
         )),
         const SizedBox(width: 12),
         Expanded(child: _ModeCard(
@@ -261,6 +269,24 @@ class _PolaroidArt extends StatelessWidget {
     Positioned(left: 6, top: 0, child: Transform.rotate(angle: -.08, child: SizedBox(width: 56, child: FittedBox(child: PolaroidCard(image: samplePhotos[1], caption: '', color: blush))))),
     const Positioned(right: -6, top: 4, child: Sparkle(size: 11)),
     const Positioned(left: -6, bottom: 8, child: Sparkle(size: 9)),
+  ]));
+}
+
+/// Prints laid out in a zigzag with tape, like the collage.
+class _CollageArt extends StatelessWidget {
+  const _CollageArt();
+
+  Widget _print(int photo, double angle) => Transform.rotate(angle: angle, child: SizedBox(
+    width: 40, child: FittedBox(child: PolaroidCard(image: samplePhotos[photo], caption: '', color: Colors.white)),
+  ));
+
+  @override
+  Widget build(BuildContext context) => SizedBox(width: 108, height: 74, child: Stack(clipBehavior: Clip.none, children: [
+    Positioned(left: 0, top: 2, child: _print(0, -.12)),
+    Positioned(left: 34, top: 12, child: _print(2, .08)),
+    Positioned(left: 68, top: 0, child: _print(3, -.06)),
+    const Positioned(left: 44, top: 6, child: WashiTape(width: 22, height: 8, angle: .1)),
+    const Positioned(right: -4, bottom: 2, child: Sparkle(size: 10)),
   ]));
 }
 
