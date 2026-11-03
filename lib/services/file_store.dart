@@ -20,7 +20,17 @@ class FileWriter {
   static Future<void> _replace(File file, Future<void> Function(File tmp) write) async {
     final tmp = File('${file.path}.tmp');
     await write(tmp);
-    await tmp.rename(file.path);
+    // Windows briefly refuses to replace a file another program (antivirus,
+    // indexer) has just looked at; try again a moment later.
+    for (var attempt = 0;; attempt++) {
+      try {
+        await tmp.rename(file.path);
+        return;
+      } on FileSystemException {
+        if (attempt >= 4) rethrow;
+        await Future<void>.delayed(Duration(milliseconds: 20 * (attempt + 1)));
+      }
+    }
   }
 }
 
