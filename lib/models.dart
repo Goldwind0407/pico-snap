@@ -129,9 +129,9 @@ const stripTemplates = [
   StripTemplate(name: 'Kodak Yellow Paper', category: '底片復古', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
     art: ArtFrame('assets/templates/kodak-yellow-b.webp', 0.3678, [Rect.fromLTWH(0.2059, 0.0407, 0.586, 0.1882), Rect.fromLTWH(0.2081, 0.2562, 0.5827, 0.1873), Rect.fromLTWH(0.2081, 0.4706, 0.5816, 0.1873), Rect.fromLTWH(0.207, 0.6853, 0.5838, 0.1873)])),
   // 黑白
-  StripTemplate(name: 'Darkroom Paper', category: '黑白', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4), mono: true,
+  StripTemplate(name: 'Darkroom Paper', category: '黑白', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
     art: ArtFrame('assets/templates/darkroom-b.webp', 0.3664, [Rect.fromLTWH(0.214, 0.0464, 0.571, 0.1812), Rect.fromLTWH(0.2151, 0.26, 0.5677, 0.1816), Rect.fromLTWH(0.2172, 0.4728, 0.5633, 0.18), Rect.fromLTWH(0.2151, 0.6848, 0.5677, 0.1812)])),
-  StripTemplate(name: 'Paper Mono Paper', category: '黑白', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4), mono: true,
+  StripTemplate(name: 'Paper Mono Paper', category: '黑白', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
     art: ArtFrame('assets/templates/paper-mono-b.webp', 0.3693, [Rect.fromLTWH(0.2061, 0.0415, 0.5812, 0.1869), Rect.fromLTWH(0.2061, 0.2557, 0.5812, 0.1865), Rect.fromLTWH(0.2061, 0.47, 0.5812, 0.1865), Rect.fromLTWH(0.2072, 0.6843, 0.5823, 0.1865)])),
   // 生日派對
   StripTemplate(name: 'Pastel Party Paper', category: '生日派對', caption: '', frame: Colors.white, cell: Color(0xFFEDEAE4),
