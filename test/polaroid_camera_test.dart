@@ -65,7 +65,7 @@ void main() {
     expect(find.descendant(of: caption, matching: find.byType(Text)), findsNothing, reason: '白邊一開始是空的');
     expect(find.byType(DoodleInput), findsNothing);
     final small = t.getRect(find.byType(InstantPrint)).width;
-    expect(find.text('簽名、寫日期，或貼幾張貼紙'), findsOneWidget);
+    expect(find.text('換個濾鏡、簽名寫日期，或貼幾張貼紙'), findsOneWidget);
     await t.tap(find.text('手寫'));
     await t.pumpAndSettle();
     expect(find.byType(DoodleInput), findsOneWidget, reason: '整張相片都可以寫');

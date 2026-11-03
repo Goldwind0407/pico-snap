@@ -9,7 +9,7 @@ import 'package:pico_snap/filters.dart';
 import 'package:pico_snap/live_filter.dart';
 import 'package:pico_snap/models.dart';
 import 'package:pico_snap/polaroid_camera_screen.dart';
-import 'package:pico_snap/theme.dart';
+import 'package:pico_snap/widgets/filter_thumbs.dart';
 import 'package:pico_snap/widgets/instant_print.dart';
 
 import 'test_filters.dart';
@@ -100,51 +100,41 @@ void main() {
     expect(find.text('已套用到全部'), findsOneWidget);
   });
 
-  testWidgets('相機：選底片時選的濾鏡會印在相片上', (t) async {
+  testWidgets('相機：選底片時沒有濾鏡；顯影完看著相片選濾鏡，印在相片上', (t) async {
     t.view.physicalSize = const Size(390, 844);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);
     final photo = (await t.runAsync(_photo))!;
     await t.pumpWidget(MaterialApp(home: PolaroidCameraScreen(pickPhoto: () async => photo, motion: const Stream.empty())));
     await t.pump();
-    await t.scrollUntilVisible(find.text('測試青橙'), 200, scrollable: find.byWidget(t.widget(find.ancestor(of: find.text('原圖'), matching: find.byType(Scrollable)).first)));
-    await t.tap(find.text('測試青橙'));
-    await t.pump();
+    expect(find.text('原圖'), findsNothing, reason: '還沒拍，看不出濾鏡效果');
     await t.tap(find.text('開始拍照'));
     await t.pump();
     await t.tap(find.text('從相簿'));
     await t.pump();
     await t.pump(const Duration(seconds: 3));
-    expect(t.widget<InstantPrint>(find.byType(InstantPrint)).filter?.id, 'test_teal');
-    await t.pumpWidget(const SizedBox());
-    await t.pump(const Duration(seconds: 3));
-  });
-
-  testWidgets('相機：拍完換底片，濾鏡還是選好的那個', (t) async {
-    t.view.physicalSize = const Size(390, 844);
-    t.view.devicePixelRatio = 1;
-    addTearDown(t.view.reset);
-    final photo = (await t.runAsync(_photo))!;
-    await t.pumpWidget(MaterialApp(home: PolaroidCameraScreen(pickPhoto: () async => photo, motion: const Stream.empty())));
-    await t.pump();
-    final row = find.byWidget(t.widget(find.ancestor(of: find.text('原圖'), matching: find.byType(Scrollable)).first));
-    await t.scrollUntilVisible(find.text('測試褪色'), 200, scrollable: row);
-    await t.tap(find.text('測試褪色'));
-    await t.pump();
-    await t.tap(find.text('開始拍照'));
-    await t.pump();
-    await t.tap(find.text('從相簿'));
-    await t.pump();
-    await t.pump(const Duration(seconds: 3));
+    expect(t.widget<InstantPrint>(find.byType(InstantPrint)).filter?.id, photoFilters.first.id, reason: '拍出來先是原圖');
     await t.tap(find.byType(InstantPrint));
     await t.pumpAndSettle();
+    await t.tap(find.text('濾鏡'));
+    await t.pumpAndSettle();
+    expect(find.byType(FilterThumbs), findsOneWidget, reason: '每個濾鏡都是這張相片的小圖');
+    await t.scrollUntilVisible(find.text('測試青橙'), 200, scrollable: find.descendant(of: find.byType(FilterThumbs), matching: find.byType(Scrollable)));
+    await t.tap(find.text('測試青橙'));
+    await t.pump();
+    expect(t.widget<InstantPrint>(find.byType(InstantPrint)).filter?.id, 'test_teal');
+    await t.tap(find.text('選好了'));
+    await t.pumpAndSettle();
+    expect(find.text('測試青橙'), findsOneWidget, reason: '按鈕寫著選了哪個濾鏡');
+    // 再拍一張又從原圖開始
     await t.tap(find.text('再拍一張'));
     await t.pumpAndSettle();
-    await t.tap(find.text('換底片'));
-    await t.pumpAndSettle();
-    await t.scrollUntilVisible(find.text('測試褪色'), 200, scrollable: find.byWidget(t.widget(find.ancestor(of: find.text('原圖'), matching: find.byType(Scrollable)).first)));
-    final chip = find.ancestor(of: find.text('測試褪色'), matching: find.byType(AnimatedContainer));
-    expect((t.widget<AnimatedContainer>(chip).decoration! as BoxDecoration).color, ink, reason: '選中的濾鏡還是選著');
+    await t.tap(find.text('從相簿'));
+    await t.pump();
+    await t.pump(const Duration(seconds: 3));
+    expect(t.widget<InstantPrint>(find.byType(InstantPrint)).filter?.id, photoFilters.first.id);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 3));
   });
 
   group('底片處理', () {
