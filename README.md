@@ -86,9 +86,10 @@
 | 濾鏡 | 來源 |
 |---|---|
 | 原圖 | |
-| 濃烈負片 | Fujifilm 的 LUT，**只供測試**，上架前要拿掉 |
+| 韓系奶油 | 調色配方（`lib/filter_recipes.dart`）：暖白、微抬黑位、綠色和藍色降飽和 |
+| 濃烈負片 | 調色配方（`lib/filter_recipes.dart`）加細顆粒；沿用舊的 Fujifilm 檔名當 id，讓舊草稿還找得到 |
 | 日系街拍 | `.cube` LUT，加輕微顆粒、暗角、柔化、光暈 |
-| 冷調、暖調、柔軟、深秋、膠片、青橙 | 自己在修圖 App 調的 Hald 圖（`design/hald/`） |
+| 冷調、暖調、柔軟、深秋、冷暖對比、復古柔和、馬卡龍、賽博朋克、黑白 | 自己在修圖 App 調的 Hald 圖（`design/hald/`） |
 
 調色引擎、底片效果和讀調色檔的功能都在，新濾鏡可以寫成調色配方（`lib/filters.dart` 的 `photoFilters`），或放調色檔進 `assets/luts/`。
 
@@ -125,7 +126,8 @@
   - 濾鏡名字用我們自己的，不用 Kodak、Fuji、Polaroid 等商標。
 - **相機廠的 Log LUT**（例如 Fujifilm 給 GFX ETERNA 55 的 `FLog2_to_*.cube`）是給 F-Log2 影片用的。直接套在手機照片上會變得高對比、高飽和，目前就這樣放了 `fuji_classic_neg_raw`（濃烈負片）**只供自己測試**：這是 Fujifilm 的檔案，上架前要拿掉。想要接近相機原本的樣子，可以用 `python design/flog2_bake.py <Fuji 的 .cube> assets/luts/<名字>.cube "<標題>" 1.0` 先把 sRGB 換成 F-Gamut／F-Log2 再接上它（最後的數字是曝光倍率）。
 - **授權**：`assets/luts/` 裡的檔案會進 Git。網路上的免費 LUT 大多只能自己用來調色、**不能放進 App 散布或販售**（例如 RocketStock 的 35 Free LUTs 明文禁止；Shutterstock 的免費包沒附授權）；上架前確認每個檔案都能散布。別的 App 內建的濾鏡也不要用 Hald 圖複製過來。
-- **Hald 圖用 JPEG 匯出時**：壓縮會讓每一格顏色帶一點雜訊，套在平滑的天空、膚色上可能出現色塊。放進 `assets/luts/` 前先把 64³ 的表輕微平滑、存成無損 PNG（目前的 6 張就是這樣處理的）。
+- **調 Hald 圖時只能動顏色**（曲線、色溫、HSL、飽和度等）。顆粒、柔化、模糊、暗角、紋理這類跟位置有關的效果會把色卡打亂，套到照片上會變成雜色或完全錯的顏色；這些效果改寫在 `lutLooks` 裡。
+- **Hald 圖用 JPEG 匯出時**：壓縮會讓每一格顏色帶一點雜訊，套在平滑的天空、膚色上可能出現色塊。放進 `assets/luts/` 前先把 64³ 的表輕微平滑、存成無損 PNG（目前的色卡都是這樣處理的）。
 
 ### 去背
 
@@ -184,7 +186,7 @@
 這些現在放在 App 裡只是為了自己測試，**沒有授權，不能上架**：
 
 - 拍立得底片的 **Keroro 框、寶可夢框、樂天桃猿框**：用了別人的角色、名字、吉祥物和商標（`lib/widgets/instant_print.dart` 的 `FilmStock`、`assets/instant/frame_*.png`）。
-- **濃烈負片** 濾鏡：Fujifilm 的 LUT（`assets/luts/fuji_classic_neg_raw.cube`）。
+- `assets/luts/fuji_classic_neg_raw.cube`：濃烈負片已經改用自己的配方，但這個 Fujifilm 檔案還打包在 App 裡（只是借它的檔名當 id）。上架前要把 id 改成不靠檔案、再刪掉它。
 - `assets/samples/` 的佔位人物照片、很像 instax mini 7 的相機外型（見「素材來源」）。
 
 ## 專案結構

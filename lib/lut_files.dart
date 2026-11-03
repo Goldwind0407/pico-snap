@@ -115,8 +115,11 @@ const lutLooks = <String, LutLook>{
   'warm': LutLook('暖調'),
   'soft': LutLook('柔軟', soften: .32),
   'late_autumn': LutLook('深秋'),
-  'film': LutLook('膠片', grain: .22, soften: .12, halation: .08),
-  'teal_orange': LutLook('青橙'),
+  'warm_cool': LutLook('冷暖對比'),
+  'retro_soft': LutLook('復古柔和'),
+  'macaron': LutLook('馬卡龍'),
+  'cyberpunk': LutLook('賽博朋克'),
+  'mono': LutLook('黑白'),
 };
 
 /// A LUT as read from a file: [size]³ entries of r, g, b (0–1), blue
