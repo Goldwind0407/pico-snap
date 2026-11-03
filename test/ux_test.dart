@@ -84,22 +84,28 @@ void main() {
     expect(find.byWidgetPredicate((w) => w is InstantPrint && w.film == FilmStock.black), findsNWidgets(4));
   });
 
-  testWidgets('相機：選黑底片拍出來就是黑底片，做成拼貼也帶過去', (t) async {
+  testWidgets('相機：選黑底片拍出來就是黑底片；機身顏色在設定裡換', (t) async {
     final photo = (await t.runAsync(_photo))!;
     await _phone(t, PolaroidCameraScreen(pickPhoto: () async => photo, motion: const Stream.empty()));
     await t.tap(find.text('黑底片'));
     await t.pump();
+    expect(t.widget<InstantPrint>(find.byType(InstantPrint)).film, FilmStock.black, reason: '選的底片放大給你看');
+    await t.tap(find.byTooltip('設定'));
+    await t.pumpAndSettle();
+    expect(find.text('相機顏色'), findsOneWidget);
+    await t.tap(find.text('薄荷'));
+    await t.pumpAndSettle();
+    await t.tapAt(const Offset(195, 60));
+    await t.pumpAndSettle();
+    await t.tap(find.text('開始拍照'));
+    await t.pump();
+    expect(find.byWidgetPredicate((w) => w is Image && w.image is AssetImage && (w.image as AssetImage).assetName == 'assets/instant/camera_mint.png'), findsOneWidget);
     await t.tap(find.text('從相簿'));
     await t.pump();
     await t.pump(const Duration(seconds: 3));
     expect(t.widget<InstantPrint>(find.byType(InstantPrint)).film, FilmStock.black);
-    await t.tap(find.byType(InstantPrint));
-    await t.pumpAndSettle();
-    await t.tap(find.text('再拍一張'));
-    await t.pumpAndSettle();
-    await t.tap(find.text('做成拼貼'));
-    await t.pumpAndSettle();
-    expect(t.widget<EditorScreen>(find.byType(EditorScreen)).films, [FilmStock.black]);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 3));
   });
 
   testWidgets('相機：下次打開還是上次選的底片', (t) async {
@@ -109,6 +115,9 @@ void main() {
     await t.pump();
     await t.pumpWidget(const SizedBox());
     await _phone(t, PolaroidCameraScreen(pickPhoto: () async => photo, motion: const Stream.empty()));
+    expect(t.widget<InstantPrint>(find.byType(InstantPrint)).film, FilmStock.black);
+    await t.tap(find.text('開始拍照'));
+    await t.pump();
     await t.tap(find.text('從相簿'));
     await t.pump();
     await t.pump(const Duration(seconds: 3));

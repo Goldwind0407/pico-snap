@@ -19,9 +19,13 @@ class StickerItem extends StatefulWidget {
   final VoidCallback onSelect, onDelete, onFlip, onEditStart;
   final ValueChanged<StickerData> onChanged;
   final Offset Function(Offset global) toLocal;
+  /// How much the canvas is magnified on screen; the handles shrink by as
+  /// much so they keep their fingertip size.
+  final double zoom;
   const StickerItem({
     super.key, required this.data, required this.canvas, required this.selected, required this.onSelect,
     required this.onDelete, required this.onFlip, required this.onEditStart, required this.onChanged, required this.toLocal,
+    this.zoom = 1,
   });
 
   @override
@@ -64,13 +68,14 @@ class _StickerItemState extends State<StickerItem> {
   @override
   Widget build(BuildContext context) {
     final s = _baseSize * widget.data.scale;
-    const h = StickerItem.handle;
+    final h = StickerItem.handle / widget.zoom;
+    Widget sized(Widget handle) => SizedBox.square(dimension: h * 2, child: FittedBox(child: handle));
     final c = _centerPx;
     return Positioned(
       left: c.dx - s / 2 - h, top: c.dy - s / 2 - h, width: s + h * 2, height: s + h * 2,
       child: Transform.rotate(angle: widget.data.rotation, child: Stack(children: [
         Positioned.fill(child: Padding(
-          padding: const EdgeInsets.all(h),
+          padding: EdgeInsets.all(h),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: widget.onSelect,
@@ -83,22 +88,22 @@ class _StickerItemState extends State<StickerItem> {
           ),
         )),
         if (widget.selected) ...[
-          const Positioned(left: h - 5, bottom: h - 5, child: _CornerDot()),
+          Positioned(left: h - 5 / widget.zoom, bottom: h - 5 / widget.zoom, child: SizedBox.square(dimension: 10 / widget.zoom, child: const FittedBox(child: _CornerDot()))),
           Positioned(left: 0, top: 0, child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: widget.onDelete,
-            child: const _Handle(label: '刪除貼紙', delete: true, child: Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFB4483C))),
+            child: sized(const _Handle(label: '刪除貼紙', delete: true, child: Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFB4483C)))),
           )),
           Positioned(right: 0, top: 0, child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: widget.onFlip,
-            child: const _Handle(label: '左右翻轉', child: Icon(Icons.flip_rounded, size: 15, color: ink)),
+            child: sized(const _Handle(label: '左右翻轉', child: Icon(Icons.flip_rounded, size: 15, color: ink))),
           )),
           Positioned(right: 0, bottom: 0, child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onPanStart: (_) => widget.onEditStart(),
             onPanUpdate: (d) => _onHandleUpdate(d, pi / 4),
-            child: const _Handle(label: '拖曳縮放、旋轉', child: Icon(Icons.open_in_full_rounded, size: 12, color: ink)),
+            child: sized(const _Handle(label: '拖曳縮放、旋轉', child: Icon(Icons.open_in_full_rounded, size: 12, color: ink))),
           )),
         ],
       ])),

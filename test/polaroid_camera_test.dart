@@ -5,11 +5,13 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/polaroid_camera_screen.dart';
 import 'package:pico_snap/services/photo_save_service.dart';
 import 'package:pico_snap/widgets/doodle.dart';
 import 'package:pico_snap/widgets/instant_print.dart';
+import 'package:pico_snap/widgets/sticker_item.dart';
+import 'package:pico_snap/widgets/sticker_book_view.dart';
+import 'package:pico_snap/sticker_book.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 Future<Uint8List> _photo() async {
@@ -26,22 +28,22 @@ void main() {
     expect(developFilter(.5), isNot(developFilter(1)), reason: '中途還沒完全顯影');
   });
 
-  testWidgets('沒有相機：顯示說明；從相簿選 → 出片 → 顯影 → 存檔、做成拼貼', (t) async {
+  testWidgets('先選底片；沒有相機：顯示說明；從相簿選 → 出片 → 顯影 → 手寫、貼紙 → 存檔', (t) async {
     t.view.physicalSize = const Size(390, 844);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);
     final photo = (await t.runAsync(_photo))!;
     // 測試裡沒有相機外掛
     await t.pumpWidget(MaterialApp(home: PolaroidCameraScreen(pickPhoto: () async => photo, motion: const Stream.empty())));
+    await t.tap(find.text('開始拍照'));
+    await t.pump();
     for (var i = 0; i < 40 && find.textContaining('從相簿選照片').evaluate().isEmpty; i++) {
       await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 25)));
       await t.pump();
     }
     expect(find.textContaining('從相簿選照片'), findsOneWidget);
-    await t.tap(find.text('做成拼貼'));
-    await t.pump();
-    expect(find.text('先拍一張，再做成拼貼'), findsOneWidget);
-    await t.pump(const Duration(seconds: 5));
+    expect(find.text('做成拼貼'), findsNothing, reason: '拍立得沒有拼貼了');
+    expect(find.text('濾鏡'), findsNothing, reason: '拍照時只有取景框和快門');
 
     await t.tap(find.text('從相簿'));
     await t.pump();
@@ -63,8 +65,8 @@ void main() {
     expect(find.descendant(of: caption, matching: find.byType(Text)), findsNothing, reason: '白邊一開始是空的');
     expect(find.byType(DoodleInput), findsNothing);
     final small = t.getRect(find.byType(InstantPrint)).width;
-    expect(find.text('簽名、寫日期，或畫點小塗鴉'), findsOneWidget);
-    await t.tap(find.text('在相片上手寫'));
+    expect(find.text('簽名、寫日期，或貼幾張貼紙'), findsOneWidget);
+    await t.tap(find.text('手寫'));
     await t.pumpAndSettle();
     expect(find.byType(DoodleInput), findsOneWidget, reason: '整張相片都可以寫');
     expect(t.getRect(find.byType(InstantPrint)).width, greaterThan(small * 1.2), reason: '寫字時相片放大');
@@ -85,7 +87,21 @@ void main() {
     expect(written().single.points.length, greaterThan(4));
     expect(written().single.color, FilmStock.white.pen, reason: '白底片預設黑筆');
     expect(find.text('修改手寫'), findsOneWidget, reason: '寫過之後按鈕改成修改');
-    expect(find.text('簽名、寫日期，或畫點小塗鴉'), findsNothing);
+
+    // 貼貼紙：相片放大，下方換成貼紙本，點一張貼上去
+    await t.tap(find.text('貼貼紙'));
+    await t.pumpAndSettle();
+    expect(find.byType(StickerBookView), findsOneWidget);
+    final sheet = stickerBooks.first;
+    final page = t.getRect(find.byWidgetPredicate((w) => w is Image && w.image is AssetImage && (w.image as AssetImage).assetName == sheet.sheet));
+    final r = sheet.stickers.first.rect;
+    await t.tapAt(Offset(page.left + r.center.dx * page.width, page.top + r.center.dy * page.height));
+    await t.pumpAndSettle();
+    expect(find.byType(StickerItem), findsOneWidget);
+    await t.tap(find.text('貼好了'));
+    await t.pumpAndSettle();
+    expect(find.byType(StickerItem), findsOneWidget, reason: '貼紙留在相片上');
+    expect(find.text('修改貼紙'), findsOneWidget);
 
     // 存檔：測試裡沒有相簿外掛，會顯示錯誤但不會當掉
     await t.tap(find.text('存到相簿'));
@@ -97,16 +113,12 @@ void main() {
 
     await t.tap(find.text('再拍一張'));
     await t.pumpAndSettle();
-    expect(find.text('1'), findsOneWidget, reason: '左下角有一張拍好的');
-    await t.tap(find.text('做成拼貼'));
+    expect(find.text('從相簿'), findsOneWidget, reason: '回到拍照');
+    expect(find.byType(StickerItem), findsNothing);
+    // 返回：先回到選底片
+    await t.binding.handlePopRoute();
     await t.pumpAndSettle();
-    expect(find.byType(EditorScreen), findsOneWidget);
-    final editor = t.widget<EditorScreen>(find.byType(EditorScreen));
-    expect(editor.photos, hasLength(1));
-    expect(editor.captions, [''], reason: '手寫的那張不放範例文字');
-    expect(editor.handwriting.single, hasLength(1));
-    expect(find.byType(InstantPrint), findsNWidgets(4), reason: '拼貼也是同一種底片');
-    expect(find.byWidgetPredicate((w) => w is InstantPrint && w.handwriting.isNotEmpty), findsOneWidget, reason: '手寫帶到拼貼');
+    expect(find.text('開始拍照'), findsOneWidget);
   });
 
   testWidgets('顯影約 20 秒；搖手機會加快', (t) async {
@@ -117,6 +129,8 @@ void main() {
     final motion = StreamController<UserAccelerometerEvent>.broadcast();
     addTearDown(motion.close);
     await t.pumpWidget(MaterialApp(home: PolaroidCameraScreen(pickPhoto: () async => photo, motion: motion.stream)));
+    await t.tap(find.text('開始拍照'));
+    await t.pump();
     await t.pump();
     await t.tap(find.text('從相簿'));
     await t.pump();
@@ -179,6 +193,8 @@ void main() {
     addTearDown(t.view.reset);
     final photo = (await t.runAsync(_photo))!;
     await t.pumpWidget(MaterialApp(home: PolaroidCameraScreen(pickPhoto: () async => photo, motion: const Stream.empty())));
+    await t.tap(find.text('開始拍照'));
+    await t.pump();
     for (var i = 0; i < 40 && find.textContaining('從相簿選照片').evaluate().isEmpty; i++) {
       await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 25)));
       await t.pump();
@@ -204,6 +220,8 @@ void main() {
       opened++;
       return picked.future;
     }, motion: const Stream.empty())));
+    await t.tap(find.text('開始拍照'));
+    await t.pump();
     for (var i = 0; i < 40 && find.textContaining('從相簿選照片').evaluate().isEmpty; i++) {
       await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 25)));
       await t.pump();

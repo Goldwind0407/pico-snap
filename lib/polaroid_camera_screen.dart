@@ -9,7 +9,6 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
-import 'editor_screen.dart';
 import 'filters.dart';
 import 'lut_files.dart';
 import 'live_filter.dart';
@@ -19,6 +18,8 @@ import 'services/photo_save_service.dart';
 import 'theme.dart';
 import 'widgets/doodle.dart';
 import 'widgets/instant_print.dart';
+import 'widgets/sticker_book_view.dart';
+import 'widgets/sticker_item.dart';
 
 /// Geometry of the camera photos (all the same model), as fractions of the
 /// photo's width (x, radius) and height (y), measured on the cream one.
@@ -44,11 +45,27 @@ enum _Body {
   final double aspect;
   final Color text, swatch;
   const _Body(this.asset, this.aspect, this.text, this.swatch);
+
+  String get label => switch (this) {
+    _Body.cream => '奶油',
+    _Body.blue => '天藍',
+    _Body.pink => '粉紅',
+    _Body.mint => '薄荷',
+    _Body.black => '黑',
+  };
 }
 
-enum _Stage { aiming, ejecting, developing, done }
+/// Like the four-cut booth: pick the film, shoot, watch it develop, then
+/// write or stick stickers on it and save.
+enum _Stage { pick, aiming, ejecting, developing, done }
+
+/// Decorating the developed print: nothing, writing, or stickers.
+enum _Decor { none, write, stickers }
 
 const _controlsHeight = 196.0;
+
+/// While shooting only the shutter row is below the camera.
+const _shootingControlsHeight = 118.0;
 
 /// Pens for writing on a print; each film starts with its own ([FilmStock.pen]).
 const _handColors = [Color(0xFF1E1E20), Color(0xFFD4AF5A), Colors.white, coral, Color(0xFFFF8FB1), Color(0xFF86BBD8)];
@@ -63,13 +80,15 @@ class _Print {
   final PhotoFilter filter;
   /// Finger writing on the print; blank until the user writes.
   final handwriting = <Stroke>[];
+  /// Stickers on the print, in fractions of the print.
+  final stickers = <StickerData>[];
   bool saved = false;
   _Print(this.bytes, this.film, this.filter) : image = photoImage(bytes);
 }
 
-/// 拍立得相機：取景在鏡頭裡，按下快門後相片從上方的出片口慢慢吐出來，
-/// 拿到前面之後從淡灰藍的空白慢慢顯影。可以換機身顏色、白底片或黑底片；
-/// 拍好的相片可以存到相簿，或放進拍立得拼貼。
+/// 拍立得相機，流程跟四格拍貼一樣：先選底片和濾鏡，再拍照（這時只有大大的
+/// 取景框和快門），相片從出片口吐出來、拿到前面慢慢顯影，接著可以手寫或貼
+/// 貼紙，最後存到相簿。機身顏色在右上角的設定裡換。
 class PolaroidCameraScreen extends StatefulWidget {
   const PolaroidCameraScreen({super.key, this.pickPhoto, this.motion});
 
@@ -138,12 +157,13 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   /// (m/s², gravity removed).
   static const _shakeBoost = .035, _shakeForce = 12.0;
 
-  _Stage _stage = _Stage.aiming;
+  _Stage _stage = _Stage.pick;
+  _Decor _decor = _Decor.none;
+  int? _selectedSticker;
+  final _stickerLayerKey = GlobalKey();
   _Print? _current;
   final _prints = <_Print>[];
   bool _saving = false;
-  /// Writing on the print with a finger.
-  bool _writing = false;
   Color _pen = FilmStock.white.pen;
   int _penWidth = 0;
   int _inkVersion = 0;
@@ -157,9 +177,6 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   _Body _body = _lastBody;
   FilmStock _film = _lastFilm;
   PhotoFilter _filter = filterById(_lastFilter);
-  /// The filter row is rebuilt after each shot; it starts where it was left.
-  double _filterOffset = 0;
-  ScrollController? _filterScroll;
 
   @override
   void initState() {
@@ -181,7 +198,6 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     _flash.dispose();
     _wiggle.dispose();
     _enlarge.dispose();
-    _filterScroll?.dispose();
     _motion?.cancel();
     super.dispose();
   }
@@ -339,10 +355,6 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   /// The print comes out of the slot, is taken to the front and develops.
   Future<void> _printOut(Uint8List bytes) async {
     final print = _Print(bytes, _film, _filter);
-    // The row goes away while printing; a new controller picks up the offset.
-    final old = _filterScroll;
-    _filterScroll = null;
-    WidgetsBinding.instance.addPostFrameCallback((_) => old?.dispose());
     setState(() {
       _current = print;
       _stage = _Stage.ejecting;
@@ -417,14 +429,55 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     setState(() {
       _current = null;
       _stage = _Stage.aiming;
-      _writing = false;
+      _decor = _Decor.none;
+      _selectedSticker = null;
     });
     _enlarge.value = 0;
   }
 
+  /// Step 1 → 2: the film is picked, shoot.
+  void _start() => setState(() => _stage = _Stage.aiming);
+
+  /// Back from shooting to picking the film.
+  void _backToPick() => setState(() => _stage = _Stage.pick);
+
+  /// Camera colour: a setting, not part of every shot.
+  Future<void> _settings() => showModalBottomSheet<void>(
+    context: context, backgroundColor: cream, showDragHandle: true,
+    builder: (context) => StatefulBuilder(builder: (context, setSheet) => SafeArea(child: Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('相機顏色', style: TextStyle(fontSize: 16, color: ink, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 14),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          for (final b in _Body.values)
+            GestureDetector(
+              onTap: () {
+                setState(() => _lastBody = _body = b);
+                setSheet(() {});
+              },
+              child: Column(children: [
+                Container(
+                  width: 54, height: 54, padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: _body == b ? coral : Colors.transparent, width: 3)),
+                  child: ClipOval(child: Image.asset(b.asset, fit: BoxFit.cover)),
+                ),
+                const SizedBox(height: 6),
+                Text(b.label, style: TextStyle(fontSize: 12, color: ink, fontWeight: _body == b ? FontWeight.w900 : FontWeight.w600)),
+              ]),
+            ),
+        ]),
+      ]),
+    ))),
+  );
+
   Future<void> _save() async {
     if (_saving) return;
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _selectedSticker = null;
+    });
+    await WidgetsBinding.instance.endOfFrame;
     if (_develop.value < 1) await _develop.animateTo(1, duration: const Duration(milliseconds: 400));
     final error = await PhotoSaveService.saveBoundary(_printKey, longSide: 2000, keep: WorkKind.instant);
     if (!mounted) return;
@@ -437,18 +490,38 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
 
   void _startWriting() {
     final print = _current;
-    if (print == null || _stage != _Stage.done || _writing) return;
+    if (print == null || _stage != _Stage.done || _decor != _Decor.none) return;
     setState(() {
-      _writing = true;
+      _decor = _Decor.write;
       if (print.handwriting.isEmpty) _pen = print.film.pen;
     });
     _enlarge.forward();
   }
 
-  void _stopWriting() {
-    setState(() => _writing = false);
+  void _startStickers() {
+    if (_current == null || _stage != _Stage.done || _decor != _Decor.none) return;
+    setState(() => _decor = _Decor.stickers);
+    _enlarge.forward();
+  }
+
+  /// Done writing or sticking: the print goes back to its place.
+  void _stopDecorating() {
+    setState(() {
+      _decor = _Decor.none;
+      _selectedSticker = null;
+    });
     _enlarge.reverse();
   }
+
+  void _addSticker(String sticker, [double scale = 1]) => setState(() {
+    final stickers = _current!.stickers;
+    final n = stickers.length;
+    stickers.add(StickerData(sticker: sticker, scale: scale, center: Offset(.5 + (n % 3 - 1) * .18, .38 + (n % 2) * .14)));
+    _selectedSticker = stickers.length - 1;
+    _current!.saved = false;
+  });
+
+  Offset _toPrint(Offset global) => (_stickerLayerKey.currentContext!.findRenderObject()! as RenderBox).globalToLocal(global);
 
   void _penDown(Offset at, Size size) => setState(() {
     _current!.saved = false;
@@ -469,28 +542,17 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     _inkVersion++;
   });
 
-  void _collage() {
-    if (_prints.isEmpty) return showMessage(context, '先拍一張，再做成拼貼', above: _controlsHeight);
-    final last = _prints.length > 4 ? _prints.sublist(_prints.length - 4) : _prints;
-    Navigator.push(context, MaterialPageRoute(builder: (_) => EditorScreen(
-      mode: EditorMode.polaroid,
-      photos: [for (final p in last) p.bytes],
-      // Handwritten instead of typed: no sample captions on top of it.
-      captions: [for (final _ in last) ''],
-      handwriting: [for (final p in last) p.handwriting],
-      films: [for (final p in last) p.film],
-      filters: [for (final p in last) p.filter],
-    )));
-  }
-
   /// Prints that would be lost by leaving: unsaved ones, or one coming out.
   bool get _unsaved => _stage == _Stage.ejecting || _stage == _Stage.developing || _prints.any((p) => !p.saved);
 
   @override
   Widget build(BuildContext context) => PopScope(
-    canPop: !_unsaved,
+    canPop: _stage == _Stage.pick && !_unsaved,
     onPopInvokedWithResult: (didPop, _) async {
       if (didPop) return;
+      if (_stage == _Stage.aiming) return _backToPick();
+      if (_decor != _Decor.none) return _stopDecorating();
+      if (_stage == _Stage.pick && !_unsaved) return Navigator.of(context).pop();
       final navigator = Navigator.of(context);
       if (await confirmLeave(context, '拍好的相片還沒存到相簿，離開就會不見喔。', stay: '留下來')) navigator.pop();
     },
@@ -502,11 +564,14 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     body: Stack(children: [
       SafeArea(child: Column(children: [
         _topBar(),
-        Expanded(child: LayoutBuilder(builder: (context, c) => AnimatedBuilder(
-          animation: Listenable.merge([_eject, _lift, _develop, _wiggle, _enlarge]),
-          builder: (context, _) => _stageView(c.biggest),
-        ))),
-        SizedBox(height: _controlsHeight, child: _bottom()),
+        if (_stage == _Stage.pick) Expanded(child: _pickView())
+        else ...[
+          Expanded(child: LayoutBuilder(builder: (context, c) => AnimatedBuilder(
+            animation: Listenable.merge([_eject, _lift, _develop, _wiggle, _enlarge]),
+            builder: (context, _) => _stageView(c.biggest),
+          ))),
+          SizedBox(height: _bottomHeight, child: _bottom()),
+        ],
       ])),
       // Flash.
       IgnorePointer(child: AnimatedBuilder(
@@ -519,15 +584,79 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     ]),
   );
 
+  double get _bottomHeight => switch (_stage) {
+    _Stage.aiming => _shootingControlsHeight,
+    _Stage.done when _decor == _Decor.stickers => max(_controlsHeight, MediaQuery.sizeOf(context).height * .36),
+    _ => _controlsHeight,
+  };
+
   Widget _topBar() => Padding(
-    padding: const EdgeInsets.fromLTRB(8, 8, 12, 0),
+    padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
     child: Row(children: [
       IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
-      const Expanded(child: Text('Polaroid', style: TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
-      if (_canFlip)
-        IconButton(onPressed: _stage == _Stage.aiming ? _flipCamera : null, icon: const Icon(Icons.cameraswitch_outlined), color: ink, disabledColor: line),
+      Expanded(child: Text(switch (_stage) {
+        _Stage.pick => '選底片',
+        _Stage.aiming => _film.label,
+        _ => '拍立得',
+      }, style: const TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
+      if (_canFlip && _stage == _Stage.aiming)
+        IconButton(tooltip: '切換鏡頭', onPressed: _flipCamera, icon: const Icon(Icons.cameraswitch_outlined), color: ink),
+      if (_stage == _Stage.pick || _stage == _Stage.aiming)
+        IconButton(tooltip: '設定', onPressed: _settings, icon: const Icon(Icons.settings_outlined), color: ink),
     ]),
   );
+
+  /// Step 1: the film, big, and the filter to shoot with.
+  Widget _pickView() => Column(children: [
+    Expanded(child: Padding(
+      padding: const EdgeInsets.fromLTRB(40, 16, 40, 16),
+      // Fills the room, so the film is shown big.
+      child: FittedBox(child: DecoratedBox(
+        decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .16), blurRadius: 18, offset: const Offset(0, 8))]),
+        child: InstantPrint(film: _film, caption: ''),
+      )),
+    )),
+    SizedBox(height: 40, child: ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: FilmStock.values.length,
+      separatorBuilder: (_, __) => const SizedBox(width: 8),
+      itemBuilder: (_, i) {
+        final f = FilmStock.values[i];
+        return GestureDetector(
+          onTap: () => setState(() => _lastFilm = _film = f),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: _film == f ? blush : Colors.white, borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: _film == f ? blushLine : line),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 10, height: 12, decoration: BoxDecoration(color: f.swatch, borderRadius: BorderRadius.circular(2), border: Border.all(color: line))),
+              const SizedBox(width: 6),
+              Text(f.label, style: TextStyle(fontSize: 13, color: ink, fontWeight: _film == f ? FontWeight.w900 : FontWeight.w600)),
+            ]),
+          ),
+        );
+      },
+    )),
+    const SizedBox(height: 10),
+    const Padding(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, 6),
+      child: Align(alignment: Alignment.centerLeft, child: Text('濾鏡', style: TextStyle(fontSize: 13, color: muted, fontWeight: FontWeight.w800))),
+    ),
+    _filterRow(),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+      child: SizedBox(width: double.infinity, child: FilledButton.icon(
+        onPressed: _start,
+        icon: const Icon(Icons.photo_camera_rounded),
+        label: const Text('開始拍照', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+        style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+      )),
+    ),
+  ]);
 
   static const _emergeStart = .16, _emergeEnd = .9;
 
@@ -541,7 +670,9 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   }
 
   Widget _stageView(Size size) {
-    final cw = [size.width * .8, size.height * .5, 360.0].reduce(min);
+    // While shooting there is nothing else below: the camera and the
+    // viewfinder above it get the room.
+    final cw = [size.width * (_stage == _Stage.aiming ? .7 : .8), size.height * (_stage == _Stage.aiming ? .42 : .5), 360.0].reduce(min);
     final ch = cw / _body.aspect;
     final camLeft = (size.width - cw) / 2, camTop = size.height - ch - 4;
     final aspect = (_current?.film ?? _film).aspect;
@@ -565,6 +696,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     final rect = Rect.lerp(Rect.lerp(ejected, review, l)!, big, z)!;
 
     final print = _current;
+    final printSize = Size(InstantPrint.width, InstantPrint.heightOf(print?.film ?? _film));
     final printView = print == null ? null : Positioned.fromRect(rect: rect, child: Transform.rotate(
       angle: -.035 * l * (1 - z) + (_wiggle.isAnimating ? sin(_wiggle.value * pi * 4) * .06 * (1 - _wiggle.value) : 0),
       child: GestureDetector(
@@ -572,12 +704,36 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         child: FittedBox(child: DecoratedBox(
           decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .1 + .15 * l), blurRadius: 8 + 14 * l, offset: Offset(0, 3 + 7 * l))]),
           child: Stack(children: [
-            PhotoCapture(key: _printKey, child: InstantPrint(
-              image: print.image, film: print.film, filter: print.filter, develop: _develop.value, caption: '',
-              handwriting: print.handwriting, handwritingVersion: _inkVersion, handwritingRepaint: _inkTick,
-              onCaption: _stage == _Stage.done ? _startWriting : null,
-            )),
-            if (_writing) Positioned.fill(child: DoodleInput(onStart: _penDown, onMove: _penMove, onEnd: () {})),
+            PhotoCapture(key: _printKey, child: SizedBox.fromSize(size: printSize, child: Stack(key: _stickerLayerKey, clipBehavior: Clip.none, children: [
+              Positioned.fill(child: InstantPrint(
+                image: print.image, film: print.film, filter: print.filter, develop: _develop.value, caption: '',
+                handwriting: print.handwriting, handwritingVersion: _inkVersion, handwritingRepaint: _inkTick,
+                onCaption: _stage == _Stage.done && _decor == _Decor.none ? _startWriting : null,
+              )),
+              // Only movable while sticking; the layer is the print's size.
+              Positioned.fill(child: IgnorePointer(ignoring: _decor != _Decor.stickers, child: Stack(clipBehavior: Clip.none, children: [
+              for (var i = 0; i < print.stickers.length; i++)
+                StickerItem(
+                  data: print.stickers[i],
+                  canvas: printSize,
+                  zoom: rect.width / printSize.width,
+                  selected: _decor == _Decor.stickers && _selectedSticker == i,
+                  toLocal: _toPrint,
+                  onSelect: () => setState(() => _selectedSticker = i),
+                  onEditStart: () => setState(() {
+                    _selectedSticker = i;
+                    print.saved = false;
+                  }),
+                  onChanged: (d) => setState(() => print.stickers[i] = d),
+                  onFlip: () => setState(() => print.stickers[i] = print.stickers[i].copyWith(flipped: !print.stickers[i].flipped)),
+                  onDelete: () => setState(() {
+                    print.stickers.removeAt(i);
+                    _selectedSticker = null;
+                  }),
+                ),
+              ]))),
+            ]))),
+            if (_decor == _Decor.write) Positioned.fill(child: DoodleInput(onStart: _penDown, onMove: _penMove, onEnd: () {})),
           ]),
         )),
       ),
@@ -593,7 +749,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     // you see exactly what will be printed. Fades while the motor spins up.
     final win = _film.window;
     final winAspect = win.width * _film.aspect / win.height;
-    final vh = min(camTop - 28, size.width * .66 / winAspect);
+    final vh = min(camTop - 28, size.width * (_stage == _Stage.aiming ? .86 : .66) / winAspect);
     final vw = vh * winAspect;
     final finderOpacity = _stage == _Stage.aiming ? 1.0 : (1 - e / _emergeStart).clamp(0.0, 1.0);
     final finder = vh < 60 || finderOpacity == 0 ? null : Positioned(
@@ -635,21 +791,10 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     return FittedBox(fit: BoxFit.cover, child: SizedBox(width: s.height, height: s.width, child: CameraPreview(camera)));
   }
 
-  /// Body colour and film stock.
-  ScrollController _filterController() {
-    final existing = _filterScroll;
-    if (existing != null) return existing;
-    // keepScrollOffset off: PageStorage would put back a stale offset.
-    final c = ScrollController(initialScrollOffset: _filterOffset, keepScrollOffset: false);
-    c.addListener(() => _filterOffset = c.offset);
-    return _filterScroll = c;
-  }
-
   /// Filter chips; the viewfinder shows the chosen one live.
   Widget _filterRow() => ValueListenableBuilder<int>(
     valueListenable: LutFiles.changes,
     builder: (_, version, child) => SizedBox(height: 32, child: ListView.separated(
-    controller: _filterController(),
     scrollDirection: Axis.horizontal,
     padding: const EdgeInsets.symmetric(horizontal: 16),
     itemCount: photoFilters.length,
@@ -673,44 +818,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     },
   )));
 
-  // Scrolls sideways once there are more films than fit.
-  Widget _options() => SizedBox(height: 34, child: Center(child: SingleChildScrollView(
-    scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-    for (final b in _Body.values)
-      GestureDetector(
-        onTap: () => setState(() => _lastBody = _body = b),
-        child: Container(
-          width: 26, height: 26, margin: const EdgeInsets.symmetric(horizontal: 4),
-          decoration: BoxDecoration(
-            color: b.swatch, shape: BoxShape.circle,
-            border: Border.all(color: _body == b ? coral : Colors.white, width: _body == b ? 3 : 2),
-            boxShadow: [BoxShadow(color: ink.withValues(alpha: .18), blurRadius: 3)],
-          ),
-        ),
-      ),
-    Container(width: 1, height: 20, margin: const EdgeInsets.symmetric(horizontal: 10), color: line),
-    for (final f in FilmStock.values)
-      GestureDetector(
-        onTap: () => setState(() => _lastFilm = _film = f),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: _film == f ? blush : Colors.white, borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _film == f ? blushLine : line),
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 10, height: 12, decoration: BoxDecoration(color: f.swatch, borderRadius: BorderRadius.circular(2), border: Border.all(color: line))),
-            const SizedBox(width: 5),
-            Text(f.label, style: TextStyle(fontSize: 12, color: ink, fontWeight: _film == f ? FontWeight.w900 : FontWeight.w600)),
-          ]),
-        ),
-      ),
-  ]))));
-
   Widget _controls() => Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-    _Tray(prints: _prints, onTap: _collage),
+    _SideButton(icon: Icons.style_outlined, label: '換底片', onTap: _backToPick),
     GestureDetector(
       onTap: _shoot,
       child: Container(
@@ -724,39 +833,47 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   ]);
 
   Widget _bottom() => switch (_stage) {
-    _Stage.aiming => Column(children: [
-      _options(),
-      const SizedBox(height: 6),
-      _filterRow(),
-      Expanded(child: _controls()),
-    ]),
+    _Stage.pick => const SizedBox.shrink(),
+    _Stage.aiming => _controls(),
     _Stage.ejecting => const Center(child: Text('出片中…', style: TextStyle(fontSize: 15, color: muted, fontWeight: FontWeight.w800))),
     _Stage.developing => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Text('顯影中…', style: TextStyle(fontSize: 18, color: ink, fontWeight: FontWeight.w900)),
       const SizedBox(height: 6),
       const Text('輕點照片可以跳過', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)),
     ])),
-    _Stage.done when _writing => _penBar(),
+    _Stage.done when _decor == _Decor.write => _penBar(),
+    _Stage.done when _decor == _Decor.stickers => _stickerBar(),
     _Stage.done => _doneBar(),
   };
 
-  /// Write on the print, shoot again, save.
+  /// Write or stick stickers on the print, then shoot again or save.
   Widget _doneBar() {
     final inked = _current?.handwriting.isNotEmpty ?? false;
+    final stuck = _current?.stickers.isNotEmpty ?? false;
     final saved = _current?.saved ?? false;
+    ButtonStyle decor(Color color, Color border) => OutlinedButton.styleFrom(
+      foregroundColor: ink, backgroundColor: color, side: BorderSide(color: border),
+      padding: const EdgeInsets.symmetric(vertical: 12), shape: const StadiumBorder(),
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        OutlinedButton.icon(
-          onPressed: _startWriting, icon: const Icon(Icons.edit_rounded, size: 18),
-          label: Text(inked ? '修改手寫' : '在相片上手寫', style: const TextStyle(fontWeight: FontWeight.w800)),
-          style: OutlinedButton.styleFrom(foregroundColor: ink, backgroundColor: blush, side: const BorderSide(color: blushLine), shape: const StadiumBorder()),
-        ),
-        if (!inked) ...[
-          const SizedBox(height: 6),
-          const Text('簽名、寫日期，或畫點小塗鴉', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)),
-        ],
-        const SizedBox(height: 16),
+        Row(children: [
+          Expanded(child: OutlinedButton.icon(
+            onPressed: _startWriting, icon: const Icon(Icons.edit_rounded, size: 18),
+            label: Text(inked ? '修改手寫' : '手寫', style: const TextStyle(fontWeight: FontWeight.w800)),
+            style: decor(blush, blushLine),
+          )),
+          const SizedBox(width: 10),
+          Expanded(child: OutlinedButton.icon(
+            onPressed: _startStickers, icon: const Icon(Icons.emoji_emotions_outlined, size: 18),
+            label: Text(stuck ? '修改貼紙' : '貼貼紙', style: const TextStyle(fontWeight: FontWeight.w800)),
+            style: decor(butter, butterLine),
+          )),
+        ]),
+        const SizedBox(height: 6),
+        const Text('簽名、寫日期，或貼幾張貼紙', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
         Row(children: [
           Expanded(child: OutlinedButton.icon(
             onPressed: _again, icon: const Icon(Icons.camera_alt_outlined, size: 18), label: const Text('再拍一張', style: TextStyle(fontWeight: FontWeight.w800)),
@@ -814,7 +931,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
           ),
           const SizedBox(width: 4),
           FilledButton(
-            onPressed: _stopWriting,
+            onPressed: _stopDecorating,
             style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12)),
             child: const Text('寫好了', style: TextStyle(fontWeight: FontWeight.w800)),
           ),
@@ -822,6 +939,19 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       ]),
     );
   }
+
+  /// The sticker book, in place of the buttons while sticking.
+  Widget _stickerBar() => Column(children: [
+    Expanded(child: StickerBookView(onPick: _addSticker)),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+      child: SizedBox(width: double.infinity, child: FilledButton(
+        onPressed: _stopDecorating,
+        style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 12)),
+        child: const Text('貼好了', style: TextStyle(fontWeight: FontWeight.w800)),
+      )),
+    ),
+  ]);
 }
 
 /// The instant camera photo with the live picture in its lens, our own name
@@ -977,38 +1107,6 @@ class _CornersPainter extends CustomPainter {
 
 /// Writes on the print's white strip. Owns its controller so it lives as long
 /// as the dialog, closing animation included.
-/// Prints taken so far; tap to make a collage of the last four.
-class _Tray extends StatelessWidget {
-  final List<_Print> prints;
-  final VoidCallback onTap;
-  const _Tray({required this.prints, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: SizedBox(width: 74, child: Column(mainAxisSize: MainAxisSize.min, children: [
-      SizedBox(width: 56, height: 56, child: Stack(clipBehavior: Clip.none, children: [
-        if (prints.isEmpty)
-          Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: line)))
-        else
-          for (final (i, p) in prints.reversed.take(3).toList().reversed.indexed)
-            Positioned.fill(child: Transform.rotate(
-              angle: (i - 1) * .12,
-              child: FittedBox(child: InstantPrint(image: p.image, film: p.film, filter: p.filter, caption: '')),
-            )),
-        if (prints.isNotEmpty)
-          Positioned(right: -6, top: -6, child: Container(
-            width: 22, height: 22, alignment: Alignment.center,
-            decoration: const BoxDecoration(color: coral, shape: BoxShape.circle),
-            child: Text('${prints.length}', style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w900)),
-          )),
-      ])),
-      const SizedBox(height: 6),
-      Text('做成拼貼', style: TextStyle(fontSize: 11, color: prints.isEmpty ? muted : ink, fontWeight: FontWeight.w800)),
-    ])),
-  );
-}
-
 class _SideButton extends StatelessWidget {
   final IconData icon;
   final String label;
