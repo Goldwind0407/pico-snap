@@ -51,14 +51,20 @@ void main() {
     await font.load();
     await LutFiles.load();
     const label = String.fromEnvironment('AUDIT_LABEL', defaultValue: 'current');
+    // Optional comma-separated IDs for a focused before/after contact sheet.
+    const selection = String.fromEnvironment('AUDIT_FILTERS');
+    final looks = selection.isEmpty ? photoFilters : [
+      for (final id in selection.split(','))
+        photoFilters.firstWhere((filter) => filter.id == id.trim()),
+    ];
     final dir = await Directory('build/filter_audit').create(recursive: true);
     final record = ui.PictureRecorder();
     final canvas = Canvas(record);
     const tileW = 400, tileH = 375, columns = 3;
-    final rows = (photoFilters.length / columns).ceil();
+    final rows = (looks.length / columns).ceil();
     canvas.drawColor(const Color(0xFFF3F3F3), BlendMode.src);
     final report = <String, Object>{};
-    for (final (index, filter) in photoFilters.indexed) {
+    for (final (index, filter) in looks.indexed) {
       await filter.prepare();
       final dx = (index % columns) * tileW.toDouble();
       final dy = (index ~/ columns) * tileH.toDouble();

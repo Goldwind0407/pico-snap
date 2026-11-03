@@ -30,6 +30,47 @@ void main() {
     expect(filter.soften, 0);
   });
 
+  test('instant looks retain skin and smooth tonal separation', () {
+    for (final id in ['instant_golden', 'instant_cool']) {
+      final filter = filterById(id);
+      expect(filter.id, id, reason: 'Saved instant IDs must not fall back to original');
+      var previous = rgb(filter, [0, 0, 0]);
+      for (var v = 1; v <= 255; v++) {
+        final current = rgb(filter, [v, v, v]);
+        for (var c = 0; c < 3; c++) {
+          expect(current[c] - previous[c], inInclusiveRange(0, 3),
+            reason: '$id must not reverse or posterize the grey ramp');
+        }
+        previous = current;
+      }
+      for (final skin in [[220, 164, 140], [160, 106, 80], [85, 56, 43]]) {
+        final out = rgb(filter, skin);
+        expect(out[0], greaterThan(out[1]));
+        expect(out[1], greaterThan(out[2]));
+        expect(out.every((v) => v > 0 && v < 250), isTrue);
+      }
+      final high = rgb(filter, [220, 220, 220]);
+      final white = rgb(filter, [255, 255, 255]);
+      for (var c = 0; c < 3; c++) {
+        expect(white[c] - high[c], greaterThan(10), reason: 'Retain highlight texture');
+      }
+      expect(white.every((v) => v < 255), isTrue);
+    }
+  });
+
+  test('instant warm and cool looks have distinct split tones', () {
+    final golden = filterById('instant_golden');
+    final cool = filterById('instant_cool');
+    final goldenBlack = rgb(golden, [0, 0, 0]);
+    expect(goldenBlack[1] - goldenBlack[0], greaterThan(5));
+    expect(goldenBlack[2] - goldenBlack[0], greaterThan(5));
+    final warmMid = rgb(golden, [128, 128, 128]);
+    final coolMid = rgb(cool, [128, 128, 128]);
+    expect(warmMid[0] - warmMid[2], greaterThan(5));
+    expect(coolMid[2] - coolMid[0], greaterThan(5));
+    expect(warmMid[0] - warmMid[2] - (coolMid[0] - coolMid[2]), greaterThan(15));
+  });
+
   test('retro has smooth neutral ramps, faded blacks and warm highlights', () {
     final filter = filterById('lut:retro_soft');
     var previous = rgb(filter, [0, 0, 0]);
