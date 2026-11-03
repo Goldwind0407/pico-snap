@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:pico_snap/color_grade.dart';
 import 'package:pico_snap/filters.dart';
 import 'package:pico_snap/lut_files.dart';
@@ -12,31 +11,45 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(LutFiles.load);
 
-  test('all named looks load and saved negative ID keeps its new recipe', () {
+  test('all named looks load and saved IDs keep resolving', () {
     final ids = photoFilters.map((f) => f.id).toList();
     expect(ids.toSet().length, ids.length);
     for (final entry in lutLooks.entries) {
       expect(filterById('lut:${entry.key}').name, entry.value.name);
     }
     expect(filterById('korean_cream').name, '韓系奶油');
-    expect(filterById('lut:fuji_classic_neg_raw').table, isNull);
+    expect(filterById('lut:fuji_classic_neg_raw').table, isNotNull);
+    expect(filterById('lut:retro_soft').table, isNull);
   });
 
-  test('negative preserves skin colour and separates bright tones', () {
+  test('negative retains the original LUT and original film settings', () async {
     final filter = filterById('lut:fuji_classic_neg_raw');
-    for (final skin in [[220, 164, 140], [160, 106, 80], [85, 56, 43]]) {
-      final out = rgb(filter, skin);
-      expect(out[0], greaterThan(out[1]));
-      expect(out[1], greaterThan(out[2]));
-      expect(out.every((v) => v > 10 && v < 245), isTrue);
+    final source = parseCube(await rootBundle.loadString('assets/luts/fuji_classic_neg_raw.cube'));
+    expect(filter.lut, orderedEquals(resampleLut(source.table, source.size, lutSize)));
+    expect(filter.grain, 0);
+    expect(filter.soften, 0);
+  });
+
+  test('retro has smooth neutral ramps, faded blacks and warm highlights', () {
+    final filter = filterById('lut:retro_soft');
+    var previous = rgb(filter, [0, 0, 0]);
+    expect(previous.every((v) => v >= 18 && v <= 30), isTrue);
+    for (var v = 1; v <= 255; v++) {
+      final current = rgb(filter, [v, v, v]);
+      for (var c = 0; c < 3; c++) {
+        expect(current[c] - previous[c], inInclusiveRange(0, 2),
+          reason: '灰階不能跳色或明暗反轉');
+      }
+      expect(current.reduce((a, b) => a > b ? a : b) -
+          current.reduce((a, b) => a < b ? a : b), lessThan(14));
+      previous = current;
     }
-    final shadow = rgb(filter, [40, 40, 40]);
-    expect(shadow[1], lessThan(40), reason: '濃烈負片保留深陰影');
-    final high = rgb(filter, [220, 220, 220]);
-    final white = rgb(filter, [250, 250, 250]);
-    for (var c = 0; c < 3; c++) {
-      expect(white[c] - high[c], greaterThan(10));
-    }
+    expect(previous[0], greaterThan(previous[2]));
+    expect(previous.every((v) => v < 250), isTrue);
+    final skin = rgb(filter, [220, 164, 140]);
+    expect(skin[0], greaterThan(skin[1]));
+    expect(skin[1], greaterThan(skin[2]));
+    expect(filter.soften, greaterThan(0));
   });
 
   test('cream lifts shadows with warm whites and restrained saturation', () {

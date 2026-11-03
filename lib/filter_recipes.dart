@@ -1,18 +1,19 @@
 import 'color_grade.dart';
 
 /// Display-referred recipes for ordinary sRGB photos (not Log footage).
-const negativeGrade = Grade(
-  contrast: .22,
-  saturation: 1.08,
-  curve: [(0, .018), (.18, .135), (.5, .51), (.8, .84), (1, .98)],
+// The source retro Hald has spatial effects baked into its colour coordinates.
+// Rebuild a smooth faded look; apply softening to the photo, never the Hald.
+const retroSoftGrade = Grade(
+  saturation: .78,
+  curve: [(0, .09), (.18, .22), (.5, .5), (.8, .77), (1, .93)],
   hsl: {
-    Hue.red: Hsl(sat: -.08),
-    Hue.orange: Hsl(sat: -.14, lum: .025),
-    Hue.green: Hsl(hue: 12, sat: -.12),
-    Hue.blue: Hsl(hue: -8, sat: -.08),
+    Hue.orange: Hsl(sat: -.04, lum: .015),
+    Hue.yellow: Hsl(hue: -6, sat: -.08),
+    Hue.green: Hsl(hue: -12, sat: -.18),
+    Hue.blue: Hsl(sat: -.12),
   },
-  shadowTone: (-.008, .008, .006),
-  highlightTone: (.012, .004, -.008),
+  shadowTone: (.012, .006, -.004),
+  highlightTone: (.018, .006, -.018),
 );
 
 /// Warm near-whites, lifted blacks and muted foliage without a global
