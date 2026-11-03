@@ -841,7 +841,12 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       Row(children: [
         const SizedBox(width: 44, child: Text('底片', style: TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800))),
         Expanded(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
-            for (final f in FilmStock.values)
+            for (final f in FilmStock.values) ...[
+              if (f == FilmStock.values.firstWhere((x) => x.group == f.group))
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Text(f.group, style: const TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w800)),
+                ),
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: GestureDetector(
@@ -865,6 +870,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                   ),
                 ),
               ),
+            ],
         ]))),
       ]),
     ]),

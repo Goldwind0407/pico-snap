@@ -9,22 +9,36 @@ import 'frames.dart';
 /// window is transparent: the card lies over the photo, so its decorations
 /// and characters can overlap the photo's edges.
 enum FilmStock {
-  white('白底片', 'assets/instant/film.png', Rect.fromLTWH(.10889, .11, .78333, .65167), ink, Colors.white, Color(0xFF1E1E20)),
-  black('黑底片', 'assets/instant/film_black.png', Rect.fromLTWH(.10778, .11667, .78444, .6475), Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A)),
-  filmFrame('底片框', 'assets/instant/frame_film.png', Rect.fromLTWH(.14222, .11833, .71556, .655), Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A)),
+  white('白底片', '基本', 'assets/instant/film.png', Rect.fromLTWH(.10889, .11, .78333, .65167), ink, Colors.white, Color(0xFF1E1E20)),
+  black('黑底片', '基本', 'assets/instant/film_black.png', Rect.fromLTWH(.10778, .11667, .78444, .6475), Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A)),
+  filmFrame('底片框', '基本', 'assets/instant/frame_film.png', Rect.fromLTWH(.14222, .11833, .71556, .655), Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A)),
+  smile('微笑', '基本', 'assets/instant/film_smile.png', Rect.fromLTWH(.10889, .105, .78222, .6625), ink, Colors.white, Color(0xFF1E1E20)),
+  stars('星星', '基本', 'assets/instant/film_stars.png', Rect.fromLTWH(.12111, .09917, .75778, .66833), ink, Colors.white, Color(0xFF1E1E20)),
   // For testing only: other people's characters, names and logos, not ours
   // to ship.
-  keroroFrame('Keroro 框', 'assets/instant/frame_keroro.png', Rect.fromLTWH(.11333, .085, .77111, .69917), ink, Colors.white, ink),
-  pokemonFrame('寶可夢框', 'assets/instant/frame_pokemon.png', Rect.fromLTWH(.16667, .1175, .66444, .65), Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A)),
-  rakutenFrame('樂天桃猿框', 'assets/instant/frame_rakuten.png', Rect.fromLTWH(.10778, .09333, .78444, .67083), ink, Colors.white, Color(0xFF9E1B32));
+  sanrioKitty('凱蒂貓', '三麗鷗', 'assets/instant/sanrio_kitty.png', Rect.fromLTWH(.10778, .125, .78444, .58417), ink, Colors.white, Color(0xFF1E1E20)),
+  sanrioKeroppi('大眼蛙', '三麗鷗', 'assets/instant/sanrio_keroppi.png', Rect.fromLTWH(.10889, .12583, .78222, .57417), ink, Colors.white, Color(0xFF1E1E20)),
+  sanrioCinnamoroll('大耳狗', '三麗鷗', 'assets/instant/sanrio_cinnamoroll.png', Rect.fromLTWH(.10667, .125, .78667, .58417), ink, Colors.white, Color(0xFF1E1E20)),
+  sanrioPompompurin('布丁狗', '三麗鷗', 'assets/instant/sanrio_pompompurin.png', Rect.fromLTWH(.10667, .12667, .78667, .5825), ink, Colors.white, Color(0xFF1E1E20)),
+  sanrioMelody('美樂蒂酷洛米', '三麗鷗', 'assets/instant/sanrio_melody.png', Rect.fromLTWH(.11222, .12917, .77556, .55667), ink, Colors.white, Color(0xFF1E1E20)),
+  sanrioBadtz('酷企鵝', '三麗鷗', 'assets/instant/sanrio_badtz.png', Rect.fromLTWH(.11556, .1325, .76889, .54583), ink, Colors.white, Color(0xFF1E1E20)),
+  pokemonFrame('寶可夢框', '寶可夢', 'assets/instant/frame_pokemon.png', Rect.fromLTWH(.16667, .1175, .66444, .65), Colors.white, Color(0xFF1E1E20), Color(0xFFD4AF5A)),
+  pokemonGs('心金魂銀', '寶可夢', 'assets/instant/pokemon_gs.png', Rect.fromLTWH(.10667, .11667, .78778, .5975), ink, Colors.white, Color(0xFF1E1E20)),
+  pokemonFrlg('火紅葉綠', '寶可夢', 'assets/instant/pokemon_frlg.png', Rect.fromLTWH(.10667, .125, .78667, .55667), ink, Colors.white, Color(0xFF1E1E20)),
+  pokemonRs('紅寶藍寶', '寶可夢', 'assets/instant/pokemon_rs.png', Rect.fromLTWH(.12222, .13417, .75667, .55667), ink, Colors.white, Color(0xFF1E1E20)),
+  keroroFrame('Keroro 框', '聯名', 'assets/instant/frame_keroro.png', Rect.fromLTWH(.11333, .085, .77111, .69917), ink, Colors.white, ink),
+  rakutenFrame('樂天桃猿框', '聯名', 'assets/instant/frame_rakuten.png', Rect.fromLTWH(.10778, .09333, .78444, .67083), ink, Colors.white, Color(0xFF9E1B32));
 
-  final String label, asset;
+  /// The film picker's tabs, in order.
+  static const series = ['基本', '三麗鷗', '寶可夢', '聯名'];
+
+  final String label, group, asset;
   /// The photo window, as fractions of the print.
   final Rect window;
   final Color text, swatch;
   /// The pen handwriting starts with: black on white film, gold on black.
   final Color pen;
-  const FilmStock(this.label, this.asset, this.window, this.text, this.swatch, this.pen);
+  const FilmStock(this.label, this.group, this.asset, this.window, this.text, this.swatch, this.pen);
 
   /// Width / height of a print: the same for every stock.
   double get aspect => .75;

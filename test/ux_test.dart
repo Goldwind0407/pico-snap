@@ -84,6 +84,26 @@ void main() {
     expect(find.byWidgetPredicate((w) => w is InstantPrint && w.film == FilmStock.black), findsNWidgets(4));
   });
 
+  testWidgets('相機：底片分系列，切到三麗鷗只看到三麗鷗的底片', (t) async {
+    await _phone(t, PolaroidCameraScreen(pickPhoto: () async => null, motion: const Stream.empty()));
+    expect(find.text('凱蒂貓'), findsNothing, reason: '一開始是基本');
+    await t.tap(find.text('三麗鷗'));
+    await t.pump();
+    expect(find.text('白底片'), findsNothing);
+    await t.tap(find.text('凱蒂貓'));
+    await t.pump();
+    expect(t.widget<InstantPrint>(find.byType(InstantPrint)).film, FilmStock.sanrioKitty);
+    // Back to 白底片: the screen remembers the last film for the next tests.
+    await t.tap(find.text('基本'));
+    await t.pump();
+    await t.tap(find.text('白底片'));
+    await t.pump();
+    for (final g in FilmStock.series) {
+      expect(FilmStock.values.where((f) => f.group == g), isNotEmpty, reason: g);
+    }
+    expect(FilmStock.values.every((f) => FilmStock.series.contains(f.group)), isTrue);
+  });
+
   testWidgets('相機：選黑底片拍出來就是黑底片；機身顏色在設定裡換', (t) async {
     final photo = (await t.runAsync(_photo))!;
     await _phone(t, PolaroidCameraScreen(pickPhoto: () async => photo, motion: const Stream.empty()));

@@ -173,6 +173,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   /// Body, film and filter last used, picked again next time the camera opens.
   static _Body _lastBody = _Body.cream;
   static FilmStock _lastFilm = FilmStock.white;
+  late String _series = _film.group;
   static String? _lastFilter;
   _Body _body = _lastBody;
   FilmStock _film = _lastFilm;
@@ -616,31 +617,9 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         child: InstantPrint(film: _film, caption: ''),
       )),
     )),
-    SizedBox(height: 40, child: ListView.separated(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: FilmStock.values.length,
-      separatorBuilder: (_, __) => const SizedBox(width: 8),
-      itemBuilder: (_, i) {
-        final f = FilmStock.values[i];
-        return GestureDetector(
-          onTap: () => setState(() => _lastFilm = _film = f),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: _film == f ? blush : Colors.white, borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: _film == f ? blushLine : line),
-            ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: 10, height: 12, decoration: BoxDecoration(color: f.swatch, borderRadius: BorderRadius.circular(2), border: Border.all(color: line))),
-              const SizedBox(width: 6),
-              Text(f.label, style: TextStyle(fontSize: 13, color: ink, fontWeight: _film == f ? FontWeight.w900 : FontWeight.w600)),
-            ]),
-          ),
-        );
-      },
-    )),
+    _seriesTabs(),
+    const SizedBox(height: 8),
+    _filmRow(),
     const SizedBox(height: 10),
     const Padding(
       padding: EdgeInsets.fromLTRB(20, 0, 20, 6),
@@ -657,6 +636,56 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       )),
     ),
   ]);
+
+  /// 基本 / 三麗鷗 / 寶可夢 / 聯名: which films the row below shows.
+  Widget _seriesTabs() => SizedBox(height: 34, child: ListView.separated(
+    scrollDirection: Axis.horizontal,
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    itemCount: FilmStock.series.length,
+    separatorBuilder: (_, __) => const SizedBox(width: 8),
+    itemBuilder: (_, i) {
+      final g = FilmStock.series[i], on = g == _series;
+      return GestureDetector(
+        onTap: () => setState(() => _series = g),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: on ? ink : Colors.white, borderRadius: BorderRadius.circular(17), border: Border.all(color: on ? ink : line)),
+          child: Text(g, style: TextStyle(fontSize: 13, color: on ? Colors.white : ink, fontWeight: on ? FontWeight.w900 : FontWeight.w600)),
+        ),
+      );
+    },
+  ));
+
+  /// The films of the chosen series, each a small picture of the card.
+  Widget _filmRow() {
+    final films = [for (final f in FilmStock.values) if (f.group == _series) f];
+    return SizedBox(height: 96, child: ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: films.length,
+      separatorBuilder: (_, __) => const SizedBox(width: 10),
+      itemBuilder: (_, i) {
+        final f = films[i], on = f == _film;
+        return GestureDetector(
+          onTap: () => setState(() => _lastFilm = _film = f),
+          child: SizedBox(width: 72, child: Column(children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 54, height: 72, padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), border: Border.all(color: on ? coral : Colors.transparent, width: 2)),
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: const Color(0xFFDCE3EA), boxShadow: [BoxShadow(color: ink.withValues(alpha: .12), blurRadius: 4, offset: const Offset(0, 2))]),
+                child: Image.asset(f.asset, fit: BoxFit.fill, cacheWidth: 150, filterQuality: FilterQuality.medium),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(f.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: ink, fontWeight: on ? FontWeight.w900 : FontWeight.w600)),
+          ])),
+        );
+      },
+    ));
+  }
 
   static const _emergeStart = .16, _emergeEnd = .9;
 
