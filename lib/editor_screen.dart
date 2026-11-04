@@ -141,6 +141,11 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   String? _historyGroup;
   DateTime? _historyAt;
   late bool _exported = widget.saved;
+  /// The text tool adds words as a sticker, rather than editing the
+  /// piece's own text; and how the next words look.
+  bool _wordSticker = false;
+  TextLook _wordLook = TextLook.hand;
+  Color _wordColor = ink;
 
   EditorDocument _document() => EditorDocument(mode: widget.mode, photos: _photoBytes,
     fits: _fits, films: _films, filters: [for (final f in _filters) f.id],
@@ -476,7 +481,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     text = text.trim();
     if (text.isEmpty) return;
     _textCtrl.clear();
-    _addSticker('text:$text');
+    _addSticker(TypedWords(text, look: _wordLook, color: _wordColor).id);
     // Words fill the width of a sticker's square: start them wide enough to read.
     setState(() => _stickers.last = _stickers.last.copyWith(scale: 2.2, center: Offset(.5, _stickers.last.center.dy)));
   }
@@ -780,7 +785,8 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       // The sticker book wants room to show a good part of a sheet; a bit
       // less beside the narrow four-cut strip, which shouldn't get thinner.
       SizedBox(
-        height: _tool == _Tool.sticker ? max(168.0, MediaQuery.sizeOf(context).height * (widget.mode == EditorMode.fourCut ? .3 : .36)) : 168,
+        height: _tool == _Tool.sticker ? max(168.0, MediaQuery.sizeOf(context).height * (widget.mode == EditorMode.fourCut ? .3 : .36))
+            : _tool == _Tool.text ? (_printedText ? 168 : 206) : 168,
         child: switch (_tool) {
         _Tool.template => _templateTool(),
         _Tool.layout => _layoutTool(),
@@ -1110,50 +1116,115 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     );
   }
 
-  Widget _textTool() => _printedText
-    ? Padding(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('加一句話（可以拖曳、縮放）', style: TextStyle(fontSize: 13, color: ink, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(child: TextField(
-              controller: _textCtrl,
-              maxLength: 20,
-              onSubmitted: _addText,
-              style: hand(24),
-              decoration: InputDecoration(
-                isDense: true, filled: true, fillColor: cream, counterText: '', hintText: '想說的話…',
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: line)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: coral, width: 1.5)),
+  /// Text on the piece itself (the strip's caption, a Polaroid's, the
+  /// bubble), or words as a sticker in a look and colour. Pieces with
+  /// printed text (illustrated strips) only have the words.
+  Widget _textTool() {
+    final words = _printedText || _wordSticker;
+    return Column(children: [
+      if (!_printedText) Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        child: Row(children: [
+          for (final (on, label) in [(false, switch (widget.mode) {
+            EditorMode.fourCut => '底部的字',
+            EditorMode.polaroid => '相片上的字',
+            EditorMode.sticker => '對話泡泡',
+          }), (true, '文字貼紙')])
+            Padding(padding: const EdgeInsets.only(right: 8), child: GestureDetector(
+              onTap: () => setState(() {
+                _wordSticker = on;
+                _textCtrl.text = on ? '' : _text;
+              }),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: words == on ? ink : Colors.white, borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: words == on ? ink : line, width: 1.3),
+                ),
+                child: Text(label, style: TextStyle(fontSize: 13, color: words == on ? Colors.white : ink, fontWeight: FontWeight.w800)),
               ),
             )),
-            const SizedBox(width: 8),
-            FilledButton(
-              onPressed: () => _addText(_textCtrl.text),
-              style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-              child: const Text('加上去', style: TextStyle(fontWeight: FontWeight.w800)),
+        ]),
+      ),
+      Expanded(child: words ? _wordsTool() : _captionTool()),
+    ]);
+  }
+
+  /// The selected sticker's words, if it is words.
+  TypedWords? get _selectedWords {
+    final i = _selectedSticker;
+    return i == null || i >= _stickers.length ? null : TypedWords.parse(_stickers[i].sticker);
+  }
+
+  /// A look or colour for the next words, and for the selected words.
+  void _styleWords({TextLook? look, Color? color}) => setState(() {
+    _wordLook = look ?? _wordLook;
+    _wordColor = color ?? _wordColor;
+    final i = _selectedSticker;
+    final old = _selectedWords;
+    if (i == null || old == null) return;
+    _remember(group: 'words:$i');
+    _stickers[i] = _stickers[i].copyWith(sticker: TypedWords(old.text, look: _wordLook, color: _wordColor).id);
+  });
+
+  Widget _wordsTool() => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(child: TextField(
+          controller: _textCtrl,
+          maxLength: 20,
+          onSubmitted: _addText,
+          style: _wordLook == TextLook.hand ? hand(24) : const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink),
+          decoration: InputDecoration(
+            isDense: true, filled: true, fillColor: cream, counterText: '', hintText: '想說的話…（可以拖曳、縮放）',
+            hintStyle: const TextStyle(fontSize: 14, color: muted, fontFamily: 'Nunito'),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: line)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: coral, width: 1.5)),
+          ),
+        )),
+        const SizedBox(width: 8),
+        FilledButton(
+          onPressed: () => _addText(_textCtrl.text),
+          style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+          child: const Text('加上去', style: TextStyle(fontWeight: FontWeight.w800)),
+        ),
+      ]),
+      const SizedBox(height: 10),
+      // Looks, then colours; they also restyle the selected words.
+      Row(children: [
+        for (final look in TextLook.values) Padding(padding: const EdgeInsets.only(right: 8), child: GestureDetector(
+          onTap: () => _styleWords(look: look),
+          child: Container(
+            height: 34, padding: const EdgeInsets.symmetric(horizontal: 12),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: _wordLook == look ? blush : Colors.white, borderRadius: BorderRadius.circular(17),
+              border: Border.all(color: _wordLook == look ? coral : line, width: 1.5),
             ),
-          ]),
-          const SizedBox(height: 10),
-          SizedBox(height: 34, child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: _captionIdeas.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (_, i) => GestureDetector(
-              onTap: () => _addText(_captionIdeas[i]),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: blush, borderRadius: BorderRadius.circular(17)),
-                child: Text(_captionIdeas[i], style: hand(18)),
-              ),
+            child: SizedBox(height: 24, child: FittedBox(child: TextSticker(TypedWords(look.label, look: look, color: _wordColor)))),
+          ),
+        )),
+      ]),
+      const SizedBox(height: 10),
+      Row(children: [
+        for (final c in textColors) Expanded(child: GestureDetector(
+          onTap: () => _styleWords(color: c),
+          child: Center(child: Container(
+            width: 28, height: 28,
+            decoration: BoxDecoration(
+              color: c, shape: BoxShape.circle,
+              border: Border.all(color: _wordColor == c ? coral : line, width: _wordColor == c ? 3 : 1.5),
             ),
           )),
-        ]),
-      )
-    : Padding(
+        )),
+      ]),
+    ]),
+  );
+
+  Widget _captionTool() => Padding(
     padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(switch (widget.mode) {

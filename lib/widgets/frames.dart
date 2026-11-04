@@ -627,7 +627,7 @@ class StickerVisual extends StatelessWidget {
 
   Widget _look() {
     if (sticker.startsWith('assets/')) return Image.asset(sticker, width: size, height: size, filterQuality: FilterQuality.medium);
-    if (sticker.startsWith('text:')) return SizedBox.square(dimension: size, child: FittedBox(child: TextSticker(sticker.substring(5))));
+    if (TypedWords.parse(sticker) case final words?) return SizedBox.square(dimension: size, child: FittedBox(child: TextSticker(words)));
     if (sticker.startsWith('my:')) {
       final custom = customStickers[sticker];
       final path = customStickerPaths[sticker];
@@ -644,23 +644,65 @@ class StickerVisual extends StatelessWidget {
   }
 }
 
-/// Words typed in the editor, handwritten with a white sticker edge.
-class TextSticker extends StatelessWidget {
+/// How typed words look: [hand] and [round] are letters in the colour with
+/// a white sticker edge; [outline] is white letters in a thick coloured edge.
+enum TextLook {
+  hand('手寫'),
+  round('圓體'),
+  outline('描邊');
+
+  final String label;
+  const TextLook(this.label);
+}
+
+/// Colours for typed words.
+const textColors = [ink, coral, Color(0xFFF28DB2), Color(0xFFF4A259), Color(0xFFE9C46A), Color(0xFF7FB77E), Color(0xFF6FA8DC), Color(0xFFA48BD6), Colors.white];
+
+/// Words typed in the editor, as a sticker. Its id is
+/// `text2:look:argb hex:words`; `text:words` (handwritten, ink)
+/// is how it was saved before there were looks.
+class TypedWords {
   final String text;
-  const TextSticker(this.text, {super.key});
+  final TextLook look;
+  final Color color;
+  const TypedWords(this.text, {this.look = TextLook.hand, this.color = ink});
+
+  String get id => 'text2:${look.name}:${color.toARGB32().toRadixString(16)}:$text';
+
+  static TypedWords? parse(String id) {
+    if (id.startsWith('text:')) return TypedWords(id.substring(5));
+    if (!id.startsWith('text2:')) return null;
+    final parts = id.split(':');
+    if (parts.length < 4) return null;
+    return TypedWords(parts.sublist(3).join(':'),
+      look: TextLook.values.asNameMap()[parts[1]] ?? TextLook.hand,
+      color: Color(int.tryParse(parts[2], radix: 16) ?? ink.toARGB32()));
+  }
+}
+
+/// [TypedWords] drawn: handwritten or rounded letters with a white sticker
+/// edge, or white letters in a coloured edge.
+class TextSticker extends StatelessWidget {
+  final TypedWords words;
+  const TextSticker(this.words, {super.key});
 
   @override
   Widget build(BuildContext context) {
-    final style = hand(48);
+    final outline = words.look == TextLook.outline;
+    // White on white wouldn't show: white gets a dark edge.
+    final edge = words.color == Colors.white ? ink : outline ? words.color : Colors.white;
+    final style = words.look == TextLook.hand
+        ? hand(48, color: words.color)
+        : TextStyle(fontFamily: 'Nunito', fontSize: 42, height: 1.15, fontWeight: FontWeight.w900, color: outline ? Colors.white : words.color);
     return Padding(
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(7),
       child: Stack(children: [
-        Text(text, style: style.copyWith(foreground: Paint()
+        Text(words.text, style: style.copyWith(color: null, foreground: Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 10
+          ..strokeWidth = outline ? 13 : 10
           ..strokeJoin = StrokeJoin.round
-          ..color = Colors.white)),
-        Text(text, style: style),
+          ..color = edge)),
+        Text(words.text, style: style),
       ]),
     );
   }

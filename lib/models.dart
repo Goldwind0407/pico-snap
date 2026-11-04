@@ -429,8 +429,8 @@ class StickerData {
   final bool flipped;
   const StickerData({required this.sticker, required this.center, this.scale = 1, this.rotation = 0, this.flipped = false});
 
-  StickerData copyWith({Offset? center, double? scale, double? rotation, bool? flipped}) => StickerData(
-    sticker: sticker,
+  StickerData copyWith({String? sticker, Offset? center, double? scale, double? rotation, bool? flipped}) => StickerData(
+    sticker: sticker ?? this.sticker,
     center: center ?? this.center,
     scale: scale ?? this.scale,
     rotation: rotation ?? this.rotation,

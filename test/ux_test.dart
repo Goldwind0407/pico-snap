@@ -155,8 +155,33 @@ void main() {
     await t.enterText(find.byType(TextField), '好開心');
     await t.tap(find.text('加上去'));
     await t.pumpAndSettle();
-    expect(find.byWidgetPredicate((w) => w is TextSticker && w.text == '好開心'), findsOneWidget);
+    expect(find.byWidgetPredicate((w) => w is TextSticker && w.words.text == '好開心'), findsOneWidget);
     expect(find.byType(StickerItem), findsOneWidget);
+  });
+
+  testWidgets('文字貼紙：選字型和顏色再加上去；選中的字也能改樣式', (t) async {
+    await _phone(t, const EditorScreen(mode: EditorMode.polaroid));
+    await t.tap(find.text('文字').last);
+    await t.pumpAndSettle();
+    expect(find.text('相片上的字'), findsOneWidget);
+    await t.tap(find.text('文字貼紙'));
+    await t.pumpAndSettle();
+    await t.tap(find.byWidgetPredicate((w) => w is TextSticker && w.words.text == '描邊'));
+    final dot = find.byWidgetPredicate((w) => w is Container && w.decoration is BoxDecoration && (w.decoration! as BoxDecoration).color == textColors[1] && (w.decoration! as BoxDecoration).shape == BoxShape.circle);
+    await t.tap(dot);
+    await t.pump();
+    await t.enterText(find.byType(TextField), '好開心');
+    await t.tap(find.text('加上去'));
+    await t.pumpAndSettle();
+    TypedWords words() => t.widget<TextSticker>(find.byWidgetPredicate((w) => w is TextSticker && w.words.text == '好開心')).words;
+    expect(words().look, TextLook.outline);
+    expect(words().color, textColors[1]);
+    // 剛加上去的是選中的：換成手寫，它跟著換
+    await t.tap(find.byWidgetPredicate((w) => w is TextSticker && w.words.text == '手寫'));
+    await t.pumpAndSettle();
+    expect(words().look, TextLook.hand);
+    expect(TypedWords.parse('text:舊的字')!.text, '舊的字', reason: '以前存的文字貼紙還讀得到');
+    expect(TypedWords.parse(const TypedWords('a:b', look: TextLook.round).id)!.text, 'a:b');
   });
 
   testWidgets('首頁：「素材」是分頁，返回鍵先回首頁；沒有還沒開放的商店', (t) async {
