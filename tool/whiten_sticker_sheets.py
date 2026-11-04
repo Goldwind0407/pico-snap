@@ -1,10 +1,10 @@
 """Re-bakes every built-in sticker sheet on warm white paper: each cut-out
 sticker at its place with a soft shadow, so the white borders still show."""
-import re
+import re, sys
 from PIL import Image, ImageFilter
 PAPER = (251, 248, 243, 255)
 src = open('lib/sticker_book.dart', encoding='utf8').read()
-for sid, label, sheet, aspect, body in re.findall(r"StickerSheet\('(\w+)', '([^']+)', '([^']+)', ([\d.]+), \[(.*?)\]\)", src, re.S):
+for sid, label, sheet, aspect, body in [m for m in re.findall(r"StickerSheet\('(\w+)', '([^']+)', '([^']+)', ([\d.]+), \[(.*?)\]\)", src, re.S) if len(sys.argv) < 2 or m[0] in sys.argv[1:]]:
     W, H = Image.open(sheet).size
     paper = Image.new('RGBA', (W, H), PAPER)
     k = W / 1000
