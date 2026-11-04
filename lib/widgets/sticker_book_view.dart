@@ -227,7 +227,7 @@ class _StickerBookViewState extends State<StickerBookView> with SingleTickerProv
                   Positioned(
                     left: k.rect.left * w, top: k.rect.top * h, width: k.rect.width * w, height: k.rect.height * h,
                     child: IgnorePointer(child: ColorFiltered(
-                      colorFilter: const ColorFilter.mode(MySheetView.paper, BlendMode.srcIn),
+                      colorFilter: const ColorFilter.mode(MySheetView.cut, BlendMode.srcIn),
                       child: Image.asset(k.asset, fit: BoxFit.contain),
                     )),
                   ),
@@ -241,7 +241,7 @@ class _StickerBookViewState extends State<StickerBookView> with SingleTickerProv
                       child: IgnorePointer(child: Stack(clipBehavior: Clip.none, children: [
                         // A paper silhouette covers the printed sticker as it lifts.
                         Positioned.fill(child: ColorFiltered(
-                          colorFilter: const ColorFilter.mode(MySheetView.paper, BlendMode.srcIn),
+                          colorFilter: const ColorFilter.mode(MySheetView.cut, BlendMode.srcIn),
                           child: child,
                         )),
                         Positioned.fill(child: Opacity(

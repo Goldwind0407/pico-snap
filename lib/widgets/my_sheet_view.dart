@@ -6,7 +6,7 @@ import '../theme.dart';
 import 'frames.dart';
 import 'sticker_motion.dart';
 
-/// One of the user's sticker sheets drawn like the generated ones: grey
+/// One of the user's sticker sheets drawn like the built-in ones: white
 /// backing paper with the stickers laid out on it. [onTap] gets the sticker
 /// tapped; [selected] stickers get a coral ring.
 class MySheetView extends StatelessWidget {
@@ -18,7 +18,8 @@ class MySheetView extends StatelessWidget {
   final int columns;
   const MySheetView({super.key, required this.sheet, this.onTap, this.onLongPress, this.selected = const {}, this.columns = 4, this.peelOnTap = false});
 
-  static const paper = Color(0xFF9E9E9E);
+  /// The backing paper, and the bare spot a sticker leaves when peeled off.
+  static const paper = Color(0xFFFBF8F3), cut = Color(0xFFEAE3D9);
 
   @override
   Widget build(BuildContext context) => Container(
@@ -29,7 +30,7 @@ class MySheetView extends StatelessWidget {
     ),
     padding: const EdgeInsets.all(10),
     child: sheet.stickers.isEmpty
-      ? const SizedBox(height: 70, child: Center(child: Text('還沒有貼紙', style: TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w700))))
+      ? const SizedBox(height: 70, child: Center(child: Text('還沒有貼紙', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w700))))
       : GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -40,7 +41,7 @@ class MySheetView extends StatelessWidget {
                 PeelableSticker(
                   key: ValueKey(id),
                   onPick: () => onTap!(id),
-                  child: Padding(padding: const EdgeInsets.all(6.5), child: FittedBox(child: StickerVisual(id, size: 96))),
+                  child: Padding(padding: const EdgeInsets.all(6.5), child: FittedBox(child: StickerVisual(id, size: 96, shadow: true))),
                 )
               else GestureDetector(
                 onTap: onTap == null ? null : () => onTap!(id),
@@ -50,11 +51,11 @@ class MySheetView extends StatelessWidget {
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    color: selected.contains(id) ? Colors.white.withValues(alpha: .28) : Colors.transparent,
+                    color: selected.contains(id) ? blush.withValues(alpha: .6) : Colors.transparent,
                     border: Border.all(color: selected.contains(id) ? coral : Colors.transparent, width: 2.5),
                   ),
                   child: Stack(children: [
-                    Positioned.fill(child: FittedBox(child: StickerVisual(id, size: 96))),
+                    Positioned.fill(child: FittedBox(child: StickerVisual(id, size: 96, shadow: true))),
                     if (selected.contains(id))
                       const Positioned(right: 0, top: 0, child: Icon(CupertinoIcons.checkmark_circle_fill, color: coral, size: 20)),
                   ]),
@@ -64,3 +65,4 @@ class MySheetView extends StatelessWidget {
         ),
   );
 }
+

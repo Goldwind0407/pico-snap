@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
@@ -604,10 +605,27 @@ class EmojiSticker extends StatelessWidget {
 class StickerVisual extends StatelessWidget {
   final String sticker;
   final double size;
-  const StickerVisual(this.sticker, {super.key, this.size = 40});
+  /// A soft shadow under it, so its white border shows on white paper.
+  final bool shadow;
+  const StickerVisual(this.sticker, {super.key, this.size = 40, this.shadow = false});
 
   @override
   Widget build(BuildContext context) {
+    final look = _look();
+    if (!shadow) return look;
+    return Stack(clipBehavior: Clip.none, children: [
+      Positioned.fill(child: Transform.translate(
+        offset: const Offset(0, 2.5),
+        child: ImageFiltered(
+          imageFilter: ui.ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+          child: ColorFiltered(colorFilter: const ColorFilter.mode(Color(0x2E46322A), BlendMode.srcIn), child: look),
+        ),
+      )),
+      look,
+    ]);
+  }
+
+  Widget _look() {
     if (sticker.startsWith('assets/')) return Image.asset(sticker, width: size, height: size, filterQuality: FilterQuality.medium);
     if (sticker.startsWith('text:')) return SizedBox.square(dimension: size, child: FittedBox(child: TextSticker(sticker.substring(5))));
     if (sticker.startsWith('my:')) {
