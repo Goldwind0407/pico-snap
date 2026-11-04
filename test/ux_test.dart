@@ -171,6 +171,24 @@ void main() {
     expect(find.text('Create'), findsOneWidget, reason: '回到首頁分頁');
   });
 
+  testWidgets('首頁：相機按鈕和「開始製作」都先選一種玩法', (t) async {
+    await _phone(t, const HomeScreen());
+    await t.tap(find.byIcon(CupertinoIcons.camera_fill));
+    await t.pumpAndSettle();
+    final sheet = find.byType(BottomSheet);
+    for (final mode in ['四格拍貼', '拍立得', '拍立得拼貼', '貼紙裝飾']) {
+      expect(find.descendant(of: sheet, matching: find.text(mode)), findsOneWidget);
+    }
+    await t.tap(find.descendant(of: sheet, matching: find.text('貼紙裝飾')));
+    await t.pumpAndSettle();
+    expect(t.widget<EditorScreen>(find.byType(EditorScreen)).mode, EditorMode.sticker);
+    t.state<NavigatorState>(find.byType(Navigator)).pop();
+    await t.pumpAndSettle();
+    await t.tap(find.text('開始製作'));
+    await t.pumpAndSettle();
+    expect(find.text('像拍貼機，倒數連拍 4 張'), findsOneWidget);
+  });
+
   testWidgets('我的素材：點模板直接用它拍四格', (t) async {
     MyLibrary.addTemplate(const CustomTemplate(id: 't1', caption: 'mine!', frame: Color(0xFFB9C9AE)));
     await _phone(t, const LibraryScreen());

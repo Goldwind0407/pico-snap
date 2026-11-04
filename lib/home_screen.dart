@@ -31,6 +31,59 @@ class _HomeScreenState extends State<HomeScreen> {
     context, MaterialPageRoute(builder: (_) => mode == EditorMode.fourCut ? BoothScreen(template: template) : EditorScreen(mode: mode, template: template)),
   );
 
+  void _camera(BuildContext context) => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolaroidCameraScreen()));
+
+  /// The camera button and 開始製作 both ask which way to play, the same
+  /// four as the cards.
+  Future<void> _choose(BuildContext context) async {
+    final pick = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: cream,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (context) => SafeArea(child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('選一種玩法', style: TextStyle(fontSize: 20, color: ink, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 14),
+          for (final (i, icon, color, label, note) in const [
+            (0, CupertinoIcons.square_split_1x2, blush, '四格拍貼', '像拍貼機，倒數連拍 4 張'),
+            (1, CupertinoIcons.camera, lilac, '拍立得', '拍一張，看它慢慢顯影'),
+            (2, CupertinoIcons.square_grid_2x2, sky, '拍立得拼貼', '從相簿選照片，排成一頁'),
+            (3, CupertinoIcons.smiley, butter, '貼紙裝飾', '一張照片，貼滿貼紙'),
+          ]) Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Material(
+              color: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: line)),
+              child: InkWell(
+                customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                onTap: () => Navigator.pop(context, i),
+                child: Padding(padding: const EdgeInsets.all(12), child: Row(children: [
+                  Container(width: 44, height: 44, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(14)),
+                    child: Icon(icon, color: ink, size: 22)),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(label, style: const TextStyle(fontSize: 16, color: ink, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 2),
+                    Text(note, style: const TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w700)),
+                  ])),
+                  const Icon(CupertinoIcons.chevron_right, size: 18, color: muted),
+                ])),
+              ),
+            ),
+          ),
+        ]),
+      )),
+    );
+    if (!context.mounted) return;
+    switch (pick) {
+      case 0: _open(context, EditorMode.fourCut);
+      case 1: _camera(context);
+      case 2: _open(context, EditorMode.polaroid);
+      case 3: _open(context, EditorMode.sticker);
+    }
+  }
+
   Widget _pad(Widget child) => Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: child);
 
   @override
@@ -48,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ]),
       bottomNavigationBar: _BottomBar(
         tab: _tab,
-        onCamera: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolaroidCameraScreen())),
+        onCamera: () => _choose(context),
         onTab: (t) => setState(() => _tab = t),
       ),
     ),
@@ -102,9 +155,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ])));
       }),
       const SizedBox(height: 22),
-      _pad(_HeroCard(onStart: () => _open(context, EditorMode.fourCut))),
+      _pad(_HeroCard(onStart: () => _choose(context))),
       const SizedBox(height: 30),
-      _pad(const _SectionTitle(title: 'Create', note: '選一種玩法')),
+      _pad(const _SectionTitle(title: '選一種玩法', note: 'Create')),
       const SizedBox(height: 14),
       // Two by two; each row's cards share a height and grow with large text.
       _pad(IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -115,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(width: 12),
         Expanded(child: _ModeCard(
           label: '拍立得', sub: 'Polaroid', color: lilac, border: lilacLine,
-          art: const _PolaroidArt(), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolaroidCameraScreen())),
+          art: const _PolaroidArt(), onTap: () => _camera(context),
         )),
       ]))),
       const SizedBox(height: 12),
@@ -131,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
         )),
       ]))),
       const SizedBox(height: 30),
-      _pad(const _SectionTitle(title: "Today's styles", note: '今日風格')),
+      _pad(const _SectionTitle(title: '今日風格', note: "Today's styles")),
       const SizedBox(height: 14),
       SizedBox(height: 210, child: ListView.separated(
         scrollDirection: Axis.horizontal,
@@ -147,25 +200,13 @@ class _Header extends StatelessWidget {
   const _Header();
 
   @override
-  Widget build(BuildContext context) => Row(children: [
-    Container(
-      width: 44, height: 44,
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: line)),
-      alignment: Alignment.center,
-      child: const Text('快趣\n拍', textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 11, height: 1.05, color: coral, fontWeight: FontWeight.w900)),
-    ),
-    const Expanded(child: Text.rich(
-      TextSpan(children: [
-        TextSpan(text: '快趣', style: TextStyle(color: coral)),
-        TextSpan(text: '拍', style: TextStyle(color: ink)),
-      ]),
-      textAlign: TextAlign.center,
-      style: TextStyle(fontSize: 26, letterSpacing: 3, fontWeight: FontWeight.w900),
-    )),
-    // Balances the logo so the name sits in the middle.
-    const SizedBox(width: 44),
-  ]);
+  Widget build(BuildContext context) => const SizedBox(height: 44, child: Center(child: Text.rich(
+    TextSpan(children: [
+      TextSpan(text: '快趣', style: TextStyle(color: coral)),
+      TextSpan(text: '拍', style: TextStyle(color: ink)),
+    ]),
+    style: TextStyle(fontSize: 26, letterSpacing: 3, fontWeight: FontWeight.w900),
+  )));
 }
 
 class _HeroCard extends StatelessWidget {
@@ -332,8 +373,6 @@ class _StyleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = stripTemplates[index];
-    // Every other card shows sample photos so the row feels alive.
-    final photos = index.isEven ? samplePhotos : const <ImageProvider>[];
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -344,7 +383,7 @@ class _StyleCard extends StatelessWidget {
         ),
         child: Stack(clipBehavior: Clip.none, children: [
           Positioned(left: 22, top: 16, bottom: 34, child: Transform.rotate(angle: index.isEven ? -.06 : .05, child: FittedBox(
-            child: PhotoStrip(template: t, photos: photos),
+            child: PhotoStrip(template: t, photos: samplePhotos),
           ))),
           Positioned(left: 14, top: 8, child: WashiTape(width: 46, height: 16, angle: -.5, colors: index.isEven
             ? const [Color(0xFFF59E95), Color(0xFFFFD9D4)]
