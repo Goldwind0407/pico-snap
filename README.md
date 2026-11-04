@@ -292,6 +292,11 @@
 
 去背的手機內建 AI、相機、存相簿、影片編碼都要在手機或模擬器上才會動；在測試裡會自動改用備案（例如 GrabCut）或顯示錯誤訊息。
 
+## App 圖示
+
+- 原圖是 `design/app_icon.png`（Gemini 生成，兩張疊在一起的拍立得）。換圖：把新的正方形圖放到那裡，在專案根目錄跑 `python tool/make_app_icons.py`，iOS 和 Android 所有尺寸都會重做。
+- iOS 不透明、不畫圓角，系統自己裁。Android 8 以上是自適應圖示：桌面會裁成圓形、圓角方形等形狀，只露出中間約 2/3，所以整張圖放在那個範圍裡，外面用鏡射延伸補滿。
+
 ## App 識別碼
 
 iPhone 和 Android 都是 `com.goldwind.picosnap`。上架之後就不能再改。
