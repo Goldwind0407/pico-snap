@@ -13,6 +13,9 @@ import 'models.dart';
 import 'theme.dart';
 import 'widgets/frames.dart';
 
+/// Whether the drafts list on the home screen is open.
+final _draftsOpen = ValueNotifier(false);
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -56,7 +59,14 @@ class _HomeScreenState extends State<HomeScreen> {
       ValueListenableBuilder<int>(valueListenable: EditorDrafts.changes, builder: (context, _, child) {
         if (EditorDrafts.entries.isEmpty) return const SizedBox.shrink();
         return _pad(ExpansionTile(title: Text('繼續編輯草稿（${EditorDrafts.entries.length}）'),
-          leading: const Icon(CupertinoIcons.square_pencil), children: [
+          leading: const Icon(CupertinoIcons.square_pencil),
+          // iOS chevron that turns down when open, in place of Material's arrow.
+          onExpansionChanged: (open) => _draftsOpen.value = open,
+          trailing: ValueListenableBuilder<bool>(valueListenable: _draftsOpen, builder: (_, open, __) => AnimatedRotation(
+            turns: open ? .25 : 0, duration: const Duration(milliseconds: 200),
+            child: const Icon(CupertinoIcons.chevron_right, size: 18, color: muted),
+          )),
+          children: [
           for (final draft in List.of(EditorDrafts.entries)) ListTile(
             title: Text(draft.label), subtitle: Text('${draft.updated.month}/${draft.updated.day} ${draft.updated.hour.toString().padLeft(2, '0')}:${draft.updated.minute.toString().padLeft(2, '0')}'),
             onTap: () async {
