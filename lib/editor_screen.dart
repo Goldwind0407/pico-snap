@@ -630,11 +630,32 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     child: AbsorbPointer(absorbing: _saving, child: _page()),
   );
 
-  Widget _page() => Scaffold(
-    backgroundColor: cream,
-    body: SafeArea(bottom: false, child: Column(children: [
-      _topBar(),
-      Expanded(child: Stack(children: [
+  /// A wide screen (a foldable opened, a tablet): the tools beside the
+  /// piece rather than under it.
+  bool get _wide {
+    final size = MediaQuery.sizeOf(context);
+    return size.width >= 700 && size.width > size.height * .7;
+  }
+
+  Widget _page() {
+    final stage = _stage();
+    return Scaffold(
+      backgroundColor: cream,
+      body: SafeArea(bottom: false, child: Column(children: [
+        _topBar(),
+        if (_wide) Expanded(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Expanded(child: stage),
+          SizedBox(width: 400, child: _sheet(side: true)),
+        ])) else ...[
+          Expanded(child: stage),
+          _sheet(),
+        ],
+      ])),
+    );
+  }
+
+  /// The piece, with what floats around it.
+  Widget _stage() => Stack(children: [
         // Hand-drawn doodles beside the narrow strip (wider canvases cover them).
         if (widget.mode == EditorMode.fourCut) ...const [
           Positioned(right: 54, top: 30, child: Sparkle(size: 22)),
@@ -657,10 +678,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
               shape: const StadiumBorder(), elevation: 3, shadowColor: ink.withValues(alpha: .3),
             ),
           ))),
-      ])),
-      _sheet(),
-    ])),
-  );
+      ]);
 
   Widget _topBar() => Padding(
     padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
@@ -806,31 +824,27 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     ]),
   );
 
-  Widget _sheet() => Container(
+  /// The tools: under the piece, or beside it ([side]) on a wide screen,
+  /// where each tool gets the full height.
+  Widget _sheet({bool side = false}) => Container(
+    margin: side ? const EdgeInsets.fromLTRB(0, 8, 16, 0) : null,
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      boxShadow: [BoxShadow(color: ink.withValues(alpha: .07), blurRadius: 20, offset: const Offset(0, -4))],
+      boxShadow: [BoxShadow(color: ink.withValues(alpha: .07), blurRadius: 20, offset: Offset(0, side ? 4 : -4))],
     ),
-    child: Column(mainAxisSize: MainAxisSize.min, children: [
-      const SizedBox(height: 8),
-      Container(width: 38, height: 4, decoration: BoxDecoration(color: line, borderRadius: BorderRadius.circular(2))),
+    child: Column(mainAxisSize: side ? MainAxisSize.max : MainAxisSize.min, children: [
+      if (!side) ...[
+        const SizedBox(height: 8),
+        Container(width: 38, height: 4, decoration: BoxDecoration(color: line, borderRadius: BorderRadius.circular(2))),
+      ],
+      if (side) Expanded(child: Padding(padding: const EdgeInsets.only(top: 8), child: _toolView())) else
       // The sticker book wants room to show a good part of a sheet; a bit
       // less beside the narrow four-cut strip, which shouldn't get thinner.
       SizedBox(
         height: _tool == _Tool.sticker ? max(168.0, MediaQuery.sizeOf(context).height * (widget.mode == EditorMode.fourCut ? .3 : .36))
             : _tool == _Tool.text ? (_printedText ? 168 : 206) : 168,
-        child: switch (_tool) {
-        _Tool.template => _templateTool(),
-        _Tool.layout => _layoutTool(),
-        _Tool.pattern => _patternTool(),
-        _Tool.sticker => _stickerTool(),
-        _Tool.cutout => _cutoutTool(),
-        _Tool.photo => _photoTool(),
-        _Tool.filter => _filterTool(),
-        _Tool.text => _textTool(),
-        _Tool.brush => _brushTool(),
-        },
+        child: _toolView(),
       ),
       Container(
         decoration: BoxDecoration(
@@ -847,6 +861,18 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       ),
     ]),
   );
+
+  Widget _toolView() => switch (_tool) {
+    _Tool.template => _templateTool(),
+    _Tool.layout => _layoutTool(),
+    _Tool.pattern => _patternTool(),
+    _Tool.sticker => _stickerTool(),
+    _Tool.cutout => _cutoutTool(),
+    _Tool.photo => _photoTool(),
+    _Tool.filter => _filterTool(),
+    _Tool.text => _textTool(),
+    _Tool.brush => _brushTool(),
+  };
 
   Widget _templateTool() {
     final visible = [for (var i = 0; i < allStripTemplates.length; i++) if (allStripTemplates[i].category == _category) i];

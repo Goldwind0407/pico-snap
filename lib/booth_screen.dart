@@ -684,7 +684,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
             Padding(padding: const EdgeInsets.only(right: 8), child: _Chip(label: '$s 秒', selected: _seconds == s, onTap: () => setState(() => _seconds = s))),
         ]),
       ),
-      Padding(
+      Narrow(child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
         child: SizedBox(width: double.infinity, child: FilledButton.icon(
           onPressed: _start,
@@ -695,7 +695,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
         )),
-      ),
+      )),
     ]);
   }
 
@@ -824,7 +824,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
           )),
         ]),
       )),
-      if (filtering) ..._filterControls() else ..._saveControls(),
+      Narrow(child: Column(mainAxisSize: MainAxisSize.min, children: filtering ? _filterControls() : _saveControls())),
     ]);
   }
 

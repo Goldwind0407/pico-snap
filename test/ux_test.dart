@@ -184,6 +184,30 @@ void main() {
     expect(TypedWords.parse(const TypedWords('a:b', look: TextLook.round).id)!.text, 'a:b');
   });
 
+  testWidgets('寬螢幕（摺疊機打開、平板）：編輯器的工具在作品旁邊，首頁玩法排成一排；摺回去又變回上下', (t) async {
+    t.view.physicalSize = const Size(820, 900);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(const MaterialApp(home: EditorScreen(mode: EditorMode.polaroid)));
+    await t.pumpAndSettle();
+    final canvas = t.getRect(find.byType(InstantPrint).first);
+    final tabs = t.getRect(find.text('版面'));
+    expect(tabs.left, greaterThan(canvas.right), reason: '工具在右邊');
+    // 摺回去：同一個畫面變窄，工具回到下面，作品還在
+    await t.tap(find.text('黑底片'));
+    await t.pumpAndSettle();
+    t.view.physicalSize = const Size(390, 844);
+    await t.pumpAndSettle();
+    expect(t.getRect(find.text('版面')).top, greaterThan(t.getRect(find.byType(InstantPrint).first).bottom));
+    expect(find.byWidgetPredicate((w) => w is InstantPrint && w.film == FilmStock.black), findsNWidgets(4), reason: '改過的還在');
+
+    t.view.physicalSize = const Size(820, 900);
+    await t.pumpWidget(const MaterialApp(home: HomeScreen()));
+    await t.pumpAndSettle();
+    final four = t.getRect(find.text('四格拍貼').first), sticker = t.getRect(find.text('貼紙裝飾').first);
+    expect(sticker.top, closeTo(four.top, 1), reason: '四張卡片同一排');
+  });
+
   testWidgets('首頁：「素材」是分頁，返回鍵先回首頁；沒有還沒開放的商店', (t) async {
     await _phone(t, const HomeScreen());
     expect(find.text('商店'), findsNothing);

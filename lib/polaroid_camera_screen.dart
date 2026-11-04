@@ -593,7 +593,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
             animation: Listenable.merge([_eject, _lift, _develop, _wiggle, _enlarge]),
             builder: (context, _) => _stageView(c.biggest),
           ))),
-          SizedBox(height: _bottomHeight, child: _bottom()),
+          SizedBox(height: _bottomHeight, child: Narrow(maxWidth: 600, child: _bottom())),
         ],
       ])),
       // Flash.
@@ -642,7 +642,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     _seriesTabs(),
     const SizedBox(height: 8),
     _filmRow(),
-    Padding(
+    Narrow(child: Padding(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
       child: SizedBox(width: double.infinity, child: FilledButton.icon(
         onPressed: _start,
@@ -650,7 +650,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         label: const Text('開始拍照', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
         style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
       )),
-    ),
+    )),
   ]);
 
   /// 基本 / 三麗鷗 / 寶可夢 / 聯名: which films the row below shows.

@@ -159,30 +159,33 @@ class _HomeScreenState extends State<HomeScreen> {
       const SizedBox(height: 30),
       _pad(const _SectionTitle(title: '選一種玩法', note: 'Create')),
       const SizedBox(height: 14),
-      // Two by two; each row's cards share a height and grow with large text.
-      _pad(IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Expanded(child: _ModeCard(
-          label: '四格拍貼', sub: 'Four Cuts', color: blush, border: blushLine,
-          art: const _FourCutsArt(), onTap: () => _open(context, EditorMode.fourCut),
-        )),
-        const SizedBox(width: 12),
-        Expanded(child: _ModeCard(
-          label: '拍立得', sub: 'Polaroid', color: lilac, border: lilacLine,
-          art: const _PolaroidArt(), onTap: () => _camera(context),
-        )),
-      ]))),
-      const SizedBox(height: 12),
-      _pad(IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Expanded(child: _ModeCard(
-          label: '拍立得拼貼', sub: 'Collage', color: sky, border: const Color(0xFF9DC0D6),
-          art: const _CollageArt(), onTap: () => _open(context, EditorMode.polaroid),
-        )),
-        const SizedBox(width: 12),
-        Expanded(child: _ModeCard(
-          label: '貼紙裝飾', sub: 'Sticker', color: butter, border: butterLine,
-          art: const _StickerArt(), onTap: () => _open(context, EditorMode.sticker),
-        )),
-      ]))),
+      // Two by two (four in a row on a wide screen); each row's cards share
+      // a height and grow with large text.
+      Builder(builder: (context) {
+        final cards = [
+          _ModeCard(
+            label: '四格拍貼', sub: 'Four Cuts', color: blush, border: blushLine,
+            art: const _FourCutsArt(), onTap: () => _open(context, EditorMode.fourCut),
+          ),
+          _ModeCard(
+            label: '拍立得', sub: 'Polaroid', color: lilac, border: lilacLine,
+            art: const _PolaroidArt(), onTap: () => _camera(context),
+          ),
+          _ModeCard(
+            label: '拍立得拼貼', sub: 'Collage', color: sky, border: const Color(0xFF9DC0D6),
+            art: const _CollageArt(), onTap: () => _open(context, EditorMode.polaroid),
+          ),
+          _ModeCard(
+            label: '貼紙裝飾', sub: 'Sticker', color: butter, border: butterLine,
+            art: const _StickerArt(), onTap: () => _open(context, EditorMode.sticker),
+          ),
+        ];
+        Widget row(List<Widget> cards) => _pad(IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (final (i, c) in cards.indexed) ...[if (i > 0) const SizedBox(width: 12), Expanded(child: c)],
+        ])));
+        if (MediaQuery.sizeOf(context).width >= 700) return row(cards);
+        return Column(children: [row(cards.sublist(0, 2)), const SizedBox(height: 12), row(cards.sublist(2))]);
+      }),
       const SizedBox(height: 30),
       _pad(const _SectionTitle(title: '今日風格', note: "Today's styles")),
       const SizedBox(height: 14),

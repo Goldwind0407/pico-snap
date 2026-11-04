@@ -150,3 +150,14 @@ class GlassDialog extends StatelessWidget {
     ),
   );
 }
+
+/// Buttons and controls at most [maxWidth] wide, centred: on a wide screen
+/// (a foldable opened, a tablet) they don't stretch from edge to edge.
+class Narrow extends StatelessWidget {
+  final Widget child;
+  final double maxWidth;
+  const Narrow({super.key, required this.child, this.maxWidth = 560});
+
+  @override
+  Widget build(BuildContext context) => Center(child: ConstrainedBox(constraints: BoxConstraints(maxWidth: maxWidth), child: child));
+}

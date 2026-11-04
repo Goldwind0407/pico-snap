@@ -331,6 +331,12 @@ zip -qr ~/Desktop/pico_snap-unsigned.ipa Payload
 ### iOS 設定重點
 
 - 最低支援 iOS 15，只支援 iPhone，只能直式使用。
+- **iPhone Duo（摺疊機）**：打開後的內螢幕不理會「只能直式」，App 會用接近正方形的大畫面顯示，所以版面是照寬度排的（寬度 700 以上算寬螢幕），不是照方向：
+  - 編輯器：工具面板改到作品右邊（寬 400），每個工具拿到整個高度；窄的時候在下面。
+  - 首頁：四種玩法排成一排。
+  - 拍貼機、拍立得相機：按鈕和控制列最寬 560～600，置中。
+  - 摺起來、打開時，畫面只是變大變小，編輯中的作品、拍到一半的相片都會留著（`test/ux_test.dart` 有測）。
+  - 還沒用到摺痕位置、半摺角度：Flutter 在 iPhone 上拿不到（`MediaQuery.displayFeatures` 是空的）。要在 Mac 上用 Xcode 27.1 的 iPhone Duo 模擬器跑一次確認。
 - `Info.plist` 寫好了相簿、相機、存到相簿的權限說明，以及麥克風說明（相機套件要求，拍照不錄音）。少了這些說明，iOS 會直接讓 App 閃退。
 - Vision 去背和影片編碼寫在 `AppDelegate.swift`（不另開新檔，因為新的 .swift 檔要加進 Xcode 專案檔才會編譯）。iOS 17 以上可以分開切出每個主體；iOS 15、16 只能切人像。模擬器上 Vision 不能用，要用實機測。
 - 已經採用 UIScene（`SceneDelegate.swift`）。iOS 27 起，沒有採用 UIScene 的 App 一打開就會被系統終止。
