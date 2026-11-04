@@ -16,6 +16,10 @@ const fadedFilter = PhotoFilter('test_faded', '測試褪色', Grade(
 
 /// Additional deterministic fixtures, independent of the shipped looks.
 void useTestFilters() {
+  // Their tables are built once and kept: built inside one widget test,
+  // the work would be left unfinished for the next.
+  setUpAll(() => Future.wait([tealFilter.prepare(), fadedFilter.prepare()]));
   setUp(() => photoFilters.addAll([tealFilter, fadedFilter]));
+  tearDown(FilteredImage.resetQueue);
   tearDown(() => photoFilters.removeWhere((f) => f.id.startsWith('test_')));
 }

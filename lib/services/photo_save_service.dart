@@ -24,14 +24,16 @@ class PhotoSaveService {
   /// [longSide] 像素。透明的地方補成 [background]，不然相簿裡會變成黑色。
   /// 那個東西一定要整個在畫面上，被切掉的部分截不到。
   /// 成功回傳 null，失敗回傳可以直接顯示給使用者的訊息。
-  /// 有 [keep] 的話，存好之後另外收一份縮小版進作品集。
+  /// 有 [keep] 的話，存好之後另外收一份縮小版進作品集。[album] 是 false
+  /// 的話只收進作品集，不存到相簿。
   static Future<String?> saveBoundary(
     GlobalKey key, {
     double longSide = 3000,
     Color background = const Color(0xFFFFFFFF),
     WorkKind? keep,
+    bool album = true,
   }) async {
-    if (kIsWeb) return '網頁版不能存到相簿，請用手機 App';
+    if (kIsWeb && album) return '網頁版不能存到相簿，請用手機 App';
     final ui.Image shot;
     final element = key.currentContext;
     final state = element is StatefulElement ? element.state : null;
@@ -65,7 +67,7 @@ class PhotoSaveService {
       flat = await recorder.endRecording().toImage(shot.width, shot.height);
       final data = await flat.toByteData(format: ui.ImageByteFormat.png);
       if (data == null) return '產生圖片失敗，請再試一次';
-      final error = await saveBytes(data.buffer.asUint8List());
+      final error = album ? await saveBytes(data.buffer.asUint8List()) : null;
       if (error == null && keep != null) await _keep(flat, keep, data.buffer.asUint8List());
       return error;
     } catch (e) {

@@ -126,10 +126,12 @@ void main() {
     await t.tap(find.text('選好了'));
     await t.pumpAndSettle();
     expect(find.text('測試青橙'), findsOneWidget, reason: '按鈕寫著選了哪個濾鏡');
-    // 再拍一張又從原圖開始
-    await t.tap(find.text('再拍一張'));
-    await t.pumpAndSettle();
-    await t.tap(find.text('再拍一張').last, warnIfMissed: false);
+    // 完成後下一張又從原圖開始
+    await t.tap(find.text('完成！'));
+    for (var i = 0; i < 200 && find.text('從相簿').evaluate().isEmpty; i++) {
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await t.pump(const Duration(milliseconds: 50));
+    }
     await t.pumpAndSettle();
     await t.tap(find.text('從相簿'));
     await t.pump();

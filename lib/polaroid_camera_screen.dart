@@ -83,13 +83,14 @@ class _Print {
   final handwriting = <Stroke>[];
   /// Stickers on the print, in fractions of the print.
   final stickers = <StickerData>[];
+  /// This look of it is in the phone's album.
   bool saved = false;
   _Print(this.bytes, this.film) : image = photoImage(bytes);
 }
 
 /// 拍立得相機，流程跟四格拍貼一樣：先選底片，再拍照（這時只有大大的取景框
 /// 和快門），相片從出片口吐出來、拿到前面慢慢顯影，接著看著相片選濾鏡、手寫
-/// 或貼貼紙，最後存到相簿。機身顏色在右上角的設定裡換。
+/// 或貼貼紙，按「完成！」收進作品集（要不要存到相簿另外決定）。機身顏色在右上角的設定裡換。
 class PolaroidCameraScreen extends StatefulWidget {
   const PolaroidCameraScreen({super.key, this.pickPhoto, this.motion});
 
@@ -416,18 +417,25 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     if (_stage == _Stage.developing) _develop.animateTo(1, duration: const Duration(milliseconds: 600));
   }
 
-  Future<void> _again() async {
-    // The print on show is the only one: shooting again throws it away.
-    if (_current?.saved == false && !await showGlassDialog<bool>(context, (context) => GlassDialog(
-      title: '這張還沒存喔', message: '再拍一張的話，這張就不見了。',
-      actions: [
-        GlassAction('留下來', () => Navigator.pop(context, false)),
-        GlassAction('再拍一張', () => Navigator.pop(context, true), danger: true),
-      ],
-    )).then((v) => v == true)) {
-      return;
-    }
+  /// 完成！: the print goes into the gallery (not the album, that's 存到相簿),
+  /// and the camera is ready for the next one.
+  Future<void> _finish() async {
+    if (_saving || _current == null) return;
+    setState(() {
+      _saving = true;
+      _selectedSticker = null;
+    });
+    await WidgetsBinding.instance.endOfFrame;
+    if (_develop.value < 1) await _develop.animateTo(1, duration: const Duration(milliseconds: 400));
+    final error = await PhotoSaveService.saveBoundary(_printKey, longSide: 2000, keep: WorkKind.instant, album: false);
     if (!mounted) return;
+    setState(() => _saving = false);
+    if (error != null) return showMessage(context, error, error: true, above: _controlsHeight);
+    showMessage(context, '收進作品集了 ♡', above: _controlsHeight);
+    _again();
+  }
+
+  void _again() {
     _serial(() async {
       final c = _camera;
       if (c != null && c.value.isInitialized && c.value.isPreviewPaused) await c.resumePreview();
@@ -488,7 +496,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     });
     await WidgetsBinding.instance.endOfFrame;
     if (_develop.value < 1) await _develop.animateTo(1, duration: const Duration(milliseconds: 400));
-    final error = await PhotoSaveService.saveBoundary(_printKey, longSide: 2000, keep: WorkKind.instant);
+    // The gallery gets it at 完成！, as it is then.
+    final error = await PhotoSaveService.saveBoundary(_printKey, longSide: 2000);
     if (!mounted) return;
     setState(() {
       _saving = false;
@@ -556,8 +565,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   });
 
   /// Whether leaving would lose a print: one coming out, or the one on show
-  /// not saved yet.
-  bool get _unsaved => _stage == _Stage.ejecting || _stage == _Stage.developing || _current?.saved == false;
+  /// (完成！ puts it in the gallery and takes it away).
+  bool get _unsaved => _stage == _Stage.ejecting || _stage == _Stage.developing || _current != null;
 
   @override
   Widget build(BuildContext context) => PopScope(
@@ -568,7 +577,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       if (_decor != _Decor.none) return _stopDecorating();
       if (!_unsaved) return Navigator.of(context).pop();
       final navigator = Navigator.of(context);
-      if (await confirmLeave(context, '拍好的相片還沒存到相簿，離開就會不見喔。', stay: '留下來')) navigator.pop();
+      if (await confirmLeave(context, '還沒按「完成！」，這張不會收進作品集。', stay: '留下來')) navigator.pop();
     },
     child: _page(),
   );
@@ -910,18 +919,25 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         const SizedBox(height: 6),
         const Text('換個濾鏡、簽名寫日期，或貼幾張貼紙', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
+        // 完成！ keeps it in the gallery; the album is up to the user.
         Row(children: [
           Expanded(child: OutlinedButton.icon(
-            onPressed: _again, icon: const Icon(CupertinoIcons.camera, size: 18), label: const Text('再拍一張', style: TextStyle(fontWeight: FontWeight.w800)),
-            style: OutlinedButton.styleFrom(foregroundColor: ink, side: const BorderSide(color: line, width: 1.4), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+            onPressed: saved || _saving ? null : _save,
+            icon: Icon(saved ? CupertinoIcons.checkmark : CupertinoIcons.arrow_down_to_line, size: 18),
+            label: Text(saved ? '已存到相簿' : '存到相簿', style: const TextStyle(fontWeight: FontWeight.w800)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: ink, disabledForegroundColor: saved ? ink : muted, backgroundColor: saved ? sage : null,
+              side: const BorderSide(color: line, width: 1.4), padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
           )),
           const SizedBox(width: 10),
           Expanded(child: FilledButton.icon(
-            onPressed: saved || _saving ? null : _save,
-            icon: Icon(saved ? CupertinoIcons.checkmark : CupertinoIcons.arrow_down_to_line, size: 18),
-            label: Text(_saving ? '儲存中…' : saved ? '已存到相簿' : '存到相簿', style: const TextStyle(fontWeight: FontWeight.w800)),
+            onPressed: _saving ? null : _finish,
+            icon: const Icon(CupertinoIcons.checkmark_circle_fill, size: 18),
+            label: Text(_saving ? '儲存中…' : '完成！', style: const TextStyle(fontWeight: FontWeight.w900)),
             style: FilledButton.styleFrom(
-              backgroundColor: coral, disabledBackgroundColor: saved ? sage : null, disabledForegroundColor: saved ? ink : null,
+              backgroundColor: coral, disabledBackgroundColor: coral.withValues(alpha: .6), disabledForegroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
           )),

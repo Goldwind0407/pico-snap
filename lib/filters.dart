@@ -101,7 +101,13 @@ PhotoFilter filterById(String? id) => photoFilters.firstWhere((f) => f.id == id,
 /// are drawn separately by [FilterEffects].
 @immutable
 class FilteredImage extends ImageProvider<FilteredImage> {
-  static final _work = _FilterWorkQueue();
+  static var _work = _FilterWorkQueue();
+
+  /// A fresh queue: a widget test that ends mid-grading leaves its jobs
+  /// waiting forever, holding the queue's places for the next test.
+  @visibleForTesting
+  static void resetQueue() => _work = _FilterWorkQueue();
+
   final ImageProvider base;
   final PhotoFilter filter;
   final int maxSide;

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/polaroid_camera_screen.dart';
+import 'package:pico_snap/services/my_works.dart';
 import 'package:pico_snap/services/photo_save_service.dart';
 import 'package:pico_snap/widgets/doodle.dart';
 import 'package:pico_snap/widgets/instant_print.dart';
@@ -22,6 +23,7 @@ Future<Uint8List> _photo() async {
 }
 
 void main() {
+  setUp(MyWorks.reset);
   test('顯影：一開始是一片淡灰藍的空白，最後是原本的照片', () {
     expect(developFilter(0), const ColorFilter.matrix([0, 0, 0, 0, 196, 0, 0, 0, 0, 202, 0, 0, 0, 0, 206, 0, 0, 0, 1, 0]));
     expect(developFilter(1), const ColorFilter.matrix([1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0]));
@@ -58,7 +60,7 @@ void main() {
     await t.tap(find.byType(InstantPrint));
     await t.pumpAndSettle();
     expect(find.text('存到相簿'), findsOneWidget);
-    expect(find.text('再拍一張'), findsOneWidget);
+    expect(find.text('完成！'), findsOneWidget);
 
     // 沒有自動印日期；按「在相片上手寫」直接在相片上寫
     final caption = find.byKey(const ValueKey('instant-caption'));
@@ -111,18 +113,22 @@ void main() {
     }
     expect(find.byType(SnackBar), findsOneWidget);
 
-    // 還沒存就再拍一張：先問，這張會不見
-    await t.tap(find.text('再拍一張'));
+    // 還沒按完成就離開：先問，這張不會收進作品集
+    await t.binding.handlePopRoute();
     await t.pumpAndSettle();
-    expect(find.text('這張還沒存喔'), findsOneWidget);
+    expect(find.text('要離開嗎？'), findsOneWidget);
     await t.tap(find.text('留下來'));
     await t.pumpAndSettle();
     expect(find.byType(StickerItem), findsOneWidget, reason: '留下來，相片還在');
-    await t.tap(find.text('再拍一張'));
-    await t.pumpAndSettle();
-    await t.tap(find.text('再拍一張').last);
+    // 完成！：收進作品集（不用存到相簿），接著拍下一張，不用問
+    await t.tap(find.text('完成！'));
+    for (var i = 0; i < 200 && find.text('從相簿').evaluate().isEmpty; i++) {
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await t.pump();
+    }
     await t.pumpAndSettle();
     expect(find.text('從相簿'), findsOneWidget, reason: '回到拍照');
+    expect(MyWorks.works.single.kind, WorkKind.instant);
     expect(find.byType(StickerItem), findsNothing);
     // 返回：先回到選底片
     await t.binding.handlePopRoute();
@@ -130,7 +136,7 @@ void main() {
     expect(find.text('開始拍照'), findsOneWidget);
   });
 
-  testWidgets('存好之後離開不會再問；再拍一張也不用問', (t) async {
+  testWidgets('存到相簿之後還是要按完成才收進作品集；完成後離開不會問', (t) async {
     t.view.physicalSize = const Size(390, 844);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);
@@ -160,9 +166,19 @@ void main() {
     expect(find.text('已存到相簿'), findsOneWidget);
     await t.pump(const Duration(seconds: 5));
 
+    expect(MyWorks.works, isEmpty, reason: '存到相簿不會收進作品集，按完成才會');
+    await t.tap(find.text('完成！'));
+    for (var i = 0; i < 60 && MyWorks.works.isEmpty; i++) {
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await t.pump();
+    }
+    await t.pumpAndSettle();
+    expect(MyWorks.works, hasLength(1));
     await t.binding.handlePopRoute();
     await t.pumpAndSettle();
-    expect(find.text('要離開嗎？'), findsNothing, reason: '已經存了，不用問');
+    await t.binding.handlePopRoute();
+    await t.pumpAndSettle();
+    expect(find.text('要離開嗎？'), findsNothing, reason: '完成了，不用問');
     expect(find.byType(PolaroidCameraScreen), findsNothing);
     expect(find.text('打開'), findsOneWidget);
   });
