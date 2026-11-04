@@ -485,6 +485,9 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
         final failed = await PhotoSaveService.saveWork(MyWorks.works.firstWhere((w) => w.id == work.id, orElse: () => work));
         messenger.showSnackBar(SnackBar(content: Text(failed ?? '已存到相簿 ♡'), behavior: SnackBarBehavior.floating));
       }) : null,
+      // With an action it would stay until dismissed, over the tool tabs.
+      persist: false,
+      duration: const Duration(seconds: 6),
       behavior: SnackBarBehavior.floating,
       backgroundColor: error == null ? ink : const Color(0xFFB4483C),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
