@@ -626,7 +626,11 @@ class StickerVisual extends StatelessWidget {
   }
 
   Widget _look() {
-    if (sticker.startsWith('assets/')) return Image.asset(sticker, width: size, height: size, filterQuality: FilterQuality.medium);
+    // A sticker no longer in the App (an old draft's): nothing, not an error.
+    if (sticker.startsWith('assets/')) {
+      return Image.asset(sticker, width: size, height: size, filterQuality: FilterQuality.medium,
+        errorBuilder: (_, __, ___) => SizedBox.square(dimension: size));
+    }
     if (TypedWords.parse(sticker) case final words?) return SizedBox.square(dimension: size, child: FittedBox(child: TextSticker(words)));
     if (sticker.startsWith('my:')) {
       final custom = customStickers[sticker];
