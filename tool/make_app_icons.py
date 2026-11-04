@@ -10,9 +10,12 @@ Run from the project root:  python tool/make_app_icons.py [picture]
   whole picture goes in that middle and the edges around it are the picture
   mirrored outwards: nothing important is cut off, and no seam shows when
   the launcher moves the layer a little.
+- A picture on a plain background (its edges one colour) is laid out by
+  what's drawn on it instead: that is shrunk to fit inside the round mask
+  and iOS's rounded corners, on the same colour.
 """
 import json, os, sys
-from PIL import Image, ImageOps
+from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 SRC = sys.argv[1] if len(sys.argv) > 1 else 'design/app_icon.png'
 RES = 'android/app/src/main/res'
@@ -23,8 +26,33 @@ side = min(src.size)
 src = src.crop(((src.width - side) // 2, (src.height - side) // 2, (src.width + side) // 2, (src.height + side) // 2))
 
 
+# A plain background: its colour, and the box around what's drawn on it.
+edge = ([src.getpixel((x, y)) for x in range(0, side, 16) for y in (0, side - 1)]
+        + [src.getpixel((x, y)) for y in range(0, side, 16) for x in (0, side - 1)])
+plain = all(max(e[c] for e in edge) - min(e[c] for e in edge) <= 16 for c in range(3))
+if plain:
+    bg_color = tuple(sorted(e[c] for e in edge)[len(edge) // 2] for c in range(3))
+    diff = Image.eval(ImageChops.difference(src, Image.new('RGB', src.size, bg_color)).convert('L'), lambda v: 255 if v > 30 else 0)
+    box = diff.getbbox()
+    content = src.crop(box)
+    # Blended in softly: the background isn't quite one colour, and a hard
+    # edge around the drawing's box would show on the flat colour.
+    soft = diff.filter(ImageFilter.MaxFilter(31)).filter(ImageFilter.GaussianBlur(14)).crop(box)
+
+
+def placed(size, fit):
+    """The drawing, its box's diagonal [fit] of [size], on the plain colour."""
+    canvas = Image.new('RGB', (size, size), bg_color)
+    w, h = content.size
+    k = fit * size / (w * w + h * h) ** .5
+    to = (max(1, round(w * k)), max(1, round(h * k)))
+    canvas.paste(content.resize(to, Image.LANCZOS), ((size - to[0]) // 2, (size - to[1]) // 2), soft.resize(to, Image.LANCZOS))
+    return canvas
+
+
 def scaled(size):
-    return src.resize((size, size), Image.LANCZOS)
+    # Inside iOS's rounded corners and the old square icons' edges.
+    return placed(size, 1.12) if plain else src.resize((size, size), Image.LANCZOS)
 
 
 # iOS: the sizes Contents.json asks for.
@@ -46,6 +74,12 @@ for density, px in legacy.items():
 # foreground layer is empty.
 layer = {'mdpi': 108, 'hdpi': 162, 'xhdpi': 216, 'xxhdpi': 324, 'xxxhdpi': 432}
 for density, px in layer.items():
+    os.makedirs(f'{RES}/drawable-{density}', exist_ok=True)
+    if plain:
+        # Within the round mask: the visible circle is 72 of 108 dp across.
+        placed(px, 72 / 108).save(f'{RES}/drawable-{density}/ic_launcher_background.png')
+        Image.new('RGBA', (px, px), (0, 0, 0, 0)).save(f'{RES}/drawable-{density}/ic_launcher_foreground.png')
+        continue
     inner = round(px * 72 / 108)
     pad = (px - inner + 1) // 2
     pic = scaled(inner)
