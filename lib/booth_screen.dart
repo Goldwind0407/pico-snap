@@ -104,7 +104,10 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
 
   PhotoFilter _filter = photoFilters.first;
   final _stripKey = GlobalKey();
-  bool _withVideo = true, _saving = false, _saved = false;
+  /// [_saved]: in the gallery ([_kept] is its id); [_inAlbum]: in the
+  /// phone's album too.
+  bool _withVideo = true, _saving = false, _saved = false, _inAlbum = false;
+  String? _kept;
   /// What went into the album, shown once saved.
   String? _savedWhat;
   /// While making the video: the frames shown in the strip, and progress.
@@ -227,6 +230,8 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
       _frozen = null;
       _count = null;
       _saved = false;
+      _inAlbum = false;
+      _kept = null;
       _cameraError = null;
     });
     if (widget.shoot == null) await _serial(_openCamera);
@@ -475,14 +480,15 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
     pick < 0 ? _retake() : _retakeOne(pick);
   }
 
-  /// Step 6: save the strip, and the live video if wanted.
+  /// Step 6, 完成！: the strip into the gallery, and the live video if
+  /// wanted; the phone's album is a button after that.
   Future<void> _save() async {
     if (_saving) return;
     setState(() => _saving = true);
     await WidgetsBinding.instance.endOfFrame;
     MyWorks.lastAdded = null;
-    var error = await PhotoSaveService.saveBoundary(_stripKey, keep: WorkKind.fourCut);
-    var done = '已存到相簿 ♡';
+    var error = await PhotoSaveService.saveBoundary(_stripKey, keep: WorkKind.fourCut, album: false);
+    var done = '收進作品集了 ♡';
     // The gallery keeps the photos too, to decorate them later.
     final kept = error == null ? MyWorks.lastAdded : null;
     if (kept != null) {
@@ -491,21 +497,39 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
     }
     if (error == null && _withVideo && _canVideo) {
       final path = await _renderVideo();
-      error = path == null ? '圖片已存好，但影片做不出來' : await PhotoSaveService.saveVideo(path);
-      if (error == null) done = '已存到相簿 ♡ 圖片和影片';
-      if (error == null && kept != null) await MyWorks.keepVideo(kept, path!);
+      if (path == null) {
+        error = '圖片已收好，但影片做不出來';
+      } else {
+        if (kept != null) await MyWorks.keepVideo(kept, path);
+        done = '收進作品集了 ♡ 圖片和影片';
+      }
     }
     if (!mounted) return;
     setState(() {
       _saving = false;
       _playing = null;
       _progress = null;
-      if (error == null) {
+      if (kept != null) {
         _saved = true;
-        _savedWhat = done.endsWith('影片') ? '圖片和影片都存到相簿了' : '已存到相簿';
+        _kept = kept.id;
+        _savedWhat = done.endsWith('影片') ? '圖片和影片都收進作品集了' : '收進作品集了';
       }
     });
     showMessage(context, error ?? done, error: error != null, above: 150);
+  }
+
+  /// The finished strip (and its video) from the gallery into the album.
+  Future<void> _toAlbum() async {
+    final work = MyWorks.works.where((w) => w.id == _kept).firstOrNull;
+    if (_saving || work == null) return;
+    setState(() => _saving = true);
+    final error = await PhotoSaveService.saveWork(work);
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      if (error == null) _inAlbum = true;
+    });
+    showMessage(context, error ?? (work.video != null ? '圖片和影片都存到相簿了 ♡' : '已存到相簿 ♡'), error: error != null, above: 150);
   }
 
   Future<ui.Image?> _stripShot() async {
@@ -788,7 +812,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   Widget _resultView() {
     final filtering = _stage == _Stage.filter;
     return Column(children: [
-      _topBar(filtering ? '挑濾鏡' : '完成！'),
+      _topBar(filtering ? '挑濾鏡' : '拍好了！'),
       Expanded(child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
         child: Stack(alignment: Alignment.center, children: [
@@ -834,7 +858,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
     child: Row(children: [
       const Icon(CupertinoIcons.checkmark_circle_fill, color: ink),
       const SizedBox(width: 10),
-      Expanded(child: Text(_savedWhat ?? '已存到相簿', style: const TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800))),
+      Expanded(child: Text(_savedWhat ?? '收進作品集了', style: const TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800))),
     ]),
   );
 
@@ -853,7 +877,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
             Icon(CupertinoIcons.film, color: _canVideo ? coral : muted),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('同時存拍攝影片', style: TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)),
+              const Text('同時做拍攝影片', style: TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)),
               const SizedBox(height: 2),
               Text(_canVideo ? '每一格播放按下快門前的那幾秒，像拍貼機的動態照片' : '這次沒有錄到畫面，只能存圖片',
                 style: const TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
@@ -870,13 +894,19 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
               Expanded(child: OutlinedButton(
                 onPressed: _decorate,
                 style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                child: const Text('加貼紙裝飾', style: TextStyle(color: ink, fontWeight: FontWeight.w800)),
+                child: const FittedBox(child: Text('加貼紙裝飾', style: TextStyle(color: ink, fontWeight: FontWeight.w800))),
               )),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
+              Expanded(child: OutlinedButton(
+                onPressed: _inAlbum || _saving ? null : _toAlbum,
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                child: FittedBox(child: Text(_saving ? '儲存中…' : _inAlbum ? '已存到相簿' : '存到相簿', style: TextStyle(color: _inAlbum ? muted : ink, fontWeight: FontWeight.w800))),
+              )),
+              const SizedBox(width: 8),
               Expanded(child: FilledButton(
                 onPressed: _retake,
                 style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                child: const Text('再拍一組', style: TextStyle(fontWeight: FontWeight.w900)),
+                child: const FittedBox(child: Text('再拍一組', style: TextStyle(fontWeight: FontWeight.w900))),
               )),
             ])
           : Row(children: [
@@ -890,7 +920,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
               onPressed: _saving ? null : _save,
               style: FilledButton.styleFrom(backgroundColor: coral, disabledBackgroundColor: coral.withValues(alpha: .6), disabledForegroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
               child: Text(
-                _progress != null ? '影片製作中 ${(_progress! * 100).round()}%' : _saving ? '儲存中…' : '存到相簿',
+                _progress != null ? '影片製作中 ${(_progress! * 100).round()}%' : _saving ? '儲存中…' : '完成！',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
               ),
             )),

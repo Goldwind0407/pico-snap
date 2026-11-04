@@ -69,7 +69,7 @@ class EditorScreen extends StatefulWidget {
   final List<PhotoFilter> filters;
   /// Opened to decorate a finished piece: starts on the stickers.
   final bool decorate;
-  /// The piece as it opens is already in the album: leaving it untouched
+  /// The piece as it opens is already in the gallery: leaving it untouched
   /// keeps no draft.
   final bool saved;
   const EditorScreen({super.key, this.draft, this.draftId, this.mode = EditorMode.fourCut, this.template = 0, this.photos = const [], this.captions = const [], this.handwriting = const [], this.films = const [], this.filters = const [], this.decorate = false, this.saved = false});
@@ -117,6 +117,8 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   /// Records the editing for the timelapse video.
   final _recorder = TimelapseRecorder();
   bool _withVideo = true;
+  /// 完成 also saves to the phone's album: off unless asked, remembered.
+  static bool _toAlbum = false;
   final _polaroidCaptions = ['good day', 'little joy', 'sunny!', 'us ♡'];
   late int _template = widget.template;
   late String _category = allStripTemplates[widget.template].category;
@@ -373,9 +375,9 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       builder: (context) => StatefulBuilder(builder: (context, setSheet) => SafeArea(child: Padding(
         padding: const EdgeInsets.fromLTRB(22, 20, 22, 16),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('存到相簿', style: TextStyle(fontSize: 19, color: ink, fontWeight: FontWeight.w900)),
+          const Text('完成！', style: TextStyle(fontSize: 19, color: ink, fontWeight: FontWeight.w900)),
           const SizedBox(height: 4),
-          const Text('作品圖片會存成高畫質 PNG。', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)),
+          const Text('作品會收進作品集，之後可以再編輯、分享；要不要存到手機相簿你決定。', style: TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)),
           const SizedBox(height: 14),
           GestureDetector(
             onTap: canVideo ? () => setSheet(() => _withVideo = !_withVideo) : null,
@@ -389,12 +391,29 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                 Icon(CupertinoIcons.film, color: canVideo ? coral : muted),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('同時存「製作過程」縮時影片', style: TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)),
+                  const Text('同時做「製作過程」縮時影片', style: TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 2),
                   Text(canVideo ? '你放照片、去背、貼貼紙的過程，約 ${_recorder.seconds} 秒，適合發 Reels、TikTok' : '多編輯一下就能做成影片',
                     style: const TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
                 ])),
                 Checkbox(value: canVideo && _withVideo, activeColor: coral, onChanged: canVideo ? (v) => setSheet(() => _withVideo = v ?? false) : null),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: () => setSheet(() => _toAlbum = !_toAlbum),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(14, 6, 8, 6),
+              decoration: BoxDecoration(
+                color: _toAlbum ? blush : cream, borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _toAlbum ? blushLine : line),
+              ),
+              child: Row(children: [
+                const Icon(CupertinoIcons.arrow_down_to_line, color: coral),
+                const SizedBox(width: 12),
+                const Expanded(child: Text('也存到手機相簿', style: TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800))),
+                Checkbox(value: _toAlbum, activeColor: coral, onChanged: (v) => setSheet(() => _toAlbum = v ?? false)),
               ]),
             ),
           ),
@@ -405,15 +424,16 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
               backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
-            child: const Text('存到相簿', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+            child: const Text('完成', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
           )),
         ]),
       ))),
     );
-    if (go == true && mounted) await _save(video: canVideo && _withVideo);
+    if (go == true && mounted) await _save(video: canVideo && _withVideo, album: _toAlbum);
   }
 
-  Future<void> _save({bool video = false}) async {
+  /// Into the gallery, and the phone's album too if [album].
+  Future<void> _save({bool video = false, bool album = false}) async {
     if (_saving) return;
     setState(() {
       _saving = true;
@@ -424,12 +444,12 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     await WidgetsBinding.instance.endOfFrame;
     final piece = _document();
     MyWorks.lastAdded = null;
-    var error = await PhotoSaveService.saveBoundary(_shotKey, keep: switch (widget.mode) {
+    var error = await PhotoSaveService.saveBoundary(_shotKey, album: album, keep: switch (widget.mode) {
       EditorMode.fourCut => WorkKind.fourCut,
       EditorMode.polaroid => WorkKind.collage,
       EditorMode.sticker => WorkKind.sticker,
     });
-    var saved = '已存到相簿 ♡';
+    var saved = album ? '收進作品集，也存到相簿了 ♡' : '收進作品集了 ♡';
     // The gallery keeps the piece, to open it again.
     final kept = error == null ? MyWorks.lastAdded : null;
     if (kept != null) await MyWorks.keepPiece(kept, piece);
@@ -438,9 +458,12 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       final finished = await _snapshot();
       if (mounted) setState(() => _capturing = false);
       final path = finished == null ? null : await _recorder.render(finished);
-      error = path == null ? '圖片已存好，但縮時影片做不出來' : await PhotoSaveService.saveVideo(path);
-      if (error == null) saved = '已存到相簿 ♡ 圖片和縮時影片';
-      if (error == null && kept != null) await MyWorks.keepVideo(kept, path!);
+      if (path == null) {
+        error = '圖片已收好，但縮時影片做不出來';
+      } else {
+        if (kept != null) await MyWorks.keepVideo(kept, path);
+        if (album) error = await PhotoSaveService.saveVideo(path);
+      }
     }
     if (error == null) {
       _exported = true;
@@ -453,8 +476,15 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       _capturing = false;
       if (error == null) _savedKey = _contentKey();
     });
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    final work = kept == null ? null : MyWorks.works.where((w) => w.id == kept.id).firstOrNull;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(SnackBar(
       content: Text(error ?? saved),
+      // Changed one's mind: the album, from right here.
+      action: error == null && !album && work != null ? SnackBarAction(label: '存到相簿', textColor: blush, onPressed: () async {
+        final failed = await PhotoSaveService.saveWork(MyWorks.works.firstWhere((w) => w.id == work.id, orElse: () => work));
+        messenger.showSnackBar(SnackBar(content: Text(failed ?? '已存到相簿 ♡'), behavior: SnackBarBehavior.floating));
+      }) : null,
       behavior: SnackBarBehavior.floating,
       backgroundColor: error == null ? ink : const Color(0xFFB4483C),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -638,7 +668,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       _IconButton(icon: CupertinoIcons.arrow_uturn_right, tooltip: '重做', onTap: _redoHistory.isEmpty ? null : _redo),
       if (widget.mode == EditorMode.fourCut) _IconButton(icon: CupertinoIcons.photo_on_rectangle, tooltip: '從相簿選照片', onTap: _pickMany),
       const SizedBox(width: 6),
-      _TopButton(label: _saving ? '儲存中…' : '儲存', filled: true, onTap: _askSave),
+      _TopButton(label: _saving ? '儲存中…' : '完成', filled: true, onTap: _askSave),
     ]),
   );
 

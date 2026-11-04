@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/cutout/cutout_page.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/models.dart';
+import 'package:pico_snap/services/my_works.dart';
 
 
 /// 白底上一個紅色圓（測試用的照片）。
@@ -107,10 +108,10 @@ void main() {
   testWidgets('儲存：還沒放照片時不讓存', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: EditorScreen(mode: EditorMode.polaroid)));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('儲存'));
+    await tester.tap(find.text('完成'));
     await tester.pump();
     expect(find.text('先放一張照片再儲存喔'), findsOneWidget);
-    expect(find.text('同時存「製作過程」縮時影片'), findsNothing);
+    expect(find.text('同時做「製作過程」縮時影片'), findsNothing);
   });
 
   testWidgets('編輯過還沒存：按返回會先問；沒編輯就直接離開', (tester) async {
@@ -146,19 +147,40 @@ void main() {
     expect(photo, isNotEmpty);
   });
 
-  testWidgets('儲存：沒有相簿外掛時顯示錯誤訊息，不會當掉', (tester) async {
+  testWidgets('完成：收進作品集，不一定要存到相簿；選了也存相簿、沒有相簿外掛時顯示錯誤，不會當掉', (tester) async {
+    MyWorks.reset();
     final photo = (await tester.runAsync(_circlePhoto))!;
     await tester.pumpWidget(MaterialApp(home: EditorScreen(mode: EditorMode.polaroid, photos: [photo])));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('儲存'));
-    await tester.pumpAndSettle();
-    expect(find.text('同時存「製作過程」縮時影片'), findsOneWidget);
-    await tester.tap(find.text('存到相簿').last);
-    for (var i = 0; i < 100 && find.byType(SnackBar).evaluate().isEmpty; i++) {
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    Future<void> finish({required bool album}) async {
+      await tester.tap(find.text('完成'));
+      await tester.pumpAndSettle();
+      expect(find.text('同時做「製作過程」縮時影片'), findsOneWidget);
+      final box = tester.widget<Checkbox>(find.descendant(of: find.ancestor(of: find.text('也存到手機相簿'), matching: find.byType(Row)).first, matching: find.byType(Checkbox)));
+      if (box.value != album) await tester.tap(find.text('也存到手機相簿'));
       await tester.pump();
+      await tester.tap(find.text('完成').last);
+      for (var i = 0; i < 100 && find.byType(SnackBar).evaluate().isEmpty; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+        await tester.pump();
+      }
+      await tester.pump(const Duration(milliseconds: 500)); // the sheet closing
     }
+    await finish(album: false);
+    expect(find.text('收進作品集了 ♡'), findsOneWidget);
+    expect(MyWorks.works.single.kind, WorkKind.collage);
+    expect(find.widgetWithText(SnackBarAction, '存到相簿'), findsOneWidget, reason: '改變主意可以馬上存到相簿');
+    ScaffoldMessenger.of(tester.element(find.byType(EditorScreen))).removeCurrentSnackBar();
+    await tester.pumpAndSettle();
+    // 也存到相簿：測試裡沒有相簿外掛，會顯示錯誤但不會當掉
+    await finish(album: true);
     expect(find.byType(SnackBar), findsOneWidget);
-    expect(find.text('儲存'), findsOneWidget, reason: '按鈕恢復原狀');
+    expect(find.text('收進作品集了 ♡'), findsNothing);
+    expect(find.text('完成'), findsOneWidget, reason: '按鈕恢復原狀');
+    // 「也存到手機相簿」會記住：關回去，不影響其他測試
+    await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('也存到手機相簿'));
+    await tester.pump();
   });
 }

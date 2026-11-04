@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/booth_screen.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/models.dart';
+import 'package:pico_snap/services/my_works.dart';
 import 'package:pico_snap/widgets/frames.dart';
 
 import 'test_filters.dart';
@@ -84,8 +85,9 @@ void main() {
     // 6. 完成：存圖，可選順便存影片（測試沒有相機畫面，所以不能選）
     await t.tap(find.text('下一步'));
     await t.pump();
+    expect(find.text('拍好了！'), findsOneWidget);
     expect(find.text('完成！'), findsOneWidget);
-    expect(find.text('存到相簿'), findsOneWidget);
+    expect(find.text('存到相簿'), findsNothing, reason: '完成後才選要不要存到相簿');
     expect(find.text('這次沒有錄到畫面，只能存圖片'), findsOneWidget);
     expect(find.text('加貼紙裝飾'), findsOneWidget, reason: '不用先存一張沒裝飾的');
     // 返回回到挑濾鏡，不會直接離開
@@ -217,5 +219,33 @@ void main() {
     expect(editor.photos, hasLength(4));
     expect(editor.decorate, isTrue);
     expect(editor.saved, isFalse);
+  });
+
+  testWidgets('拍貼機：完成！收進作品集，接著可以存到相簿或再拍一組', (t) async {
+    MyWorks.reset();
+    final photo = (await t.runAsync(_photo))!;
+    await _phone(t, BoothScreen(template: 1, shoot: () async => photo));
+    await t.tap(find.text('3 秒'));
+    await t.pump();
+    await t.tap(find.text('開始拍照（4 張）'));
+    await t.pump();
+    for (var i = 0; i < 4; i++) {
+      await t.pump(const Duration(seconds: 3));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 1500));
+    }
+    await t.pump(const Duration(milliseconds: 500));
+    await t.tap(find.text('下一步'));
+    await t.pump();
+    await t.tap(find.text('完成！'));
+    for (var i = 0; i < 100 && find.text('再拍一組').evaluate().isEmpty; i++) {
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await t.pump();
+    }
+    expect(MyWorks.works.single.kind, WorkKind.fourCut);
+    expect(find.text('收進作品集了'), findsOneWidget);
+    expect(find.text('存到相簿'), findsOneWidget);
+    expect(find.text('再拍一組'), findsOneWidget);
+    await t.pump(const Duration(seconds: 5));
   });
 }

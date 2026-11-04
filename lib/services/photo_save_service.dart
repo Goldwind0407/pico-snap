@@ -68,8 +68,10 @@ class PhotoSaveService {
       final data = await flat.toByteData(format: ui.ImageByteFormat.png);
       if (data == null) return '產生圖片失敗，請再試一次';
       final error = album ? await saveBytes(data.buffer.asUint8List()) : null;
-      if (error == null && keep != null) await _keep(flat, keep, data.buffer.asUint8List());
-      return error;
+      if (error != null || keep == null) return error;
+      final kept = await _keep(flat, keep, data.buffer.asUint8List());
+      // Only the gallery was asked for: not getting it there is the error.
+      return kept || album ? null : '收進作品集失敗，請再試一次';
     } catch (e) {
       debugPrint('[SAVE] 產生圖片失敗: $e');
       return '產生圖片失敗，請再試一次';
@@ -82,7 +84,7 @@ class PhotoSaveService {
   /// 作品集裡的那份：最長邊 [_keepSide]，夠在 App 裡全螢幕看。
   static const _keepSide = 1400;
 
-  static Future<void> _keep(ui.Image image, WorkKind kind, Uint8List original) async {
+  static Future<bool> _keep(ui.Image image, WorkKind kind, Uint8List original) async {
     try {
       final scale = min(1.0, _keepSide / max(image.width, image.height));
       final w = max(1, (image.width * scale).round()), h = max(1, (image.height * scale).round());
@@ -100,11 +102,28 @@ class PhotoSaveService {
       } finally {
         small.dispose();
       }
-      if (data != null) await MyWorks.add(data.buffer.asUint8List(), kind, original: original);
+      if (data == null) return false;
+      await MyWorks.add(data.buffer.asUint8List(), kind, original: original);
+      return true;
     } catch (e) {
-      // 相簿已經存好了，作品集少一張不影響
       debugPrint('[SAVE] 收進作品集失敗: $e');
+      return false;
     }
+  }
+
+  /// A work from the gallery into the album: the picture (full size if it
+  /// was kept) and its video, if it has one.
+  static Future<String?> saveWork(Work work) async {
+    final Uint8List bytes;
+    try {
+      bytes = await work.exportBytes();
+    } catch (e) {
+      return '讀不到這件作品，請再試一次';
+    }
+    final error = await saveBytes(bytes);
+    if (error != null) return error;
+    final video = work.video;
+    return video == null ? null : saveVideo(video.path);
   }
 
   /// 下一張圖的檔名。每張不同：同名的話有些手機會蓋掉上一張。到毫秒，
