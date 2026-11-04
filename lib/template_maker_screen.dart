@@ -321,7 +321,7 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
     ]),
   );
 
-  Widget _stickerTool() => StickerBookView(onPick: _addSticker);
+  Widget _stickerTool() => StickerBookView(onPick: _addSticker, used: {for (final s in _t.stickers) s.sticker});
 }
 
 class _Swatch extends StatelessWidget {

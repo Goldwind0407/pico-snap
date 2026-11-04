@@ -15,10 +15,16 @@ import 'sticker_motion.dart';
 /// built-in page is the sheet itself; tap a sticker and it lifts off the
 /// sheet onto the piece. The search box finds the user's stickers by their
 /// name or their sheet's.
+///
+/// Like a real sheet, a built-in sticker can be used once per piece: those
+/// in [used] (the ones on the piece now) leave an empty spot on the sheet,
+/// and come back when taken off the piece or on the next piece. The user's
+/// own stickers can be used again and again.
 class StickerBookView extends StatefulWidget {
   /// [scale] keeps big stickers on the sheet bigger on the piece too.
   final void Function(String sticker, double scale) onPick;
-  const StickerBookView({super.key, required this.onPick});
+  final Set<String> used;
+  const StickerBookView({super.key, required this.onPick, this.used = const {}});
 
   @override
   State<StickerBookView> createState() => _StickerBookViewState();
@@ -69,7 +75,7 @@ class _StickerBookViewState extends State<StickerBookView> with SingleTickerProv
     // one's bounding box.
     SheetSticker? hit;
     for (final k in s.stickers) {
-      if (!k.rect.contains(at)) continue;
+      if (!k.rect.contains(at) || widget.used.contains(k.asset)) continue;
       if (hit == null || k.rect.width * k.rect.height < hit.rect.width * hit.rect.height) hit = k;
     }
     if (hit == null) return;
@@ -215,6 +221,16 @@ class _StickerBookViewState extends State<StickerBookView> with SingleTickerProv
             child: Stack(clipBehavior: Clip.none, children: [
               Positioned.fill(child: ClipRRect(borderRadius: BorderRadius.circular(10),
                 child: Image.asset(s.sheet, fit: BoxFit.fill, filterQuality: FilterQuality.medium))),
+              // Used on this piece: only the bare backing is left.
+              for (final k in s.stickers)
+                if (widget.used.contains(k.asset) && _lifting?.$2 != k)
+                  Positioned(
+                    left: k.rect.left * w, top: k.rect.top * h, width: k.rect.width * w, height: k.rect.height * h,
+                    child: IgnorePointer(child: ColorFiltered(
+                      colorFilter: const ColorFilter.mode(MySheetView.paper, BlendMode.srcIn),
+                      child: Image.asset(k.asset, fit: BoxFit.contain),
+                    )),
+                  ),
               if (_lifting case (final sheet, final k) when sheet == index)
                 AnimatedBuilder(
                   animation: _lift,

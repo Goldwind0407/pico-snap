@@ -905,7 +905,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     },
   );
 
-  Widget _stickerTool() => StickerBookView(onPick: _addSticker);
+  Widget _stickerTool() => StickerBookView(onPick: _addSticker, used: {for (final s in _stickers) s.sticker});
 
   void _setFilter(PhotoFilter f, {bool all = false}) => setState(() {
     _remember();

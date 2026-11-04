@@ -968,7 +968,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
 
   /// The sticker book, in place of the buttons while sticking.
   Widget _stickerBar() => Column(children: [
-    Expanded(child: StickerBookView(onPick: _addSticker)),
+    Expanded(child: StickerBookView(onPick: _addSticker, used: {for (final s in _current?.stickers ?? const <StickerData>[]) s.sticker})),
     Padding(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
       child: SizedBox(width: double.infinity, child: FilledButton(
