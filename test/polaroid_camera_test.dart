@@ -111,7 +111,16 @@ void main() {
     }
     expect(find.byType(SnackBar), findsOneWidget);
 
+    // 還沒存就再拍一張：先問，這張會不見
     await t.tap(find.text('再拍一張'));
+    await t.pumpAndSettle();
+    expect(find.text('這張還沒存喔'), findsOneWidget);
+    await t.tap(find.text('留下來'));
+    await t.pumpAndSettle();
+    expect(find.byType(StickerItem), findsOneWidget, reason: '留下來，相片還在');
+    await t.tap(find.text('再拍一張'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('再拍一張').last);
     await t.pumpAndSettle();
     expect(find.text('從相簿'), findsOneWidget, reason: '回到拍照');
     expect(find.byType(StickerItem), findsNothing);
@@ -119,6 +128,43 @@ void main() {
     await t.binding.handlePopRoute();
     await t.pumpAndSettle();
     expect(find.text('開始拍照'), findsOneWidget);
+  });
+
+  testWidgets('存好之後離開不會再問；再拍一張也不用問', (t) async {
+    t.view.physicalSize = const Size(390, 844);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    // 相簿外掛：有權限、存檔成功
+    const gal = MethodChannel('gal');
+    t.binding.defaultBinaryMessenger.setMockMethodCallHandler(gal, (call) async => call.method.contains('Access') ? true : null);
+    addTearDown(() => t.binding.defaultBinaryMessenger.setMockMethodCallHandler(gal, null));
+    final photo = (await t.runAsync(_photo))!;
+    await t.pumpWidget(MaterialApp(home: Builder(builder: (context) => TextButton(
+      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PolaroidCameraScreen(pickPhoto: () async => photo, motion: const Stream.empty()))),
+      child: const Text('打開'),
+    ))));
+    await t.tap(find.text('打開'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('開始拍照'));
+    await t.pump();
+    await t.tap(find.text('從相簿'));
+    await t.pump();
+    await t.pump(const Duration(seconds: 3));
+    await t.tap(find.byType(InstantPrint));
+    await t.pumpAndSettle();
+    await t.tap(find.text('存到相簿'));
+    for (var i = 0; i < 60 && find.text('已存到相簿').evaluate().isEmpty; i++) {
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await t.pump();
+    }
+    expect(find.text('已存到相簿'), findsOneWidget);
+    await t.pump(const Duration(seconds: 5));
+
+    await t.binding.handlePopRoute();
+    await t.pumpAndSettle();
+    expect(find.text('要離開嗎？'), findsNothing, reason: '已經存了，不用問');
+    expect(find.byType(PolaroidCameraScreen), findsNothing);
+    expect(find.text('打開'), findsOneWidget);
   });
 
   testWidgets('顯影約 20 秒；搖手機會加快', (t) async {

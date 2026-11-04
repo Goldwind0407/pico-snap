@@ -129,6 +129,8 @@ void main() {
     // 再拍一張又從原圖開始
     await t.tap(find.text('再拍一張'));
     await t.pumpAndSettle();
+    await t.tap(find.text('再拍一張').last, warnIfMissed: false);
+    await t.pumpAndSettle();
     await t.tap(find.text('從相簿'));
     await t.pump();
     await t.pump(const Duration(seconds: 3));

@@ -163,7 +163,6 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   int? _selectedSticker;
   final _stickerLayerKey = GlobalKey();
   _Print? _current;
-  final _prints = <_Print>[];
   bool _saving = false;
   Color _pen = FilmStock.white.pen;
   int _penWidth = 0;
@@ -385,7 +384,6 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       final c = _camera;
       if (_stage != _Stage.aiming && c != null && c.value.isInitialized && !c.value.isPreviewPaused) await c.pausePreview();
     });
-    _prints.add(print);
     setState(() => _stage = _Stage.developing);
     _develop.forward(from: 0);
     _listenForShakes();
@@ -418,7 +416,18 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     if (_stage == _Stage.developing) _develop.animateTo(1, duration: const Duration(milliseconds: 600));
   }
 
-  void _again() {
+  Future<void> _again() async {
+    // The print on show is the only one: shooting again throws it away.
+    if (_current?.saved == false && !await showGlassDialog<bool>(context, (context) => GlassDialog(
+      title: '這張還沒存喔', message: '再拍一張的話，這張就不見了。',
+      actions: [
+        GlassAction('留下來', () => Navigator.pop(context, false)),
+        GlassAction('再拍一張', () => Navigator.pop(context, true), danger: true),
+      ],
+    )).then((v) => v == true)) {
+      return;
+    }
+    if (!mounted) return;
     _serial(() async {
       final c = _camera;
       if (c != null && c.value.isInitialized && c.value.isPreviewPaused) await c.resumePreview();
@@ -546,8 +555,9 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     _inkVersion++;
   });
 
-  /// Prints that would be lost by leaving: unsaved ones, or one coming out.
-  bool get _unsaved => _stage == _Stage.ejecting || _stage == _Stage.developing || _prints.any((p) => !p.saved);
+  /// Whether leaving would lose a print: one coming out, or the one on show
+  /// not saved yet.
+  bool get _unsaved => _stage == _Stage.ejecting || _stage == _Stage.developing || _current?.saved == false;
 
   @override
   Widget build(BuildContext context) => PopScope(
@@ -556,7 +566,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       if (didPop) return;
       if (_stage == _Stage.aiming) return _backToPick();
       if (_decor != _Decor.none) return _stopDecorating();
-      if (_stage == _Stage.pick && !_unsaved) return Navigator.of(context).pop();
+      if (!_unsaved) return Navigator.of(context).pop();
       final navigator = Navigator.of(context);
       if (await confirmLeave(context, '拍好的相片還沒存到相簿，離開就會不見喔。', stay: '留下來')) navigator.pop();
     },
