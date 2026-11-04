@@ -515,7 +515,8 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   }
 
   /// A live four-cuts video: every window plays its moment before the
-  /// shutter, twice, then the finished strip holds.
+  /// shutter, twice, then the finished strip holds. The moments are made
+  /// once and played again ([TimelapseRecorder.loop]).
   Future<String?> _renderVideo() async {
     _video?.dispose();
     final video = _video = TimelapseRecorder(subtitle: 'live four cuts ♡');
@@ -530,7 +531,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
       clips.add(good.isEmpty ? [_providers[i]] : good);
     }
     final len = clips.map((c) => c.length).reduce(max);
-    final total = len * 2;
+    final total = len;
     List<ImageProvider> shown = [];
     try {
       for (var k = 0; k < total; k++) {
@@ -551,6 +552,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
         if (shot != null) await video.add(shot);
       }
       if (!mounted) return null;
+      video.loop(2);
       setState(() => _playing = null);
       await WidgetsBinding.instance.endOfFrame;
       final finished = await _stripShot();

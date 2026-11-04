@@ -92,6 +92,27 @@ void main() {
     rec.dispose();
   });
 
+  test('拍貼機的即時影片：畫格只做一次，重播兩遍', () async {
+    const channel = MethodChannel('picosnap/video');
+    MethodCall? sent;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      sent = call;
+      return (call.arguments as Map)['out'];
+    });
+    addTearDown(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null));
+    final rec = TimelapseRecorder(dir: tmp);
+    for (var i = 0; i < 30; i++) {
+      await rec.add(await _art(Color(0xFF000000 + i * 8)));
+    }
+    rec.loop(2);
+    await rec.render(await _art(const Color(0xFFFFFFFF)));
+    final frames = ((sent!.arguments as Map)['frames'] as List).cast<String>();
+    final moments = frames.take(60).toList();
+    expect(moments.sublist(30), moments.sublist(0, 30), reason: '第二遍跟第一遍一樣');
+    expect(tmp.listSync().whereType<Directory>().single.listSync().where((f) => f.path.endsWith('.png')), hasLength(31), reason: '30 格 + 成品，沒有多做');
+    rec.dispose();
+  });
+
   test('編碼器不能用時回傳 null，不會當掉', () async {
     final rec = TimelapseRecorder(dir: tmp);
     rec.request(() => _art(const Color(0xFFFF0000)));

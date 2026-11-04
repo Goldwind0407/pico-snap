@@ -120,6 +120,15 @@ class TimelapseRecorder {
     if (_frames.length >= maxFrames && !_encodingNow) _thin();
   }
 
+  /// Plays everything so far [times] times over, without making the
+  /// frames again (the booth's live video loops its moments).
+  void loop(int times) {
+    final once = List.of(_frames);
+    for (var i = 1; i < times; i++) {
+      _frames.addAll(once);
+    }
+  }
+
   /// 隔一張丟一張，之後截得慢一倍。
   void _thin() {
     final keep = <String>[];
