@@ -229,7 +229,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       _polaroidCaptions[i] = widget.captions[i];
     }
     if (widget.draft case final draft?) _restore(draft);
-    _savedKey = widget.draft == null ? _contentKey() : null;
+    _savedKey = widget.draft == null || widget.saved ? _contentKey() : null;
   }
 
   @override
@@ -417,12 +417,17 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     });
     // Let the frame without hints and handles paint before capturing it.
     await WidgetsBinding.instance.endOfFrame;
+    final piece = _document();
+    MyWorks.lastAdded = null;
     var error = await PhotoSaveService.saveBoundary(_shotKey, keep: switch (widget.mode) {
       EditorMode.fourCut => WorkKind.fourCut,
       EditorMode.polaroid => WorkKind.collage,
       EditorMode.sticker => WorkKind.sticker,
     });
     var saved = '已存到相簿 ♡';
+    // The gallery keeps the piece, to open it again.
+    final kept = error == null ? MyWorks.lastAdded : null;
+    if (kept != null) await MyWorks.keepPiece(kept, piece);
     if (error == null && video) {
       // The clean finished piece ends the video.
       final finished = await _snapshot();
@@ -430,6 +435,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       final path = finished == null ? null : await _recorder.render(finished);
       error = path == null ? '圖片已存好，但縮時影片做不出來' : await PhotoSaveService.saveVideo(path);
       if (error == null) saved = '已存到相簿 ♡ 圖片和縮時影片';
+      if (error == null && kept != null) await MyWorks.keepVideo(kept, path!);
     }
     if (error == null) {
       _exported = true;

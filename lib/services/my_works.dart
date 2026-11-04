@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../editor_document.dart';
+import 'editor_drafts.dart';
 import 'file_store.dart';
 
 /// 作品是用哪一種玩法做的。
@@ -29,8 +31,15 @@ class Work {
   final Uint8List? bytes;
   final File? originalFile;
   final Uint8List? originalBytes;
+  /// The live video saved with it, if any.
+  final File? video;
+  /// The piece as it was in the editor, to open it again ([EditorDrafts.readFrom]).
+  final Directory? piece;
   const Work({required this.id, required this.kind, required this.created, this.file, this.bytes,
-    this.originalFile, this.originalBytes});
+    this.originalFile, this.originalBytes, this.video, this.piece});
+
+  Work copyWith({File? video, Directory? piece}) => Work(id: id, kind: kind, created: created, file: file, bytes: bytes,
+    originalFile: originalFile, originalBytes: originalBytes, video: video ?? this.video, piece: piece ?? this.piece);
 
   bool get hasOriginal => originalFile != null || originalBytes != null;
   Future<Uint8List> exportBytes() async => originalBytes ??
@@ -82,7 +91,9 @@ class MyWorks {
                 if (File('${dir.path}/${w['id']}.png') case final f when f.existsSync())
                   Work(id: '${w['id']}', kind: kind, created: DateTime.fromMillisecondsSinceEpoch(w['t'] as int), file: f,
                     originalFile: w['original'] == true && File('${dir.path}/${w['id']}_original.png').existsSync()
-                        ? File('${dir.path}/${w['id']}_original.png') : null),
+                        ? File('${dir.path}/${w['id']}_original.png') : null,
+                    video: File('${dir.path}/${w['id']}.mp4').existsSync() ? File('${dir.path}/${w['id']}.mp4') : null,
+                    piece: File('${dir.path}/${w['id']}_piece/draft.json').existsSync() ? Directory('${dir.path}/${w['id']}_piece') : null),
           ]);
       }
     } catch (e) {
@@ -107,12 +118,16 @@ class MyWorks {
   @visibleForTesting
   static void reset() {
     _dir = null;
+    lastAdded = null;
     works.clear();
     notes.clear();
     changes.value++;
   }
 
   static int _last = 0;
+
+  /// The work [add] put in last, to keep its video or piece with it.
+  static Work? lastAdded;
 
   /// 收進一件作品（[png] 是給 App 裡看的縮小版）。
   static Future<Work> add(Uint8List png, WorkKind kind, {DateTime? at, Uint8List? original}) async {
@@ -132,10 +147,40 @@ class MyWorks {
       }
     }
     works.insert(0, work);
+    lastAdded = work;
     // Shown either way; if the list didn't save, it's gone after a restart
     // (the picture itself is safe in the phone's album).
     await _saveList();
     return work;
+  }
+
+  /// Keeps the live video at [path] with [work] (copied, the file at
+  /// [path] can go).
+  static Future<void> keepVideo(Work work, String path) async {
+    final dir = _dir;
+    if (dir == null) return;
+    try {
+      final f = await File(path).copy('${dir.path}/${work.id}.mp4');
+      _replace(work.id, (w) => w.copyWith(video: f));
+    } catch (e) {
+      debugPrint('[WORKS] 存影片失敗: $e');
+    }
+  }
+
+  /// Keeps the editor's piece with [work], so it can be opened again.
+  static Future<void> keepPiece(Work work, EditorDocument document) async {
+    final dir = _dir;
+    if (dir == null) return;
+    final piece = Directory('${dir.path}/${work.id}_piece');
+    if (await EditorDrafts.keep(document, piece)) _replace(work.id, (w) => w.copyWith(piece: piece));
+  }
+
+  static void _replace(String id, Work Function(Work) change) {
+    final i = works.indexWhere((w) => w.id == id);
+    if (i < 0) return;
+    works[i] = change(works[i]);
+    if (lastAdded?.id == id) lastAdded = works[i];
+    changes.value++;
   }
 
   /// 從作品集拿掉（相簿裡的那份不會動）。
@@ -147,6 +192,8 @@ class MyWorks {
     try {
       await work.file?.delete();
       await work.originalFile?.delete();
+      await work.video?.delete();
+      await work.piece?.delete(recursive: true);
     } catch (e) {
       debugPrint('[WORKS] 刪作品檔失敗: $e');
     }

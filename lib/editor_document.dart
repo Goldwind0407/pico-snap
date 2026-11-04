@@ -49,6 +49,25 @@ class EditorDocument {
         strokes = copyStrokes(strokes),
         handwriting = [for (final lines in handwriting) copyStrokes(lines)];
 
+  /// A fresh four-cuts piece with these photos, as the editor starts one
+  /// (its starting caption, pattern and backdrop).
+  factory EditorDocument.start(EditorMode mode, {required List<Uint8List> photos, required List<String> filters, int template = 0}) => EditorDocument(
+        mode: mode,
+        photos: [for (var i = 0; i < 4; i++) i < photos.length ? photos[i] : null],
+        fits: List.filled(4, const PhotoFit()),
+        films: List.filled(4, FilmStock.white),
+        filters: [for (var i = 0; i < 4; i++) i < filters.length ? filters[i] : ''], // '': the first filter
+        captions: const ['good day', 'little joy', 'sunny!', 'us ♡'],
+        stickers: const [],
+        strokes: const [],
+        handwriting: const [],
+        templateKey: keyForTemplate(template),
+        format: 3,
+        pattern: 0,
+        backdrop: 1,
+        bubble: 'DREAM',
+      );
+
   static List<Stroke> copyStrokes(List<Stroke> strokes) => [
         for (final s in strokes)
           Stroke(

@@ -91,34 +91,13 @@ abstract final class EditorDrafts {
         if (!enabled) return false;
         try {
           final dir = await _directory(id).create(recursive: true);
-          final known = _assets.putIfAbsent(id, () => Map.identity());
-          Future<String?> asset(Uint8List? bytes) async {
-            if (bytes == null) return null;
-            if (known[bytes] case final name?) return name;
-            final name =
-                'image_${DateTime.now().microsecondsSinceEpoch}_${_serial++}.bin';
-            await File('${dir.path}/$name').writeAsBytes(bytes, flush: true);
-            known[bytes] = name;
-            return name;
-          }
-
-          final photos = <String?>[];
-          for (final bytes in document.photos) {
-            photos.add(await asset(bytes));
-          }
-          final json = document.toJson(photos, await asset(document.subject));
-          final now = DateTime.now();
-          json['updated'] = now.millisecondsSinceEpoch;
+          final now = await _write(dir, _assets.putIfAbsent(id, () => Map.identity()), document);
           final thumbFile = File('${dir.path}/thumb.png');
           if (thumb != null) {
             await File('${dir.path}/thumb.png.tmp').writeAsBytes(thumb, flush: true);
             await File('${dir.path}/thumb.png.tmp').rename(thumbFile.path);
             await FileImage(thumbFile).evict();
           }
-          final encoded = await compute(jsonEncode, json);
-          final temp = File('${dir.path}/draft.json.tmp');
-          await temp.writeAsString(encoded, flush: true);
-          await temp.rename('${dir.path}/draft.json');
           entries.removeWhere((d) => d.id == id);
           entries.add(EditorDraft(id, document.mode, now, await thumbFile.exists() ? thumbFile : null));
           _notify();
@@ -129,29 +108,68 @@ abstract final class EditorDrafts {
         }
       });
 
-  static Future<EditorDocument> read(String id) => _writer.run(() async {
-        final dir = _directory(id);
-        final json =
-            jsonDecode(await File('${dir.path}/draft.json').readAsString())
-                as Map<String, dynamic>;
-        Future<Uint8List?> asset(Object? value) async {
-          if (value == null) return null;
-          final name = value as String;
-          if (!RegExp(r'^image_\d+_\d+\.bin$').hasMatch(name)) {
-            throw const FormatException('Invalid draft asset');
-          }
-          final bytes = await File('${dir.path}/$name').readAsBytes();
-          _assets.putIfAbsent(id, () => Map.identity())[bytes] = name;
-          return bytes;
+  /// Keeps a copy of [document] in [dir] (a saved work's), in the drafts'
+  /// format, to open it again later.
+  static Future<bool> keep(EditorDocument document, Directory dir) => _writer.run(() async {
+        try {
+          await _write(await dir.create(recursive: true), Map.identity(), document);
+          return true;
+        } catch (e) {
+          debugPrint('[DRAFT] keeping the piece failed: $e');
+          return false;
         }
-
-        final photos = <Uint8List?>[];
-        for (final file in json['photos'] as List) {
-          photos.add(await asset(file));
-        }
-        return EditorDocument.fromJson(
-            json, photos, await asset(json['subject']));
       });
+
+  /// Photo files first, the JSON last; returns the time written.
+  static Future<DateTime> _write(Directory dir, Map<Uint8List, String> known, EditorDocument document) async {
+    Future<String?> asset(Uint8List? bytes) async {
+      if (bytes == null) return null;
+      if (known[bytes] case final name?) return name;
+      final name = 'image_${DateTime.now().microsecondsSinceEpoch}_${_serial++}.bin';
+      await File('${dir.path}/$name').writeAsBytes(bytes, flush: true);
+      known[bytes] = name;
+      return name;
+    }
+
+    final photos = <String?>[];
+    for (final bytes in document.photos) {
+      photos.add(await asset(bytes));
+    }
+    final json = document.toJson(photos, await asset(document.subject));
+    final now = DateTime.now();
+    json['updated'] = now.millisecondsSinceEpoch;
+    final encoded = await compute(jsonEncode, json);
+    final temp = File('${dir.path}/draft.json.tmp');
+    await temp.writeAsString(encoded, flush: true);
+    await temp.rename('${dir.path}/draft.json');
+    return now;
+  }
+
+  static Future<EditorDocument> read(String id) =>
+      _writer.run(() => _read(_directory(id), _assets.putIfAbsent(id, () => Map.identity())));
+
+  /// A piece kept with [keep].
+  static Future<EditorDocument> readFrom(Directory dir) => _writer.run(() => _read(dir, Map.identity()));
+
+  static Future<EditorDocument> _read(Directory dir, Map<Uint8List, String> known) async {
+    final json = jsonDecode(await File('${dir.path}/draft.json').readAsString()) as Map<String, dynamic>;
+    Future<Uint8List?> asset(Object? value) async {
+      if (value == null) return null;
+      final name = value as String;
+      if (!RegExp(r'^image_\d+_\d+\.bin$').hasMatch(name)) {
+        throw const FormatException('Invalid draft asset');
+      }
+      final bytes = await File('${dir.path}/$name').readAsBytes();
+      known[bytes] = name;
+      return bytes;
+    }
+
+    final photos = <Uint8List?>[];
+    for (final file in json['photos'] as List) {
+      photos.add(await asset(file));
+    }
+    return EditorDocument.fromJson(json, photos, await asset(json['subject']));
+  }
 
   static Future<void> remove(String id) => _writer.run(() async {
         if (!enabled) return;

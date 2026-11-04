@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
+import 'editor_document.dart';
 import 'editor_screen.dart';
 import 'filters.dart';
 import 'models.dart';
@@ -479,12 +480,20 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
     if (_saving) return;
     setState(() => _saving = true);
     await WidgetsBinding.instance.endOfFrame;
+    MyWorks.lastAdded = null;
     var error = await PhotoSaveService.saveBoundary(_stripKey, keep: WorkKind.fourCut);
     var done = '已存到相簿 ♡';
+    // The gallery keeps the photos too, to decorate them later.
+    final kept = error == null ? MyWorks.lastAdded : null;
+    if (kept != null) {
+      await MyWorks.keepPiece(kept, EditorDocument.start(EditorMode.fourCut,
+        photos: _photos, filters: [for (var i = 0; i < 4; i++) _filter.id], template: _template));
+    }
     if (error == null && _withVideo && _canVideo) {
       final path = await _renderVideo();
       error = path == null ? '圖片已存好，但影片做不出來' : await PhotoSaveService.saveVideo(path);
       if (error == null) done = '已存到相簿 ♡ 圖片和影片';
+      if (error == null && kept != null) await MyWorks.keepVideo(kept, path!);
     }
     if (!mounted) return;
     setState(() {

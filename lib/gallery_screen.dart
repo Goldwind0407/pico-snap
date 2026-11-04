@@ -1,6 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:video_player/video_player.dart';
 
+import 'editor_screen.dart';
+import 'lut_files.dart';
+import 'services/editor_drafts.dart';
 import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
 import 'theme.dart';
@@ -128,7 +136,7 @@ class WorkTile extends StatelessWidget {
   );
 }
 
-/// 全螢幕看作品：左右滑換一件，可以再存一次到相簿或從作品集刪掉。
+/// 全螢幕看作品：左右滑換一件，可以分享、再編輯、看影片、再存一次到相簿或從作品集刪掉。
 class WorkViewer extends StatefulWidget {
   final List<Work> works;
   final int initial;
@@ -169,6 +177,34 @@ class _WorkViewerState extends State<WorkViewer> {
     if (!mounted) return;
     setState(() => _busy = false);
     showMessage(context, error ?? (work.hasOriginal ? '原尺寸作品已存到相簿 ♡' : '預覽版本已存到相簿 ♡'), error: error != null);
+  }
+
+  Future<void> _share() async {
+    setState(() => _busy = true);
+    final work = _work;
+    try {
+      final dir = await getTemporaryDirectory();
+      final f = await File('${dir.path}/pico_snap_${work.id}.png').writeAsBytes(await work.exportBytes(), flush: true);
+      await SharePlus.instance.share(ShareParams(files: [XFile(f.path, mimeType: 'image/png')]));
+    } catch (e) {
+      debugPrint('[WORKS] share: $e');
+      if (mounted) showMessage(context, '分享不了，請再試一次', error: true);
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
+  /// Opens the piece in the editor again; saving makes a new work.
+  Future<void> _edit() async {
+    final work = _work;
+    try {
+      await LutFiles.load();
+      final piece = await EditorDrafts.readFrom(work.piece!);
+      if (!mounted) return;
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => EditorScreen(mode: piece.mode, draft: piece, saved: true)));
+    } catch (e) {
+      debugPrint('[WORKS] edit: $e');
+      if (mounted) showMessage(context, '打不開這件作品', error: true);
+    }
   }
 
   Future<void> _delete() async {
@@ -215,30 +251,124 @@ class _WorkViewerState extends State<WorkViewer> {
         ),
       )),
       Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
         child: Row(children: [
-          Expanded(child: OutlinedButton.icon(
-            onPressed: _delete,
-            icon: const Icon(CupertinoIcons.trash, size: 18),
-            label: const Text('刪除', style: TextStyle(fontWeight: FontWeight.w800)),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFB4483C), backgroundColor: Colors.white,
-              side: const BorderSide(color: line, width: 1.3), padding: const EdgeInsets.symmetric(vertical: 13),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          )),
-          const SizedBox(width: 10),
-          Expanded(flex: 2, child: FilledButton.icon(
-            onPressed: _busy ? null : _saveAgain,
-            icon: const Icon(CupertinoIcons.arrow_down_to_line, size: 18),
-            label: Text(_busy ? '儲存中…' : _work.hasOriginal ? '再存一次到相簿' : '儲存預覽版（1400px 內）', style: const TextStyle(fontWeight: FontWeight.w800)),
-            style: FilledButton.styleFrom(
-              backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 13),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          )),
+          _Action(CupertinoIcons.share, '分享', _busy ? null : _share, main: true),
+          if (_work.piece != null) _Action(CupertinoIcons.pencil, '再編輯', _edit),
+          if (_work.video != null) _Action(CupertinoIcons.play_circle, '看影片', () => VideoViewer.open(context, _work.video!)),
+          // Older works kept only the preview (1400px).
+          _Action(CupertinoIcons.arrow_down_to_line, _busy ? '儲存中…' : _work.hasOriginal ? '存到相簿' : '存預覽版', _busy ? null : _saveAgain),
+          _Action(CupertinoIcons.trash, '刪除', _delete, danger: true),
         ]),
       ),
+    ])),
+  );
+}
+
+/// One of the viewer's actions: an icon with its name under it.
+class _Action extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool main, danger;
+  const _Action(this.icon, this.label, this.onTap, {this.main = false, this.danger = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = onTap == null ? muted : danger ? const Color(0xFFB4483C) : main ? Colors.white : ink;
+    return Expanded(child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Material(
+        color: main ? coral : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: main ? BorderSide.none : const BorderSide(color: line, width: 1.3)),
+        child: InkWell(
+          onTap: onTap,
+          customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(icon, size: 22, color: color),
+              const SizedBox(height: 4),
+              Text(label, maxLines: 1, overflow: TextOverflow.fade, softWrap: false, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w800)),
+            ]),
+          ),
+        ),
+      ),
+    ));
+  }
+}
+
+/// A work's live video, playing over and over; tap to pause.
+class VideoViewer extends StatefulWidget {
+  final File file;
+  const VideoViewer({super.key, required this.file});
+
+  static Future<void> open(BuildContext context, File file) => Navigator.push(context, MaterialPageRoute(builder: (_) => VideoViewer(file: file)));
+
+  @override
+  State<VideoViewer> createState() => _VideoViewerState();
+}
+
+class _VideoViewerState extends State<VideoViewer> {
+  late final _video = VideoPlayerController.file(widget.file);
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _video.setLooping(true);
+    _video.initialize().then((_) {
+      if (mounted) setState(() {});
+      _video.play();
+    }, onError: (Object e) {
+      debugPrint('[WORKS] video: $e');
+      if (mounted) setState(() => _failed = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _video.dispose();
+    super.dispose();
+  }
+
+  Future<void> _share() async {
+    try {
+      await SharePlus.instance.share(ShareParams(files: [XFile(widget.file.path, mimeType: 'video/mp4')]));
+    } catch (e) {
+      if (mounted) showMessage(context, '分享不了，請再試一次', error: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: cream,
+    body: SafeArea(child: Column(children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+        child: Row(children: [
+          IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(CupertinoIcons.back, color: ink, size: 26)),
+          const Expanded(child: Text('影片', style: TextStyle(fontSize: 18, color: ink, fontWeight: FontWeight.w900))),
+          IconButton(tooltip: '分享', onPressed: _share, icon: const Icon(CupertinoIcons.share, color: ink)),
+        ]),
+      ),
+      Expanded(child: Center(child: _failed
+          ? const Text('這段影片播不了', style: TextStyle(color: muted, fontWeight: FontWeight.w700))
+          : !_video.value.isInitialized
+              ? const CircularProgressIndicator(color: coral)
+              : GestureDetector(
+                  onTap: () {
+                    _video.value.isPlaying ? _video.pause() : _video.play();
+                    setState(() {});
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: AspectRatio(aspectRatio: _video.value.aspectRatio, child: Stack(fit: StackFit.expand, children: [
+                      VideoPlayer(_video),
+                      if (!_video.value.isPlaying) const Center(child: Icon(CupertinoIcons.play_circle_fill, size: 64, color: Colors.white)),
+                    ])),
+                  ),
+                ))),
     ])),
   );
 }

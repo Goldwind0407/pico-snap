@@ -1,13 +1,17 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pico_snap/editor_document.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/gallery_screen.dart';
 import 'package:pico_snap/home_screen.dart';
+import 'package:pico_snap/lut_files.dart';
 import 'package:pico_snap/models.dart';
+import 'package:pico_snap/services/editor_drafts.dart';
 import 'package:pico_snap/services/my_works.dart';
 import 'package:pico_snap/theme.dart';
 import 'package:pico_snap/widgets/doodle.dart';
@@ -82,15 +86,40 @@ void main() {
 
     await t.tap(find.byType(WorkTile));
     await t.pumpAndSettle();
-    expect(find.text('儲存預覽版（1400px 內）'), findsOneWidget);
+    expect(find.text('存預覽版'), findsOneWidget);
     await t.tap(find.text('刪除'));
     await t.pumpAndSettle();
     await t.tap(find.descendant(of: find.byType(GlassDialog), matching: find.text('刪除')));
     await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
     await t.pumpAndSettle();
-    expect(find.text('儲存預覽版（1400px 內）'), findsNothing, reason: '最後一件刪掉就回到作品集');
+    expect(find.text('存預覽版'), findsNothing, reason: '最後一件刪掉就回到作品集');
     expect(MyWorks.works.single.kind, WorkKind.fourCut);
     expect(find.byType(WorkTile), findsOneWidget, reason: '只剩一種就不用篩選，顯示全部');
+  });
+
+  testWidgets('作品集：作品可以分享、再編輯、看影片', (t) async {
+    final dir = (await t.runAsync(() => Directory.systemTemp.createTemp('pico_work_piece_')))!;
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final png = (await t.runAsync(_png))!;
+    final piece = Directory('${dir.path}/piece');
+    await t.runAsync(() => EditorDrafts.keep(EditorDocument.start(EditorMode.fourCut, photos: [png], filters: const []), piece));
+    final work = Work(id: '1', kind: WorkKind.fourCut, created: DateTime(2026, 11, 4), bytes: png, piece: piece);
+    await _phone(t, WorkViewer(works: [work, Work(id: '2', kind: WorkKind.instant, created: DateTime(2026, 11, 4), bytes: png)], initial: 1));
+    expect(find.text('分享'), findsOneWidget);
+    expect(find.text('再編輯'), findsNothing, reason: '拍立得相機的作品沒有可以編輯的內容');
+    expect(find.text('看影片'), findsNothing);
+    await t.drag(find.byType(PageView), const Offset(400, 0));
+    await t.pumpAndSettle();
+    await t.runAsync(LutFiles.load);
+    await t.tap(find.text('再編輯'));
+    for (var i = 0; i < 20 && find.byType(EditorScreen).evaluate().isEmpty; i++) {
+      await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await t.pump();
+    }
+    await t.pumpAndSettle();
+    final editor = t.widget<EditorScreen>(find.byType(EditorScreen));
+    expect(editor.draft!.photos.first, png);
+    expect(editor.saved, isTrue, reason: '沒改就離開不會問、也不會留草稿');
   });
 
   testWidgets('首頁：底部「作品集」是分頁，「日記」可以寫今天的心情', (t) async {
