@@ -2,10 +2,12 @@ import 'dart:math';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../theme.dart';
 import 'frames.dart';
+import 'sticker_motion.dart';
 
 /// A sticker inside the canvas Stack. Drag or pinch the body to move, scale
 /// and rotate it; drag the bottom-right handle to scale and rotate with one
@@ -17,6 +19,7 @@ class StickerItem extends StatefulWidget {
   final StickerData data;
   final Size canvas;
   final bool selected;
+  final bool animatePlacement, animationsEnabled;
   final VoidCallback onSelect, onDelete, onFlip, onEditStart;
   final ValueChanged<StickerData> onChanged;
   final Offset Function(Offset global) toLocal;
@@ -26,16 +29,61 @@ class StickerItem extends StatefulWidget {
   const StickerItem({
     super.key, required this.data, required this.canvas, required this.selected, required this.onSelect,
     required this.onDelete, required this.onFlip, required this.onEditStart, required this.onChanged, required this.toLocal,
-    this.zoom = 1,
+    this.zoom = 1, this.animatePlacement = false, this.animationsEnabled = true,
   });
 
   @override
   State<StickerItem> createState() => _StickerItemState();
 }
 
-class _StickerItemState extends State<StickerItem> {
+class _StickerItemState extends State<StickerItem> with SingleTickerProviderStateMixin {
+  late final _landing = AnimationController(vsync: this, value: 1, duration: stickerLandDuration);
+  bool _initialized = false;
   late StickerData _start;
   Offset _startFocal = Offset.zero;
+
+  bool get _canAnimate => widget.animationsEnabled && !MediaQuery.disableAnimationsOf(context);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      if (widget.animatePlacement && _canAnimate) _landing.forward(from: 0);
+    }
+    if (!_canAnimate) _landing.value = 1;
+  }
+
+  @override
+  void didUpdateWidget(StickerItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.animationsEnabled && oldWidget.animationsEnabled) _landing.value = 1;
+  }
+
+  @override
+  void dispose() {
+    _landing.dispose();
+    super.dispose();
+  }
+
+  Future<void> _select() async {
+    widget.onSelect();
+    HapticFeedback.selectionClick();
+    if (!_canAnimate) return;
+    try {
+      // Lift the corner before rolling it back down. Starting halfway through
+      // a landing would flash an already-folded sticker on a simple tap.
+      await _landing.animateBack(.3, duration: const Duration(milliseconds: 260)).orCancel;
+      if (mounted && _canAnimate) await _landing.forward().orCancel;
+    } on TickerCanceled {
+      // A new tap, drag or removal owns the motion now.
+    }
+  }
+
+  void _land() {
+    if (_canAnimate) _landing.forward();
+    HapticFeedback.lightImpact();
+  }
 
   // On tall narrow canvases (the four-cut strip) the width alone makes
   // stickers tiny, so the long side sets a minimum.
@@ -43,6 +91,7 @@ class _StickerItemState extends State<StickerItem> {
   Offset get _centerPx => Offset(widget.data.center.dx * widget.canvas.width, widget.data.center.dy * widget.canvas.height);
 
   void _onScaleStart(ScaleStartDetails d) {
+    _landing.value = _canAnimate ? .52 : 1;
     widget.onEditStart();
     _start = widget.data;
     _startFocal = d.focalPoint;
@@ -74,17 +123,22 @@ class _StickerItemState extends State<StickerItem> {
     final c = _centerPx;
     return Positioned(
       left: c.dx - s / 2 - h, top: c.dy - s / 2 - h, width: s + h * 2, height: s + h * 2,
-      child: Transform.rotate(angle: widget.data.rotation, child: Stack(children: [
+      child: Transform.rotate(angle: widget.data.rotation, child: Stack(clipBehavior: Clip.none, children: [
         Positioned.fill(child: Padding(
           padding: EdgeInsets.all(h),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: widget.onSelect,
+            onTap: _select,
             onScaleStart: _onScaleStart,
             onScaleUpdate: _onScaleUpdate,
+            onScaleEnd: (_) => _land(),
             child: CustomPaint(
               foregroundPainter: widget.selected ? const _DashedRectPainter() : null,
-              child: Transform.flip(flipX: widget.data.flipped, child: StickerVisual(widget.data.sticker, size: 120)),
+              child: AnimatedBuilder(
+                animation: _landing,
+                child: Transform.flip(flipX: widget.data.flipped, child: StickerVisual(widget.data.sticker, size: 120)),
+                builder: (context, child) => StickerLanding(progress: _canAnimate ? _landing.value : 1, child: child!),
+              ),
             ),
           ),
         )),
@@ -102,8 +156,12 @@ class _StickerItemState extends State<StickerItem> {
           )),
           Positioned(right: 0, bottom: 0, child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onPanStart: (_) => widget.onEditStart(),
+            onPanStart: (_) {
+              _landing.value = _canAnimate ? .52 : 1;
+              widget.onEditStart();
+            },
             onPanUpdate: (d) => _onHandleUpdate(d, pi / 4),
+            onPanEnd: (_) => _land(),
             child: sized(const _Handle(label: '拖曳縮放、旋轉', child: Icon(CupertinoIcons.arrow_up_left_arrow_down_right, size: 12, color: ink))),
           )),
         ],

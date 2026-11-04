@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../theme.dart';
 import 'frames.dart';
+import 'sticker_motion.dart';
 
 /// One of the user's sticker sheets drawn like the generated ones: grey
 /// backing paper with the stickers laid out on it. [onTap] gets the sticker
@@ -12,9 +13,10 @@ class MySheetView extends StatelessWidget {
   final MySheet sheet;
   final ValueChanged<String>? onTap, onLongPress;
   final Set<String> selected;
+  final bool peelOnTap;
   /// Stickers per row.
   final int columns;
-  const MySheetView({super.key, required this.sheet, this.onTap, this.onLongPress, this.selected = const {}, this.columns = 4});
+  const MySheetView({super.key, required this.sheet, this.onTap, this.onLongPress, this.selected = const {}, this.columns = 4, this.peelOnTap = false});
 
   static const paper = Color(0xFF9E9E9E);
 
@@ -34,7 +36,13 @@ class MySheetView extends StatelessWidget {
           crossAxisCount: columns, mainAxisSpacing: 6, crossAxisSpacing: 6,
           children: [
             for (final id in sheet.stickers)
-              GestureDetector(
+              if (peelOnTap && onTap != null)
+                PeelableSticker(
+                  key: ValueKey(id),
+                  onPick: () => onTap!(id),
+                  child: Padding(padding: const EdgeInsets.all(6.5), child: FittedBox(child: StickerVisual(id, size: 96))),
+                )
+              else GestureDetector(
                 onTap: onTap == null ? null : () => onTap!(id),
                 onLongPress: onLongPress == null ? null : () => onLongPress!(id),
                 child: AnimatedContainer(

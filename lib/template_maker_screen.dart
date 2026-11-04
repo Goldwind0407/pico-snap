@@ -151,6 +151,7 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
         for (var i = 0; i < _t.stickers.length; i++)
           StickerItem(
             data: _t.stickers[i],
+            animatePlacement: _selected == i,
             canvas: size,
             selected: _selected == i,
             toLocal: _toCanvas,

@@ -626,6 +626,8 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
         for (var i = 0; i < _stickers.length; i++)
           StickerItem(
             data: _stickers[i],
+            animatePlacement: _selectedSticker == i,
+            animationsEnabled: !_capturing,
             canvas: size,
             selected: !_capturing && _selectedSticker == i,
             toLocal: _toCanvas,

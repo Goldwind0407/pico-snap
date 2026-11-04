@@ -741,6 +741,8 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
               for (var i = 0; i < print.stickers.length; i++)
                 StickerItem(
                   data: print.stickers[i],
+                  animatePlacement: _selectedSticker == i,
+                  animationsEnabled: !_saving,
                   canvas: printSize,
                   zoom: rect.width / printSize.width,
                   selected: _decor == _Decor.stickers && _selectedSticker == i,
