@@ -558,6 +558,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
 
   void _decorate() => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => EditorScreen(
     template: _template, photos: List.of(_photos), filters: List.filled(_shots, _filter),
+    decorate: true, saved: _saved,
   )));
 
   void _fromAlbum() => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => EditorScreen(template: _template)));
@@ -865,7 +866,14 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
                 child: const Text('再拍一組', style: TextStyle(fontWeight: FontWeight.w900)),
               )),
             ])
-          : SizedBox(width: double.infinity, child: FilledButton(
+          : Row(children: [
+              OutlinedButton(
+                onPressed: _saving ? null : _decorate,
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                child: const Text('加貼紙裝飾', style: TextStyle(color: ink, fontWeight: FontWeight.w800)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: FilledButton(
               onPressed: _saving ? null : _save,
               style: FilledButton.styleFrom(backgroundColor: coral, disabledBackgroundColor: coral.withValues(alpha: .6), disabledForegroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
               child: Text(
@@ -873,6 +881,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
               ),
             )),
+            ]),
     ),
   ];
 }

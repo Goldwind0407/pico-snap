@@ -58,8 +58,13 @@ class _HomeScreenState extends State<HomeScreen> {
       _pad(const _Header()),
       ValueListenableBuilder<int>(valueListenable: EditorDrafts.changes, builder: (context, _, child) {
         if (EditorDrafts.entries.isEmpty) return const SizedBox.shrink();
-        return _pad(ExpansionTile(title: Text('繼續編輯草稿（${EditorDrafts.entries.length}）'),
-          leading: const Icon(CupertinoIcons.square_pencil),
+        // A rounded card like the others, without the tile's divider lines.
+        return _pad(Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: line)),
+          child: ExpansionTile(title: Text('繼續編輯草稿（${EditorDrafts.entries.length}）', style: const TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800)),
+          leading: const Icon(CupertinoIcons.square_pencil, color: coral),
+          shape: const Border(), collapsedShape: const Border(),
           // iOS chevron that turns down when open, in place of Material's arrow.
           onExpansionChanged: (open) => _draftsOpen.value = open,
           trailing: ValueListenableBuilder<bool>(valueListenable: _draftsOpen, builder: (_, open, __) => AnimatedRotation(
@@ -68,6 +73,12 @@ class _HomeScreenState extends State<HomeScreen> {
           )),
           children: [
           for (final draft in List.of(EditorDrafts.entries)) ListTile(
+            leading: ClipRRect(borderRadius: BorderRadius.circular(6), child: Container(
+              width: 40, height: 50, color: cream,
+              child: draft.thumb == null
+                  ? const Icon(CupertinoIcons.photo, size: 18, color: muted)
+                  : Image.file(draft.thumb!, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(CupertinoIcons.photo, size: 18, color: muted)),
+            )),
             title: Text(draft.label), subtitle: Text('${draft.updated.month}/${draft.updated.day} ${draft.updated.hour.toString().padLeft(2, '0')}:${draft.updated.minute.toString().padLeft(2, '0')}'),
             onTap: () async {
               try {
@@ -88,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             }),
           ),
-        ]));
+        ])));
       }),
       const SizedBox(height: 22),
       _pad(_HeroCard(onStart: () => _open(context, EditorMode.fourCut))),

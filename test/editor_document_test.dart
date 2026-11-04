@@ -12,6 +12,7 @@ import 'package:pico_snap/services/my_works.dart';
 import 'package:pico_snap/widgets/doodle.dart';
 import 'package:pico_snap/widgets/frames.dart';
 import 'package:pico_snap/widgets/instant_print.dart';
+import 'package:pico_snap/widgets/sticker_book_view.dart';
 
 EditorDocument document({List<Stroke> strokes = const []}) => EditorDocument(
       mode: EditorMode.polaroid,
@@ -124,5 +125,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(captions(), contains('edited caption'));
     await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('已經存到相簿的作品拿來裝飾，什麼都沒改就離開，不會變成草稿', (tester) async {
+    final dir = (await tester.runAsync(() => Directory.systemTemp.createTemp('pico_draft_saved_')))!;
+    await tester.runAsync(() => EditorDrafts.load(directory: dir));
+    addTearDown(() {
+      EditorDrafts.reset();
+      dir.deleteSync(recursive: true);
+    });
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(home: EditorScreen(
+        photos: [Uint8List.fromList([1, 2, 3])], decorate: true, saved: true)));
+    await tester.pump();
+    expect(find.byType(StickerBookView), findsOneWidget, reason: '直接開在貼紙');
+    await tester.pumpWidget(const SizedBox());
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    expect(EditorDrafts.entries, isEmpty);
   });
 }

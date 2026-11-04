@@ -67,7 +67,12 @@ class EditorScreen extends StatefulWidget {
   final List<List<Stroke>> handwriting;
   final List<FilmStock> films;
   final List<PhotoFilter> filters;
-  const EditorScreen({super.key, this.draft, this.draftId, this.mode = EditorMode.fourCut, this.template = 0, this.photos = const [], this.captions = const [], this.handwriting = const [], this.films = const [], this.filters = const []});
+  /// Opened to decorate a finished piece: starts on the stickers.
+  final bool decorate;
+  /// The piece as it opens is already in the album: leaving it untouched
+  /// keeps no draft.
+  final bool saved;
+  const EditorScreen({super.key, this.draft, this.draftId, this.mode = EditorMode.fourCut, this.template = 0, this.photos = const [], this.captions = const [], this.handwriting = const [], this.films = const [], this.filters = const [], this.decorate = false, this.saved = false});
 
   @override
   State<EditorScreen> createState() => _EditorScreenState();
@@ -135,7 +140,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   Object? _draftKey;
   String? _historyGroup;
   DateTime? _historyAt;
-  bool _exported = false;
+  late bool _exported = widget.saved;
 
   EditorDocument _document() => EditorDocument(mode: widget.mode, photos: _photoBytes,
     fits: _fits, films: _films, filters: [for (final f in _filters) f.id],
@@ -166,7 +171,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     if (!_edited && _photoBytes.every((p) => p == null)) return true;
     final key = _contentKey();
     if (_draftKey == key) return true;
-    final saved = await EditorDrafts.save(_draftId, _document());
+    final saved = await EditorDrafts.save(_draftId, _document(), thumb: await _thumb());
     if (saved) _draftKey = key;
     return saved;
   }
@@ -176,7 +181,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     if (state != AppLifecycleState.resumed) unawaited(_writeDraft());
   }
   int? _selectedSticker;
-  late _Tool _tool = _tools.first;
+  late _Tool _tool = widget.decorate ? _Tool.sticker : _tools.first;
 
   List<_Tool> get _tools => switch (widget.mode) {
     EditorMode.fourCut => const [_Tool.template, _Tool.sticker, _Tool.text, _Tool.brush, _Tool.filter],
@@ -333,6 +338,20 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     final b = _shotKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (!mounted || b == null || !b.attached || b.size.isEmpty) return null;
     return b.toImage(pixelRatio: 1000 / b.size.longestSide);
+  }
+
+  /// A small picture of the piece for the drafts list.
+  Future<Uint8List?> _thumb() async {
+    try {
+      final b = _shotKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (!mounted || b == null || !b.attached || b.size.isEmpty) return null;
+      final image = await b.toImage(pixelRatio: 200 / b.size.longestSide);
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      return png?.buffer.asUint8List();
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Ask whether to save the timelapse too, then save.

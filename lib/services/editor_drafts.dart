@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../editor_document.dart';
@@ -12,7 +13,9 @@ class EditorDraft {
   final String id;
   final EditorMode mode;
   final DateTime updated;
-  const EditorDraft(this.id, this.mode, this.updated);
+  /// A small picture of the piece, if one was saved.
+  final File? thumb;
+  const EditorDraft(this.id, this.mode, this.updated, [this.thumb]);
   String get label => switch (mode) {
         EditorMode.fourCut => '四格拍貼',
         EditorMode.polaroid => '拍立得拼貼',
@@ -57,10 +60,12 @@ abstract final class EditorDrafts {
               jsonDecode(await File('${dir.path}/draft.json').readAsString())
                   as Map<String, dynamic>;
           if (json['version'] != 1) continue;
+          final thumb = File('${dir.path}/thumb.png');
           entries.add(EditorDraft(
               id,
               EditorMode.values.byName(json['mode'] as String),
-              DateTime.fromMillisecondsSinceEpoch(json['updated'] as int)));
+              DateTime.fromMillisecondsSinceEpoch(json['updated'] as int),
+              thumb.existsSync() ? thumb : null));
         } catch (e) {
           debugPrint('[DRAFT] skipped unreadable draft $id: $e');
         }
@@ -79,7 +84,9 @@ abstract final class EditorDrafts {
     return Directory('${_root!.path}/$id');
   }
 
-  static Future<bool> save(String id, EditorDocument document) =>
+  /// [thumb] (PNG) replaces the draft's picture; without one the last
+  /// picture stays.
+  static Future<bool> save(String id, EditorDocument document, {Uint8List? thumb}) =>
       _writer.run(() async {
         if (!enabled) return false;
         try {
@@ -102,12 +109,18 @@ abstract final class EditorDrafts {
           final json = document.toJson(photos, await asset(document.subject));
           final now = DateTime.now();
           json['updated'] = now.millisecondsSinceEpoch;
+          final thumbFile = File('${dir.path}/thumb.png');
+          if (thumb != null) {
+            await File('${dir.path}/thumb.png.tmp').writeAsBytes(thumb, flush: true);
+            await File('${dir.path}/thumb.png.tmp').rename(thumbFile.path);
+            await FileImage(thumbFile).evict();
+          }
           final encoded = await compute(jsonEncode, json);
           final temp = File('${dir.path}/draft.json.tmp');
           await temp.writeAsString(encoded, flush: true);
           await temp.rename('${dir.path}/draft.json');
           entries.removeWhere((d) => d.id == id);
-          entries.add(EditorDraft(id, document.mode, now));
+          entries.add(EditorDraft(id, document.mode, now, await thumbFile.exists() ? thumbFile : null));
           _notify();
           return true;
         } catch (e) {

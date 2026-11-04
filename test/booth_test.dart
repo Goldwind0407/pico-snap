@@ -87,6 +87,7 @@ void main() {
     expect(find.text('完成！'), findsOneWidget);
     expect(find.text('存到相簿'), findsOneWidget);
     expect(find.text('這次沒有錄到畫面，只能存圖片'), findsOneWidget);
+    expect(find.text('加貼紙裝飾'), findsOneWidget, reason: '不用先存一張沒裝飾的');
     // 返回回到挑濾鏡，不會直接離開
     await t.tap(find.byIcon(CupertinoIcons.back));
     await t.pump();
@@ -193,5 +194,28 @@ void main() {
     await t.pump(const Duration(seconds: 4));
     expect(find.text('挑濾鏡'), findsOneWidget);
     expect(shots, 4, reason: '倒數中取消，沒有拍');
+  });
+
+  testWidgets('拍貼機：還沒存就能加貼紙裝飾，直接開在貼紙', (t) async {
+    final photo = (await t.runAsync(_photo))!;
+    await _phone(t, BoothScreen(template: 1, shoot: () async => photo));
+    await t.tap(find.text('3 秒'));
+    await t.pump();
+    await t.tap(find.text('開始拍照（4 張）'));
+    await t.pump();
+    for (var i = 0; i < 4; i++) {
+      await t.pump(const Duration(seconds: 3));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 1500));
+    }
+    await t.pump(const Duration(milliseconds: 500));
+    await t.tap(find.text('下一步'));
+    await t.pump();
+    await t.tap(find.text('加貼紙裝飾'));
+    await t.pumpAndSettle();
+    final editor = t.widget<EditorScreen>(find.byType(EditorScreen));
+    expect(editor.photos, hasLength(4));
+    expect(editor.decorate, isTrue);
+    expect(editor.saved, isFalse);
   });
 }
