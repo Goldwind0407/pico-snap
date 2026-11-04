@@ -189,6 +189,15 @@ void main() {
     expect(find.text('像拍貼機，倒數連拍 4 張'), findsOneWidget);
   });
 
+  testWidgets('我的素材：還沒有貼紙、模板時，有說明和「做第一個」', (t) async {
+    await _phone(t, const LibraryScreen());
+    expect(find.text('還沒有自己的貼紙'), findsOneWidget);
+    expect(find.text('做第一張貼紙'), findsOneWidget);
+    await t.tap(find.text('模板'));
+    await t.pumpAndSettle();
+    expect(find.text('做第一個模板'), findsOneWidget);
+  });
+
   testWidgets('我的素材：點模板直接用它拍四格', (t) async {
     MyLibrary.addTemplate(const CustomTemplate(id: 't1', caption: 'mine!', frame: Color(0xFFB9C9AE)));
     await _phone(t, const LibraryScreen());

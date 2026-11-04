@@ -114,7 +114,7 @@ void main() {
     await phone(t, const LibraryScreen());
     await t.tap(find.text('模板'));
     await t.pumpAndSettle();
-    await t.tap(find.text('新增模板'));
+    await t.tap(find.text('做第一個模板'));
     await t.pumpAndSettle();
     expect(find.byType(TemplateMakerScreen), findsOneWidget);
     Future<void> tab(String label) async {

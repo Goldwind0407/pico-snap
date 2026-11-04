@@ -247,6 +247,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
           onTap: _picked.isEmpty ? null : _toggle,
         ),
       ],
+      if (customStickers.isEmpty && mySheets.isEmpty) ...[
+        const SizedBox(height: 18),
+        _EmptyCard(
+          art: const _StickerDoodle(),
+          title: '還沒有自己的貼紙',
+          note: '把喜歡的照片去背，就是一張貼紙。\n做好的貼紙會排在貼紙本的最前面。',
+          action: '做第一張貼紙',
+          onTap: () => _newSticker(),
+        ),
+      ],
       if (sheets.isEmpty && q.isNotEmpty)
         const Padding(padding: EdgeInsets.only(top: 40), child: Center(child: Text('找不到這個名字的貼紙', style: TextStyle(color: muted, fontWeight: FontWeight.w700)))),
     ]);
@@ -265,7 +275,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
     ]),
   ));
 
-  Widget _templates() => GridView.count(
+  Widget _templates() => customTemplates.isEmpty ? ListView(padding: _gridPadding, children: [
+    _EmptyCard(
+      art: const _StripDoodle(),
+      title: '還沒有自己的模板',
+      note: '選外框顏色、照片格形狀，再放上貼紙，\n做一款只屬於你的四格。',
+      action: '做第一個模板',
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TemplateMakerScreen())),
+    ),
+  ]) : GridView.count(
     crossAxisCount: 3, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: .5,
     padding: _gridPadding,
     children: [
@@ -343,5 +361,74 @@ class _ItemTile extends StatelessWidget {
         child: const Icon(CupertinoIcons.xmark, size: 16, color: ink),
       ),
     )),
+  ]);
+}
+
+/// What a tab shows before there's anything in it: a little drawing, what
+/// it's for, and the way to make the first one.
+class _EmptyCard extends StatelessWidget {
+  final Widget art;
+  final String title, note, action;
+  final VoidCallback onTap;
+  const _EmptyCard({required this.art, required this.title, required this.note, required this.action, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(20, 26, 20, 22),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: line)),
+    child: Column(children: [
+      SizedBox(height: 110, child: art),
+      const SizedBox(height: 14),
+      Text(title, style: const TextStyle(fontSize: 17, color: ink, fontWeight: FontWeight.w900)),
+      const SizedBox(height: 6),
+      Text(note, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, height: 1.5, color: muted, fontWeight: FontWeight.w600)),
+      const SizedBox(height: 16),
+      FilledButton(
+        onPressed: onTap,
+        style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: const StadiumBorder()),
+        child: Text(action, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+      ),
+    ]),
+  );
+}
+
+/// Three die-cut stickers, slightly tilted, with a sparkle.
+class _StickerDoodle extends StatelessWidget {
+  const _StickerDoodle();
+
+  Widget _sticker(IconData icon, Color color, double angle) => Transform.rotate(angle: angle, child: Container(
+    width: 66, height: 66,
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 5),
+      boxShadow: [BoxShadow(color: ink.withValues(alpha: .14), blurRadius: 8, offset: const Offset(0, 3))]),
+    child: Icon(icon, color: ink, size: 28),
+  ));
+
+  @override
+  Widget build(BuildContext context) => Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
+    Transform.translate(offset: const Offset(-62, 10), child: _sticker(CupertinoIcons.heart_fill, blush, -.2)),
+    Transform.translate(offset: const Offset(62, 12), child: _sticker(CupertinoIcons.star_fill, butter, .22)),
+    Transform.translate(offset: const Offset(0, -6), child: _sticker(CupertinoIcons.scissors, lilac, .05)),
+    const Positioned(right: 70, top: 0, child: Sparkle(size: 18, fill: Color(0xFFF7D77C))),
+    const Positioned(left: 74, bottom: 4, child: DoodleHeart(size: 13)),
+  ]);
+}
+
+/// A blank four-cut strip on washi tape.
+class _StripDoodle extends StatelessWidget {
+  const _StripDoodle();
+
+  @override
+  Widget build(BuildContext context) => Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
+    Transform.rotate(angle: -.08, child: Container(
+      width: 46, height: 108, padding: const EdgeInsets.fromLTRB(5, 5, 5, 14),
+      decoration: BoxDecoration(color: blush, borderRadius: BorderRadius.circular(4),
+        boxShadow: [BoxShadow(color: ink.withValues(alpha: .14), blurRadius: 8, offset: const Offset(0, 3))]),
+      child: Column(children: [
+        for (var i = 0; i < 4; i++) Expanded(child: Container(margin: const EdgeInsets.only(bottom: 3), color: Colors.white)),
+      ]),
+    )),
+    const Positioned(top: -4, child: WashiTape(width: 52, height: 16, angle: -.3)),
+    const Positioned(right: 96, top: 14, child: Sparkle(size: 18)),
+    const Positioned(left: 96, bottom: 12, child: DoodleHeart(size: 13)),
   ]);
 }
