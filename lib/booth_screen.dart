@@ -610,7 +610,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   Widget _pickView() {
     final visible = [for (var i = 0; i < allStripTemplates.length; i++) if (allStripTemplates[i].category == _category) i];
     return Column(children: [
-      _topBar('Four Cuts', actions: [TextButton(onPressed: _fromAlbum, child: const Text('從相簿選照片', style: TextStyle(color: coral, fontWeight: FontWeight.w800)))]),
+      _topBar('四格拍貼', actions: [TextButton(onPressed: _fromAlbum, child: const Text('從相簿選照片', style: TextStyle(color: coral, fontWeight: FontWeight.w800)))]),
       Expanded(child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
         child: Center(child: FittedBox(child: DecoratedBox(
@@ -684,7 +684,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
           IconButton(onPressed: _flipCamera, icon: const Icon(CupertinoIcons.camera_rotate), color: ink),
       ]),
       Expanded(child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
         child: Center(child: Stack(alignment: Alignment.center, children: [
             _framedFinder(i, live: frozen == null),
             if (_count != null) AnimatedBuilder(
@@ -733,7 +733,9 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   /// already taken in the others. So you can pose with the decorations.
   Widget _framedFinder(int i, {required bool live}) {
     final design = _t.designSize, cell = cellRect(_t, i);
-    final m = cell.shortestSide * .18;
+    // A thin ring of the frame around the window: the window is wide, so
+    // the screen's width is what limits it; the less frame, the bigger you are.
+    final m = cell.shortestSide * .08;
     // Above and below, stop halfway to the next window so its edge doesn't peek in.
     var top = max(0.0, cell.top - m), bottom = min(design.height, cell.bottom + m);
     for (var k = 0; k < _shots; k++) {
