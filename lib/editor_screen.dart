@@ -190,9 +190,9 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   };
 
   String get _title => switch (widget.mode) {
-    EditorMode.fourCut => 'Four Cuts',
-    EditorMode.polaroid => 'Collage',
-    EditorMode.sticker => 'Sticker',
+    EditorMode.fourCut => '四格拍貼',
+    EditorMode.polaroid => '拍立得拼貼',
+    EditorMode.sticker => '貼紙裝飾',
   };
 
   double get _aspect => switch (widget.mode) {
@@ -604,12 +604,10 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
           Positioned(left: 64, bottom: 52, child: Sparkle(size: 13)),
           Positioned(left: 58, bottom: 96, child: DoodleHeart(size: 13, color: Color(0xFFE8C6F0))),
         ],
-        Positioned.fill(child: Padding(padding: const EdgeInsets.fromLTRB(28, 12, 28, 16), child: _canvas())),
-        Positioned(right: 18, top: 12, child: Row(children: [
-          Tooltip(message: '復原', child: _RoundButton(icon: CupertinoIcons.arrow_uturn_left, onTap: _history.isEmpty ? null : _undo)),
-          const SizedBox(width: 8),
-          Tooltip(message: '重做', child: _RoundButton(icon: CupertinoIcons.arrow_uturn_right, onTap: _redoHistory.isEmpty ? null : _redo)),
-        ])),
+        // A blank collage or sticker piece leaves room under it for the
+        // 選照片 button (it would hide a photo); the four-cut strip's bottom
+        // is only its caption, and the strip is narrow enough already.
+        Positioned.fill(child: Padding(padding: EdgeInsets.fromLTRB(28, 12, 28, widget.mode != EditorMode.fourCut && !_capturing && _photos.every((p) => p == null) ? 84 : 16), child: _canvas())),
         // A blank piece: photos first, then decorating.
         if (!_capturing && _photos.every((p) => p == null))
           Positioned(left: 0, right: 0, bottom: 28, child: Center(child: FilledButton.icon(
@@ -630,11 +628,11 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
     child: Row(children: [
       IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(CupertinoIcons.back, color: ink, size: 26)),
-      Expanded(child: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
-      if (widget.mode == EditorMode.fourCut) ...[
-        _TopButton(label: '匯入', onTap: _pickMany),
-        const SizedBox(width: 8),
-      ],
+      Expanded(child: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 20, color: ink, fontWeight: FontWeight.w900))),
+      _IconButton(icon: CupertinoIcons.arrow_uturn_left, tooltip: '復原', onTap: _history.isEmpty ? null : _undo),
+      _IconButton(icon: CupertinoIcons.arrow_uturn_right, tooltip: '重做', onTap: _redoHistory.isEmpty ? null : _redo),
+      if (widget.mode == EditorMode.fourCut) _IconButton(icon: CupertinoIcons.photo_on_rectangle, tooltip: '從相簿選照片', onTap: _pickMany),
+      const SizedBox(width: 6),
       _TopButton(label: _saving ? '儲存中…' : '儲存', filled: true, onTap: _askSave),
     ]),
   );
@@ -779,10 +777,11 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     child: Column(mainAxisSize: MainAxisSize.min, children: [
       const SizedBox(height: 8),
       Container(width: 38, height: 4, decoration: BoxDecoration(color: line, borderRadius: BorderRadius.circular(2))),
-      // The sticker book wants room to show a good part of a sheet; not on
-      // the narrow four-cut strip, which would get so thin that a sticker's
-      // handles stick out past it, where they can't be tapped.
-      SizedBox(height: _tool == _Tool.sticker && widget.mode != EditorMode.fourCut ? max(168.0, MediaQuery.sizeOf(context).height * .36) : 168, child: switch (_tool) {
+      // The sticker book wants room to show a good part of a sheet; a bit
+      // less beside the narrow four-cut strip, which shouldn't get thinner.
+      SizedBox(
+        height: _tool == _Tool.sticker ? max(168.0, MediaQuery.sizeOf(context).height * (widget.mode == EditorMode.fourCut ? .3 : .36)) : 168,
+        child: switch (_tool) {
         _Tool.template => _templateTool(),
         _Tool.layout => _layoutTool(),
         _Tool.pattern => _patternTool(),
@@ -792,7 +791,8 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
         _Tool.filter => _filterTool(),
         _Tool.text => _textTool(),
         _Tool.brush => _brushTool(),
-      }),
+        },
+      ),
       Container(
         decoration: BoxDecoration(
           color: cream,
@@ -1203,16 +1203,24 @@ class _CategoryRow extends StatelessWidget {
   const _CategoryRow({required this.labels, required this.selected, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => SizedBox(height: 46, child: Row(children: [
-    for (final l in labels)
-      Expanded(child: GestureDetector(
+  Widget build(BuildContext context) => SizedBox(height: 50, child: ListView(
+    scrollDirection: Axis.horizontal,
+    padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+    children: [
+      for (final l in labels) Padding(padding: const EdgeInsets.only(right: 8), child: GestureDetector(
         onTap: () => onTap(l),
-        behavior: HitTestBehavior.opaque,
-        child: Center(child: Text(l, style: TextStyle(
-          fontSize: 17, color: l == selected ? ink : muted.withValues(alpha: .8), fontWeight: l == selected ? FontWeight.w900 : FontWeight.w700,
-        ))),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: l == selected ? ink : Colors.white, borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: l == selected ? ink : line, width: 1.3),
+          ),
+          child: Text(l, style: TextStyle(fontSize: 13, color: l == selected ? Colors.white : ink, fontWeight: FontWeight.w800)),
+        ),
       )),
-  ]));
+    ],
+  ));
 }
 
 class _TemplateThumb extends StatelessWidget {
@@ -1266,21 +1274,17 @@ class _ToolTab extends StatelessWidget {
   }
 }
 
-class _RoundButton extends StatelessWidget {
+/// A plain icon in the top bar, greyed out when it can't be used.
+class _IconButton extends StatelessWidget {
   final IconData icon;
+  final String tooltip;
   final VoidCallback? onTap;
-  const _RoundButton({required this.icon, this.onTap});
+  const _IconButton({required this.icon, required this.tooltip, this.onTap});
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: ink.withValues(alpha: .12), blurRadius: 10, offset: const Offset(0, 3))]),
-    child: Material(
-      color: Colors.white, shape: const CircleBorder(),
-      child: InkWell(
-        onTap: onTap, customBorder: const CircleBorder(),
-        child: SizedBox(width: 46, height: 46, child: Icon(icon, size: 22, color: onTap == null ? line : ink)),
-      ),
-    ),
+  Widget build(BuildContext context) => IconButton(
+    tooltip: tooltip, onPressed: onTap, visualDensity: VisualDensity.compact,
+    icon: Icon(icon, size: 22, color: onTap == null ? line : ink),
   );
 }
 

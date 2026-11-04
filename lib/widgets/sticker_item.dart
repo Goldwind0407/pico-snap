@@ -102,17 +102,21 @@ class _StickerItemState extends State<StickerItem> with SingleTickerProviderStat
     final c = _start.center + Offset(delta.dx / widget.canvas.width, delta.dy / widget.canvas.height);
     widget.onChanged(_start.copyWith(
       center: Offset(c.dx.clamp(0, 1), c.dy.clamp(0, 1)),
-      scale: (_start.scale * d.scale).clamp(.3, 4),
+      scale: (_start.scale * d.scale).clamp(.3, _maxScale),
       rotation: _start.rotation + d.rotation,
     ));
   }
+
+  /// Up to 4 times, but never so big that the handles stick out past a
+  /// narrow canvas (the four-cut strip), where they couldn't be tapped.
+  double get _maxScale => max(.3, min(4.0, (widget.canvas.shortestSide - StickerItem.handle * 2 / widget.zoom) / _baseSize));
 
   /// Drag the bottom-right handle to scale and rotate. [cornerAngle] is where
   /// the handle sits relative to the centre before rotation (45°).
   void _onHandleUpdate(DragUpdateDetails d, double cornerAngle) {
     final v = widget.toLocal(d.globalPosition) - _centerPx;
     final reach = _baseSize / 2 * sqrt2;
-    widget.onChanged(widget.data.copyWith(scale: (v.distance / reach).clamp(.3, 4), rotation: v.direction - cornerAngle));
+    widget.onChanged(widget.data.copyWith(scale: (v.distance / reach).clamp(.3, _maxScale), rotation: v.direction - cornerAngle));
   }
 
   @override
