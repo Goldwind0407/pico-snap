@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import 'gallery_screen.dart';
@@ -132,13 +133,13 @@ class _MonthCard extends StatelessWidget {
       ),
       child: Column(children: [
         Row(children: [
-          IconButton(onPressed: () => onShift(-1), tooltip: '上個月', icon: const Icon(Icons.chevron_left_rounded, color: ink)),
+          IconButton(onPressed: () => onShift(-1), tooltip: '上個月', icon: const Icon(CupertinoIcons.chevron_left, color: ink)),
           Expanded(child: Column(children: [
             Text('${month.year}年${month.month}月', style: const TextStyle(fontSize: 17, color: ink, fontWeight: FontWeight.w900)),
             Text(count == 0 ? '這個月還沒有作品' : '這個月 $count 件作品',
               style: const TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w700)),
           ])),
-          IconButton(onPressed: () => onShift(1), tooltip: '下個月', icon: const Icon(Icons.chevron_right_rounded, color: ink)),
+          IconButton(onPressed: () => onShift(1), tooltip: '下個月', icon: const Icon(CupertinoIcons.chevron_right, color: ink)),
         ]),
         const SizedBox(height: 6),
         Row(children: [
@@ -192,7 +193,7 @@ class _DayCell extends StatelessWidget {
         child: works.isEmpty
           ? Stack(children: [
               Center(child: number),
-              if (hasNote) const Positioned(left: 0, right: 0, bottom: 3, child: Icon(Icons.favorite_rounded, size: 8, color: blushLine)),
+              if (hasNote) const Positioned(left: 0, right: 0, bottom: 3, child: Icon(CupertinoIcons.heart_fill, size: 8, color: blushLine)),
             ])
           : Stack(fit: StackFit.expand, children: [
               ClipRRect(
@@ -207,7 +208,7 @@ class _DayCell extends StatelessWidget {
                 decoration: BoxDecoration(color: Colors.white.withValues(alpha: .9), borderRadius: BorderRadius.circular(6)),
                 child: number,
               )),
-              if (hasNote) const Positioned(right: 2, bottom: 2, child: Icon(Icons.favorite_rounded, size: 11, color: coral)),
+              if (hasNote) const Positioned(right: 2, bottom: 2, child: Icon(CupertinoIcons.heart_fill, size: 11, color: coral)),
             ]),
       ),
     );
@@ -238,7 +239,7 @@ class _DayCard extends StatelessWidget {
             Expanded(child: note.isEmpty
               ? const Text('＋ 寫一句這天的心情', style: TextStyle(fontSize: 14, color: coral, fontWeight: FontWeight.w800))
               : Text(note, style: hand(24))),
-            if (note.isNotEmpty) const Icon(Icons.edit_outlined, size: 18, color: muted),
+            if (note.isNotEmpty) const Icon(CupertinoIcons.pencil, size: 18, color: muted),
           ]),
         ),
       ),

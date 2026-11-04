@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/cutout/cutout_page.dart';
@@ -118,7 +119,7 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
     // 沒編輯：直接離開
-    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.tap(find.byIcon(CupertinoIcons.back));
     await tester.pumpAndSettle();
     expect(find.byType(EditorScreen), findsNothing);
 
@@ -128,13 +129,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'hello');
     await tester.pump();
-    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.tap(find.byIcon(CupertinoIcons.back));
     await tester.pumpAndSettle();
     expect(find.text('要離開嗎？'), findsOneWidget);
     await tester.tap(find.text('繼續編輯'));
     await tester.pumpAndSettle();
     expect(find.byType(EditorScreen), findsOneWidget, reason: '選繼續編輯就留下來');
-    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.tap(find.byIcon(CupertinoIcons.back));
     await tester.pumpAndSettle();
     await tester.tap(find.text('離開'));
     await tester.pumpAndSettle();

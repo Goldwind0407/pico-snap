@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -92,7 +93,7 @@ class _StickerBookViewState extends State<StickerBookView> with SingleTickerProv
                 _searching = !_searching;
                 _query = '';
               }),
-              icon: Icon(_searching ? Icons.close_rounded : Icons.search_rounded, color: ink),
+              icon: Icon(_searching ? CupertinoIcons.xmark : CupertinoIcons.search, color: ink),
             ),
           ),
           Expanded(child: _searching

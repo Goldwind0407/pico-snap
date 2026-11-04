@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/booth_screen.dart';
@@ -69,15 +70,15 @@ void main() {
         expect(find.byType(StickerItem), findsOneWidget);
         await t.drag(find.byType(StickerItem), const Offset(30, 20));
         await t.pumpAndSettle();
-        await t.drag(find.byIcon(Icons.open_in_full_rounded), const Offset(25, 25));
+        await t.drag(find.byIcon(CupertinoIcons.arrow_up_left_arrow_down_right), const Offset(25, 25));
         await t.pumpAndSettle();
         // Tap the flip handle: the sticker is mirrored left to right.
         bool mirrored() => find.byWidgetPredicate((w) => w is Transform && w.transform.storage[0] == -1).evaluate().isNotEmpty;
         expect(mirrored(), isFalse);
-        await t.tap(find.byIcon(Icons.flip_rounded));
+        await t.tap(find.byIcon(CupertinoIcons.arrow_left_right_square));
         await t.pumpAndSettle();
         expect(mirrored(), isTrue);
-        await t.tap(find.byIcon(Icons.undo_rounded));
+        await t.tap(find.byIcon(CupertinoIcons.arrow_uturn_left));
         await t.pumpAndSettle();
         // To the middle of the canvas, so its handles are on it too (the
         // four-cut strip is narrow).
@@ -86,7 +87,7 @@ void main() {
         await t.pumpAndSettle();
         await t.tap(find.byType(StickerItem));
         await t.pumpAndSettle();
-        await t.tap(find.byIcon(Icons.delete_outline_rounded));
+        await t.tap(find.byIcon(CupertinoIcons.trash));
         await t.pumpAndSettle();
         expect(find.byType(StickerItem), findsNothing);
         if (m == EditorMode.polaroid) {

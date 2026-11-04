@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -73,9 +74,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final pick = await showModalBottomSheet<String>(
       context: context, backgroundColor: cream, showDragHandle: true,
       builder: (context) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        ListTile(leading: const Icon(Icons.add_photo_alternate_outlined), title: const Text('在這張紙上做新貼紙'), onTap: () => Navigator.pop(context, 'add')),
-        ListTile(leading: const Icon(Icons.edit_outlined), title: const Text('改名字'), onTap: () => Navigator.pop(context, 'rename')),
-        ListTile(leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFB4483C)), title: const Text('刪除這張紙（貼紙會留在未分類）'), onTap: () => Navigator.pop(context, 'delete')),
+        ListTile(leading: const Icon(CupertinoIcons.photo), title: const Text('在這張紙上做新貼紙'), onTap: () => Navigator.pop(context, 'add')),
+        ListTile(leading: const Icon(CupertinoIcons.pencil), title: const Text('改名字'), onTap: () => Navigator.pop(context, 'rename')),
+        ListTile(leading: const Icon(CupertinoIcons.trash, color: Color(0xFFB4483C)), title: const Text('刪除這張紙（貼紙會留在未分類）'), onTap: () => Navigator.pop(context, 'delete')),
       ])),
     );
     if (!mounted) return;
@@ -99,9 +100,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
       context: context, backgroundColor: cream, showDragHandle: true,
       builder: (context) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
         Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('把 ${_picked.length} 張貼紙移到', style: const TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800))),
-        for (final s in sheets) ListTile(leading: const Icon(Icons.style_outlined), title: Text(s.name), onTap: () => Navigator.pop(context, s.id)),
-        ListTile(leading: const Icon(Icons.add_rounded), title: const Text('新的貼紙紙…'), onTap: () => Navigator.pop(context, '+')),
-        ListTile(leading: const Icon(Icons.inbox_outlined), title: const Text(unsortedSheet), onTap: () => Navigator.pop(context, '')),
+        for (final s in sheets) ListTile(leading: const Icon(CupertinoIcons.rectangle_stack), title: Text(s.name), onTap: () => Navigator.pop(context, s.id)),
+        ListTile(leading: const Icon(CupertinoIcons.plus), title: const Text('新的貼紙紙…'), onTap: () => Navigator.pop(context, '+')),
+        ListTile(leading: const Icon(CupertinoIcons.tray), title: const Text(unsortedSheet), onTap: () => Navigator.pop(context, '')),
       ])),
     );
     if (pick == null || !mounted) return;
@@ -163,7 +164,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
         child: Row(children: [
           if (widget.embedded) const SizedBox(width: 12, height: 48)
-          else IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
+          else IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(CupertinoIcons.back, color: ink, size: 26)),
           const Text('我的素材', style: TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900)),
         ]),
       ),
@@ -215,16 +216,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
     ];
     return ListView(padding: _gridPadding, children: [
       Row(children: [
-        Expanded(child: _AddTile(icon: Icons.add_photo_alternate_outlined, label: '照片去背', onTap: () => _newSticker(mySheets.isEmpty ? null : mySheets.last.id), height: 64)),
+        Expanded(child: _AddTile(icon: CupertinoIcons.photo, label: '照片去背', onTap: () => _newSticker(mySheets.isEmpty ? null : mySheets.last.id), height: 64)),
         const SizedBox(width: 12),
-        Expanded(child: _AddTile(icon: Icons.style_outlined, label: '新增貼紙紙', onTap: _newSheet, height: 64)),
+        Expanded(child: _AddTile(icon: CupertinoIcons.rectangle_stack, label: '新增貼紙紙', onTap: _newSheet, height: 64)),
       ]),
       if (customStickers.isNotEmpty) ...[
         const SizedBox(height: 12),
         TextField(
           onChanged: (v) => setState(() => _search = v),
           decoration: InputDecoration(
-            hintText: '搜尋貼紙或貼紙紙的名字', prefixIcon: const Icon(Icons.search_rounded), isDense: true,
+            hintText: '搜尋貼紙或貼紙紙的名字', prefixIcon: const Icon(CupertinoIcons.search), isDense: true,
             filled: true, fillColor: Colors.white,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: line)),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: line)),
@@ -236,7 +237,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         Row(children: [
           Expanded(child: Text(sheet.name, style: const TextStyle(fontSize: 16, color: ink, fontWeight: FontWeight.w900))),
           Text('${sheet.stickers.length} 張', style: const TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w700)),
-          if (sheet.id.isNotEmpty) IconButton(tooltip: '貼紙紙選項', onPressed: () => _sheetMenu(sheet), icon: const Icon(Icons.more_horiz_rounded, color: ink)),
+          if (sheet.id.isNotEmpty) IconButton(tooltip: '貼紙紙選項', onPressed: () => _sheetMenu(sheet), icon: const Icon(CupertinoIcons.ellipsis, color: ink)),
         ]),
         const SizedBox(height: 4),
         MySheetView(
@@ -257,10 +258,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
     decoration: BoxDecoration(color: ink, borderRadius: BorderRadius.circular(18)),
     child: Row(children: [
       Expanded(child: Text('已選 ${_picked.length} 張', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
-      IconButton(tooltip: '移到貼紙紙', onPressed: _movePicked, icon: const Icon(Icons.drive_file_move_outline, color: Colors.white)),
-      if (_picked.length == 1) IconButton(tooltip: '取名字', onPressed: _renamePicked, icon: const Icon(Icons.edit_outlined, color: Colors.white)),
-      IconButton(tooltip: '刪除', onPressed: _deletePicked, icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFFF8A8A))),
-      IconButton(tooltip: '取消選取', onPressed: () => setState(_picked.clear), icon: const Icon(Icons.close_rounded, color: Colors.white)),
+      IconButton(tooltip: '移到貼紙紙', onPressed: _movePicked, icon: const Icon(CupertinoIcons.folder, color: Colors.white)),
+      if (_picked.length == 1) IconButton(tooltip: '取名字', onPressed: _renamePicked, icon: const Icon(CupertinoIcons.pencil, color: Colors.white)),
+      IconButton(tooltip: '刪除', onPressed: _deletePicked, icon: const Icon(CupertinoIcons.trash, color: Color(0xFFFF8A8A))),
+      IconButton(tooltip: '取消選取', onPressed: () => setState(_picked.clear), icon: const Icon(CupertinoIcons.xmark, color: Colors.white)),
     ]),
   ));
 
@@ -268,7 +269,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     crossAxisCount: 3, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: .5,
     padding: _gridPadding,
     children: [
-      _AddTile(icon: Icons.dashboard_customize_outlined, label: '新增模板', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TemplateMakerScreen()))),
+      _AddTile(icon: CupertinoIcons.square_grid_2x2, label: '新增模板', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TemplateMakerScreen()))),
       for (final (i, t) in customTemplates.indexed.toList().reversed)
         _ItemTile(onDelete: () => _deleteTemplate(t.id), onTap: () => _useTemplate(i), onEdit: () => _editTemplate(t), child: Padding(
           padding: const EdgeInsets.all(10),
@@ -331,7 +332,7 @@ class _ItemTile extends StatelessWidget {
         child: Container(
           width: 26, height: 26,
           decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: line), boxShadow: [BoxShadow(color: ink.withValues(alpha: .15), blurRadius: 3)]),
-          child: const Icon(Icons.edit_outlined, size: 15, color: ink),
+          child: const Icon(CupertinoIcons.pencil, size: 15, color: ink),
         ),
       )),
     Positioned(right: 4, top: 4, child: GestureDetector(
@@ -339,7 +340,7 @@ class _ItemTile extends StatelessWidget {
       child: Container(
         width: 26, height: 26,
         decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: line), boxShadow: [BoxShadow(color: ink.withValues(alpha: .15), blurRadius: 3)]),
-        child: const Icon(Icons.close_rounded, size: 16, color: ink),
+        child: const Icon(CupertinoIcons.xmark, size: 16, color: ink),
       ),
     )),
   ]);

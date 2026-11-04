@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/editor_document.dart';
@@ -116,10 +117,10 @@ void main() {
     await tester.enterText(find.byType(TextField).first, 'edited caption');
     await tester.pumpAndSettle();
     expect(captions(), contains('edited caption'));
-    await tester.tap(find.byIcon(Icons.undo_rounded));
+    await tester.tap(find.byIcon(CupertinoIcons.arrow_uturn_left));
     await tester.pumpAndSettle();
     expect(captions(), unorderedEquals(before));
-    await tester.tap(find.byIcon(Icons.redo_rounded));
+    await tester.tap(find.byIcon(CupertinoIcons.arrow_uturn_right));
     await tester.pumpAndSettle();
     expect(captions(), contains('edited caption'));
     await tester.pumpWidget(const SizedBox());

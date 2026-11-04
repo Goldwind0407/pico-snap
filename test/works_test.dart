@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/editor_screen.dart';
@@ -100,7 +101,7 @@ void main() {
     await t.tap(find.text('作品集'));
     await t.pumpAndSettle();
     expect(find.byType(WorkTile), findsOneWidget);
-    expect(find.byIcon(Icons.arrow_back_rounded), findsNothing, reason: '分頁裡沒有返回箭頭');
+    expect(find.byIcon(CupertinoIcons.back), findsNothing, reason: '分頁裡沒有返回箭頭');
 
     await t.tap(find.text('日記'));
     await t.pumpAndSettle();
@@ -152,14 +153,14 @@ void main() {
     await _draw(t, canvas.center - const Offset(0, 30), const Offset(0, 60));
     expect(_strokes(t).map((s) => s.style), [PenStyle.marker], reason: '只擦掉碰到的那一條');
 
-    await t.tap(find.byIcon(Icons.undo_rounded));
+    await t.tap(find.byIcon(CupertinoIcons.arrow_uturn_left));
     await t.pumpAndSettle();
     expect(_strokes(t), hasLength(2), reason: '一次抹過只算一步');
 
     await t.tap(find.text('全部清掉'));
     await t.pumpAndSettle();
     expect(_strokes(t), isEmpty);
-    await t.tap(find.byIcon(Icons.undo_rounded));
+    await t.tap(find.byIcon(CupertinoIcons.arrow_uturn_left));
     await t.pumpAndSettle();
     expect(_strokes(t), hasLength(2));
   });

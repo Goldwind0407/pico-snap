@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -703,12 +704,12 @@ class _CutoutPageState extends State<CutoutPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 4, 14, 0),
           child: Row(children: [
-            IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.close_rounded, color: ink)),
+            IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(CupertinoIcons.xmark, color: ink)),
             const Text('去背', style: TextStyle(fontSize: 20, color: ink, fontWeight: FontWeight.w900)),
-            IconButton(onPressed: () => showCutoutTips(context), icon: const Icon(Icons.help_outline_rounded, size: 20), color: muted, tooltip: '怎麼修'),
+            IconButton(onPressed: () => showCutoutTips(context), icon: const Icon(CupertinoIcons.question_circle, size: 20), color: muted, tooltip: '怎麼修'),
             const Spacer(),
-            IconButton(onPressed: _undo.isEmpty || _busy ? null : _undoStep, icon: const Icon(Icons.undo_rounded), color: ink, disabledColor: line),
-            IconButton(onPressed: _redo.isEmpty || _busy ? null : _redoStep, icon: const Icon(Icons.redo_rounded), color: ink, disabledColor: line),
+            IconButton(onPressed: _undo.isEmpty || _busy ? null : _undoStep, icon: const Icon(CupertinoIcons.arrow_uturn_left), color: ink, disabledColor: line),
+            IconButton(onPressed: _redo.isEmpty || _busy ? null : _redoStep, icon: const Icon(CupertinoIcons.arrow_uturn_right), color: ink, disabledColor: line),
             FilledButton(
               onPressed: _busy || _photo == null ? null : _done,
               style: FilledButton.styleFrom(backgroundColor: coral, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
@@ -841,7 +842,7 @@ class _CutoutPageState extends State<CutoutPage> {
             boxShadow: [BoxShadow(color: ink.withValues(alpha: .25), blurRadius: 4)],
           ),
           child: on
-            ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
+            ? const Icon(CupertinoIcons.checkmark, size: 18, color: Colors.white)
             : Text('${i + 1}', style: const TextStyle(fontSize: 13, color: muted, fontWeight: FontWeight.w900)),
         ),
       ),
@@ -902,10 +903,10 @@ class _CutoutPageState extends State<CutoutPage> {
         decoration: BoxDecoration(color: cream, borderRadius: BorderRadius.circular(16), border: Border.all(color: line)),
         child: Row(children: [
           for (final (m, icon, label) in const [
-            (_Mode.select, Icons.touch_app_outlined, '選主體'),
-            (_Mode.erase, Icons.auto_fix_off_rounded, '擦掉'),
-            (_Mode.restore, Icons.brush_rounded, '補回'),
-            (_Mode.shape, Icons.interests_outlined, '外框'),
+            (_Mode.select, CupertinoIcons.hand_point_right, '選主體'),
+            (_Mode.erase, CupertinoIcons.delete_left, '擦掉'),
+            (_Mode.restore, CupertinoIcons.paintbrush, '補回'),
+            (_Mode.shape, CupertinoIcons.square_on_circle, '外框'),
           ])
             Expanded(child: GestureDetector(
               onTap: () => _setMode(m),
@@ -926,11 +927,11 @@ class _CutoutPageState extends State<CutoutPage> {
       ...switch (_mode) {
         _Mode.select => [
           _tip(_status.isEmpty ? '點一下選或不選，可以多選；長按只留那一個' : _status),
-          _tip('黏在一起？在中間畫一條線就能切開', icon: Icons.content_cut_rounded),
+          _tip('黏在一起？在中間畫一條線就能切開', icon: CupertinoIcons.scissors),
           Align(alignment: Alignment.centerLeft, child: TextButton.icon(
             onPressed: _busy ? null : () => _findSubjects(manual: true),
             style: TextButton.styleFrom(foregroundColor: ink, padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
-            icon: const Icon(Icons.auto_fix_high_outlined, size: 17),
+            icon: const Icon(CupertinoIcons.wand_stars, size: 17),
             label: const Text('找不到想要的？改用手動去背', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, decoration: TextDecoration.underline)),
           )),
         ],
@@ -940,7 +941,7 @@ class _CutoutPageState extends State<CutoutPage> {
             const Spacer(),
             _HoldButton(onHold: (v) => setState(() => _showOriginal = v)),
             const SizedBox(width: 6),
-            _IconChip(icon: Icons.contrast_rounded, label: _darkBg ? '淺色' : '深色', onTap: () => setState(() => _darkBg = !_darkBg)),
+            _IconChip(icon: CupertinoIcons.circle_lefthalf_fill, label: _darkBg ? '淺色' : '深色', onTap: () => setState(() => _darkBg = !_darkBg)),
           ]),
           if (_fine)
             Row(children: [
@@ -969,7 +970,7 @@ class _CutoutPageState extends State<CutoutPage> {
             const Text('白邊', style: TextStyle(fontSize: 13, color: ink, fontWeight: FontWeight.w800)),
             const SizedBox(width: 10),
             for (final (i, (label, _)) in _borders.indexed) ...[
-              _IconChip(icon: i == 0 ? Icons.block_rounded : Icons.circle_outlined, label: label, selected: _border == i, onTap: () {
+              _IconChip(icon: i == 0 ? CupertinoIcons.nosign : CupertinoIcons.circle, label: label, selected: _border == i, onTap: () {
                 setState(() => _border = i);
                 _schedulePreview();
               }),
@@ -996,10 +997,10 @@ class _CutoutPageState extends State<CutoutPage> {
     ])),
   );
 
-  Widget _tip(String text, {IconData icon = Icons.info_outline_rounded}) => Padding(
+  Widget _tip(String text, {IconData icon = CupertinoIcons.info_circle}) => Padding(
     padding: const EdgeInsets.only(bottom: 4),
     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 15, color: icon == Icons.content_cut_rounded ? coral : muted)),
+      Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 15, color: icon == CupertinoIcons.scissors ? coral : muted)),
       const SizedBox(width: 6),
       Expanded(child: Text(text, style: const TextStyle(fontSize: 12, height: 1.35, color: muted, fontWeight: FontWeight.w700))),
     ]),
@@ -1029,12 +1030,12 @@ Future<void> showCutoutTips(BuildContext context) => showGlassDialog<void>(
       title: '去背小技巧',
       actions: [GlassAction('知道了', () => Navigator.pop(context))],
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        row(Icons.touch_app_outlined, '選主體', '點一下選或不選，可以多選；長按只留按到的那一個。'),
-        row(Icons.content_cut_rounded, '黏在一起', '在兩個人中間畫一條線就能切開。'),
-        row(Icons.auto_fix_off_rounded, '多出來的東西', '選「擦掉」，在上面畫一筆或點一下，會沿著邊緣整塊擦掉。'),
-        row(Icons.brush_rounded, '少了的地方', '選「補回」畫一筆。'),
-        row(Icons.zoom_in_rounded, '細的地方', '兩指放大，打開「細修」用筆刷慢慢修；按住「原圖」對照。'),
-        row(Icons.interests_outlined, '外框', '也可以做成方形、圓形、星形、愛心貼紙。'),
+        row(CupertinoIcons.hand_point_right, '選主體', '點一下選或不選，可以多選；長按只留按到的那一個。'),
+        row(CupertinoIcons.scissors, '黏在一起', '在兩個人中間畫一條線就能切開。'),
+        row(CupertinoIcons.delete_left, '多出來的東西', '選「擦掉」，在上面畫一筆或點一下，會沿著邊緣整塊擦掉。'),
+        row(CupertinoIcons.paintbrush, '少了的地方', '選「補回」畫一筆。'),
+        row(CupertinoIcons.zoom_in, '細的地方', '兩指放大，打開「細修」用筆刷慢慢修；按住「原圖」對照。'),
+        row(CupertinoIcons.square_on_circle, '外框', '也可以做成方形、圓形、星形、愛心貼紙。'),
       ]),
     );
   },
@@ -1115,7 +1116,7 @@ class _HoldButton extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
       decoration: BoxDecoration(color: cream, borderRadius: BorderRadius.circular(16), border: Border.all(color: line)),
       child: const Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.compare_rounded, size: 15, color: ink),
+        Icon(CupertinoIcons.square_lefthalf_fill, size: 15, color: ink),
         SizedBox(width: 4),
         Text('按住看原圖', style: TextStyle(fontSize: 12, color: ink, fontWeight: FontWeight.w600)),
       ]),

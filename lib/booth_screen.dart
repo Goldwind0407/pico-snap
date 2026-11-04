@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -589,7 +590,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   Widget _topBar(String title, {List<Widget> actions = const []}) => Padding(
     padding: const EdgeInsets.fromLTRB(8, 8, 12, 0),
     child: Row(children: [
-      IconButton(onPressed: _saving ? null : _back, icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
+      IconButton(onPressed: _saving ? null : _back, icon: const Icon(CupertinoIcons.back, color: ink, size: 26)),
       Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
       ...actions,
     ]),
@@ -651,7 +652,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
         child: SizedBox(width: double.infinity, child: FilledButton.icon(
           onPressed: _start,
-          icon: const Icon(Icons.photo_camera_rounded),
+          icon: const Icon(CupertinoIcons.camera_fill),
           label: Text('開始拍照（$_shots 張）', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
           style: FilledButton.styleFrom(
             backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 15),
@@ -670,7 +671,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
     return Column(children: [
       _topBar(_redo != null ? '重拍第 ${i + 1} 張' : '第 ${i + 1} / $_shots 張', actions: [
         if (_canFlip && widget.shoot == null)
-          IconButton(onPressed: _flipCamera, icon: const Icon(Icons.cameraswitch_outlined), color: ink),
+          IconButton(onPressed: _flipCamera, icon: const Icon(CupertinoIcons.camera_rotate), color: ink),
       ]),
       Expanded(child: Padding(
         padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
@@ -761,7 +762,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
     if (camera == null || !camera.value.isInitialized) {
       return ColoredBox(
         color: const Color(0xFF26282E),
-        child: Center(child: Icon(_cameraError != null ? Icons.no_photography_outlined : Icons.camera_alt_outlined, color: Colors.white38, size: 40)),
+        child: Center(child: Icon(_cameraError != null ? CupertinoIcons.exclamationmark_triangle : CupertinoIcons.camera, color: Colors.white38, size: 40)),
       );
     }
     final s = camera.value.previewSize!;
@@ -817,7 +818,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     decoration: BoxDecoration(color: sage.withValues(alpha: .45), borderRadius: BorderRadius.circular(16)),
     child: Row(children: [
-      const Icon(Icons.check_circle_rounded, color: ink),
+      const Icon(CupertinoIcons.checkmark_circle_fill, color: ink),
       const SizedBox(width: 10),
       Expanded(child: Text(_savedWhat ?? '已存到相簿', style: const TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800))),
     ]),
@@ -835,7 +836,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
             border: Border.all(color: _canVideo && _withVideo ? blushLine : line),
           ),
           child: Row(children: [
-            Icon(Icons.movie_filter_outlined, color: _canVideo ? coral : muted),
+            Icon(CupertinoIcons.film, color: _canVideo ? coral : muted),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('同時存拍攝影片', style: TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)),

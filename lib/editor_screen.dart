@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
@@ -26,16 +27,16 @@ import 'widgets/sticker_book_view.dart';
 import 'widgets/sticker_item.dart';
 
 enum _Tool {
-  template(Icons.vertical_split_outlined, '模板'),
-  layout(Icons.dashboard_customize_outlined, '版面'),
-  pattern(Icons.grid_4x4_rounded, '底紋'),
-  sticker(Icons.emoji_emotions_outlined, '貼紙'),
-  text(Icons.title_rounded, '文字'),
-  brush(Icons.brush_outlined, '畫筆'),
-  cutout(Icons.content_cut_rounded, '去背'),
-  filter(Icons.filter_vintage_outlined, '濾鏡'),
+  template(CupertinoIcons.square_split_1x2, '模板'),
+  layout(CupertinoIcons.square_grid_2x2, '版面'),
+  pattern(CupertinoIcons.circle_grid_3x3, '底紋'),
+  sticker(CupertinoIcons.smiley, '貼紙'),
+  text(CupertinoIcons.textformat, '文字'),
+  brush(CupertinoIcons.paintbrush, '畫筆'),
+  cutout(CupertinoIcons.scissors, '去背'),
+  filter(CupertinoIcons.color_filter, '濾鏡'),
   /// Adjusting the selected photo; opened by tapping a photo, not a tab.
-  photo(Icons.photo_outlined, '照片');
+  photo(CupertinoIcons.photo, '照片');
 
   final IconData icon;
   final String label;
@@ -361,7 +362,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                 border: Border.all(color: canVideo && _withVideo ? blushLine : line),
               ),
               child: Row(children: [
-                Icon(Icons.movie_filter_outlined, color: canVideo ? coral : muted),
+                Icon(CupertinoIcons.film, color: canVideo ? coral : muted),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Text('同時存「製作過程」縮時影片', style: TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)),
@@ -580,15 +581,15 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
         ],
         Positioned.fill(child: Padding(padding: const EdgeInsets.fromLTRB(28, 12, 28, 16), child: _canvas())),
         Positioned(right: 18, top: 12, child: Row(children: [
-          Tooltip(message: '復原', child: _RoundButton(icon: Icons.undo_rounded, onTap: _history.isEmpty ? null : _undo)),
+          Tooltip(message: '復原', child: _RoundButton(icon: CupertinoIcons.arrow_uturn_left, onTap: _history.isEmpty ? null : _undo)),
           const SizedBox(width: 8),
-          Tooltip(message: '重做', child: _RoundButton(icon: Icons.redo_rounded, onTap: _redoHistory.isEmpty ? null : _redo)),
+          Tooltip(message: '重做', child: _RoundButton(icon: CupertinoIcons.arrow_uturn_right, onTap: _redoHistory.isEmpty ? null : _redo)),
         ])),
         // A blank piece: photos first, then decorating.
         if (!_capturing && _photos.every((p) => p == null))
           Positioned(left: 0, right: 0, bottom: 28, child: Center(child: FilledButton.icon(
             onPressed: _pickMany,
-            icon: const Icon(Icons.photo_library_outlined, size: 20),
+            icon: const Icon(CupertinoIcons.photo_on_rectangle, size: 20),
             label: Text(_slots > 1 ? '選照片（一次可以選 $_slots 張）' : '先選一張照片', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
             style: FilledButton.styleFrom(
               backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
@@ -603,7 +604,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   Widget _topBar() => Padding(
     padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
     child: Row(children: [
-      IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
+      IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(CupertinoIcons.back, color: ink, size: 26)),
       Expanded(child: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
       if (widget.mode == EditorMode.fourCut) ...[
         _TopButton(label: '匯入', onTap: _pickMany),
@@ -954,11 +955,11 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
         Text('在照片上拖曳可以移動，兩指可以放大縮小', style: TextStyle(fontSize: 12, color: muted.withValues(alpha: .95), fontWeight: FontWeight.w600)),
         const Spacer(),
         Row(children: [
-          button(Icons.swap_horiz_rounded, '換照片', () => _pickPhoto()),
+          button(CupertinoIcons.arrow_right_arrow_left, '換照片', () => _pickPhoto()),
           const SizedBox(width: 8),
-          button(Icons.center_focus_strong_outlined, '置中', () => _setFit(_selectedCell, const PhotoFit())),
+          button(CupertinoIcons.viewfinder, '置中', () => _setFit(_selectedCell, const PhotoFit())),
           const SizedBox(width: 8),
-          button(Icons.delete_outline_rounded, '移除', _removePhoto, danger: true),
+          button(CupertinoIcons.trash, '移除', _removePhoto, danger: true),
         ]),
       ]),
     );
@@ -981,7 +982,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
         Row(children: [
           Expanded(child: FilledButton.icon(
             onPressed: _cutSubject,
-            icon: Icon(hasPhoto ? Icons.content_cut_rounded : Icons.add_photo_alternate_outlined, size: 18),
+            icon: Icon(hasPhoto ? CupertinoIcons.scissors : CupertinoIcons.photo, size: 18),
             label: Text(!hasPhoto ? '選照片' : _subject == null ? '開始去背' : '重新去背', style: const TextStyle(fontWeight: FontWeight.w800)),
             style: FilledButton.styleFrom(
               backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 13),
@@ -992,7 +993,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
             const SizedBox(width: 10),
             Expanded(child: OutlinedButton.icon(
               onPressed: () => setState(() { _remember(); _subject = null; }),
-              icon: const Icon(Icons.image_outlined, size: 18),
+              icon: const Icon(CupertinoIcons.photo, size: 18),
               label: const Text('還原照片', style: TextStyle(fontWeight: FontWeight.w800)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: ink, side: const BorderSide(color: line, width: 1.3), padding: const EdgeInsets.symmetric(vertical: 13),
@@ -1073,7 +1074,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
           const Spacer(),
           TextButton.icon(
             onPressed: _strokes.isEmpty ? null : _clearInk,
-            icon: const Icon(Icons.layers_clear_outlined, size: 18),
+            icon: const Icon(CupertinoIcons.square_stack_3d_up_slash, size: 18),
             label: const Text('全部清掉', style: TextStyle(fontWeight: FontWeight.w800)),
             style: TextButton.styleFrom(foregroundColor: coral),
           ),

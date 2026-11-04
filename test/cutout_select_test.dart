@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -88,15 +89,15 @@ void main() {
       await t.pump();
     }
     expect(find.textContaining('找到 2 個主體'), findsOneWidget);
-    expect(find.byIcon(Icons.check_rounded), findsNWidgets(2), reason: '一開始兩個都選');
+    expect(find.byIcon(CupertinoIcons.checkmark), findsNWidgets(2), reason: '一開始兩個都選');
 
     // 點掉右邊那個（徽章上的勾）
-    await t.tap(find.byIcon(Icons.check_rounded).last);
+    await t.tap(find.byIcon(CupertinoIcons.checkmark).last);
     for (var i = 0; i < 20; i++) {
       await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
       await t.pump();
     }
-    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.checkmark), findsOneWidget);
     expect(find.text('2'), findsOneWidget, reason: '沒選的顯示編號');
 
     // 外框：選「無」白邊再完成
@@ -145,7 +146,7 @@ void main() {
       await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
       await t.pump();
     }
-    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.checkmark), findsOneWidget);
 
     // Draw a vertical line through the middle of the photo.
     final box = t.getRect(find.byType(RawImage).last);
@@ -160,13 +161,13 @@ void main() {
       await t.pump();
     }
     expect(find.textContaining('切開了'), findsOneWidget);
-    expect(find.byIcon(Icons.check_rounded), findsNWidgets(2));
-    await t.tap(find.byIcon(Icons.check_rounded).last);
+    expect(find.byIcon(CupertinoIcons.checkmark), findsNWidgets(2));
+    await t.tap(find.byIcon(CupertinoIcons.checkmark).last);
     for (var i = 0; i < 20; i++) {
       await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
       await t.pump();
     }
-    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.checkmark), findsOneWidget);
   });
 
   testWidgets('外框：做成愛心貼紙，大小是正方形', (t) async {

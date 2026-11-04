@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import 'booth_screen.dart';
@@ -55,7 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ValueListenableBuilder<int>(valueListenable: EditorDrafts.changes, builder: (context, _, child) {
         if (EditorDrafts.entries.isEmpty) return const SizedBox.shrink();
         return _pad(ExpansionTile(title: Text('繼續編輯草稿（${EditorDrafts.entries.length}）'),
-          leading: const Icon(Icons.edit_note_rounded), children: [
+          leading: const Icon(CupertinoIcons.square_pencil), children: [
           for (final draft in List.of(EditorDrafts.entries)) ListTile(
             title: Text(draft.label), subtitle: Text('${draft.updated.month}/${draft.updated.day} ${draft.updated.hour.toString().padLeft(2, '0')}:${draft.updated.minute.toString().padLeft(2, '0')}'),
             onTap: () async {
@@ -69,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (context.mounted) showMessage(context, '無法讀取這份草稿');
               }
             },
-            trailing: IconButton(tooltip: '刪除草稿', icon: const Icon(Icons.delete_outline), onPressed: () async {
+            trailing: IconButton(tooltip: '刪除草稿', icon: const Icon(CupertinoIcons.trash), onPressed: () async {
               if (await confirmDelete(context, '刪除這份草稿？', '刪掉之後就不能再接著編輯了。')) {
                 try { await EditorDrafts.remove(draft.id); } catch (_) {
                   if (context.mounted) showMessage(context, '草稿刪除失敗');
@@ -171,7 +172,7 @@ class _HeroCard extends StatelessWidget {
           width: 62, height: 192,
           child: FittedBox(child: PhotoStrip(
             template: drawnTemplates.firstWhere((t) => t.name == 'Coral'), photos: samplePhotos,
-            captionWidget: const Icon(Icons.photo_camera_outlined, color: Colors.white, size: 30),
+            captionWidget: const Icon(CupertinoIcons.camera, color: Colors.white, size: 30),
           )),
         ))),
         const Positioned(left: 50, top: 20, child: Sparkle(size: 15)),
@@ -353,11 +354,11 @@ class _BottomBar extends StatelessWidget {
           boxShadow: [BoxShadow(color: ink.withValues(alpha: .08), blurRadius: 18, offset: const Offset(0, -4))],
         ),
         child: SafeArea(top: false, child: Row(children: [
-          Expanded(child: _NavItem(icon: tab == 0 ? Icons.home_rounded : Icons.home_outlined, label: '首頁', selected: tab == 0, onTap: () => onTab(0))),
-          Expanded(child: _NavItem(icon: tab == 3 ? Icons.photo_library_rounded : Icons.photo_library_outlined, label: '作品集', selected: tab == 3, onTap: () => onTab(3))),
+          Expanded(child: _NavItem(icon: tab == 0 ? CupertinoIcons.house_fill : CupertinoIcons.house, label: '首頁', selected: tab == 0, onTap: () => onTab(0))),
+          Expanded(child: _NavItem(icon: tab == 3 ? CupertinoIcons.photo_fill_on_rectangle_fill : CupertinoIcons.photo_on_rectangle, label: '作品集', selected: tab == 3, onTap: () => onTab(3))),
           const SizedBox(width: 72),
-          Expanded(child: _NavItem(icon: tab == 2 ? Icons.menu_book_rounded : Icons.menu_book_outlined, label: '日記', selected: tab == 2, onTap: () => onTab(2))),
-          Expanded(child: _NavItem(icon: tab == 1 ? Icons.collections_bookmark_rounded : Icons.collections_bookmark_outlined, label: '素材', selected: tab == 1, onTap: () => onTab(1))),
+          Expanded(child: _NavItem(icon: tab == 2 ? CupertinoIcons.book_fill : CupertinoIcons.book, label: '日記', selected: tab == 2, onTap: () => onTab(2))),
+          Expanded(child: _NavItem(icon: tab == 1 ? CupertinoIcons.bookmark_fill : CupertinoIcons.bookmark, label: '素材', selected: tab == 1, onTap: () => onTab(1))),
         ])),
       )),
       Positioned(top: 0, left: 0, right: 0, child: Center(child: GestureDetector(
@@ -369,7 +370,7 @@ class _BottomBar extends StatelessWidget {
             border: Border.all(color: cream, width: 4),
             boxShadow: [BoxShadow(color: coral.withValues(alpha: .4), blurRadius: 14, offset: const Offset(0, 6))],
           ),
-          child: const Icon(Icons.photo_camera_rounded, color: Colors.white, size: 28),
+          child: const Icon(CupertinoIcons.camera_fill, color: Colors.white, size: 28),
         ),
       ))),
     ]),

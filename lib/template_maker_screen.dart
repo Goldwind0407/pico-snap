@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import 'models.dart';
@@ -25,12 +26,12 @@ const _footers = [(FooterStyle.caption, '手寫字'), (FooterStyle.logoDate, '�
 const _captionIdeas = ['my little day', 'best friends', 'happy birthday', 'say cheese!', 'good vibes'];
 
 enum _Tab {
-  start(Icons.auto_awesome_mosaic_outlined, '範本'),
-  color(Icons.palette_outlined, '顏色'),
-  pattern(Icons.grid_4x4_rounded, '圖案'),
-  cell(Icons.crop_square_rounded, '照片格'),
-  text(Icons.title_rounded, '文字'),
-  sticker(Icons.emoji_emotions_outlined, '貼紙');
+  start(CupertinoIcons.rectangle_3_offgrid, '範本'),
+  color(CupertinoIcons.drop, '顏色'),
+  pattern(CupertinoIcons.circle_grid_3x3, '圖案'),
+  cell(CupertinoIcons.square, '照片格'),
+  text(CupertinoIcons.textformat, '文字'),
+  sticker(CupertinoIcons.smiley, '貼紙');
 
   final IconData icon;
   final String label;
@@ -120,7 +121,7 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 4, 16, 0),
           child: Row(children: [
-            IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.close_rounded, color: ink)),
+            IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(CupertinoIcons.xmark, color: ink)),
             Expanded(child: Text(_editing ? '修改模板' : '設計模板', style: const TextStyle(fontSize: 20, color: ink, fontWeight: FontWeight.w900))),
             FilledButton(
               onPressed: _save,

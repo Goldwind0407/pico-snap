@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import '../filters.dart';
@@ -117,7 +118,7 @@ class AddPhotoHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(mainAxisSize: MainAxisSize.min, children: [
-    Icon(Icons.add_circle_outline_rounded, size: 26 * scale, color: outline.withValues(alpha: .55)),
+    Icon(CupertinoIcons.plus_circle, size: 26 * scale, color: outline.withValues(alpha: .55)),
     SizedBox(height: 2 * scale),
     Text('放照片', style: TextStyle(fontSize: 12 * scale, color: outline.withValues(alpha: .7), fontWeight: FontWeight.w800)),
   ]);
@@ -240,7 +241,7 @@ class PhotoStrip extends StatelessWidget {
         final date = '${now.year}.${now.month.toString().padLeft(2, '0')}.${now.day.toString().padLeft(2, '0')}';
         return Column(mainAxisSize: MainAxisSize.min, children: [
           Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.photo_camera_outlined, size: 16, color: t.captionColor),
+            Icon(CupertinoIcons.camera, size: 16, color: t.captionColor),
             const SizedBox(width: 5),
             Flexible(child: Text('快趣拍', maxLines: 1, softWrap: false, overflow: TextOverflow.fade,
               style: TextStyle(fontFamily: 'Nunito', fontSize: 15, letterSpacing: 3, color: t.captionColor, fontWeight: FontWeight.w900))),
@@ -576,8 +577,8 @@ class DoodleHeart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Stack(alignment: Alignment.center, children: [
-    Icon(Icons.favorite_rounded, size: size, color: color),
-    Icon(Icons.favorite_border_rounded, size: size, color: outline),
+    Icon(CupertinoIcons.heart_fill, size: size, color: color),
+    Icon(CupertinoIcons.heart, size: size, color: outline),
   ]);
 }
 
@@ -615,7 +616,7 @@ class StickerVisual extends StatelessWidget {
       if (custom == null && path != null && customStickers.containsKey(sticker)) {
         return Image.file(File(path), width: size, height: size, gaplessPlayback: true,
           filterQuality: FilterQuality.medium,
-          errorBuilder: (_, error, stack) => const Icon(Icons.broken_image_outlined));
+          errorBuilder: (_, error, stack) => const Icon(CupertinoIcons.exclamationmark_triangle));
       }
       // Deleted while still referenced somewhere: draw nothing.
       if (custom == null) return SizedBox.square(dimension: size);

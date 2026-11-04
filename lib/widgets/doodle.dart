@@ -1,15 +1,16 @@
 import 'dart:math';
 import 'dart:ui' as ui;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
 
 enum PenStyle {
-  pen(Icons.edit_rounded, '畫筆'),
-  marker(Icons.highlight_rounded, '螢光筆'),
-  outline(Icons.gesture_rounded, '白邊筆'),
-  eraser(Icons.auto_fix_normal_outlined, '橡皮擦');
+  pen(CupertinoIcons.pencil, '畫筆'),
+  marker(CupertinoIcons.pencil_outline, '螢光筆'),
+  outline(CupertinoIcons.scribble, '白邊筆'),
+  eraser(CupertinoIcons.delete_left, '橡皮擦');
 
   final IconData icon;
   final String label;

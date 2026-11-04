@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -92,18 +93,18 @@ class _StickerItemState extends State<StickerItem> {
           Positioned(left: 0, top: 0, child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: widget.onDelete,
-            child: sized(const _Handle(label: '刪除貼紙', delete: true, child: Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFB4483C)))),
+            child: sized(const _Handle(label: '刪除貼紙', delete: true, child: Icon(CupertinoIcons.trash, size: 15, color: Color(0xFFB4483C)))),
           )),
           Positioned(right: 0, top: 0, child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: widget.onFlip,
-            child: sized(const _Handle(label: '左右翻轉', child: Icon(Icons.flip_rounded, size: 15, color: ink))),
+            child: sized(const _Handle(label: '左右翻轉', child: Icon(CupertinoIcons.arrow_left_right_square, size: 15, color: ink))),
           )),
           Positioned(right: 0, bottom: 0, child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onPanStart: (_) => widget.onEditStart(),
             onPanUpdate: (d) => _onHandleUpdate(d, pi / 4),
-            child: sized(const _Handle(label: '拖曳縮放、旋轉', child: Icon(Icons.open_in_full_rounded, size: 12, color: ink))),
+            child: sized(const _Handle(label: '拖曳縮放、旋轉', child: Icon(CupertinoIcons.arrow_up_left_arrow_down_right, size: 12, color: ink))),
           )),
         ],
       ])),

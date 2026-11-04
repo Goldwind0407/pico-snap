@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/booth_screen.dart';
@@ -87,7 +88,7 @@ void main() {
     expect(find.text('存到相簿'), findsOneWidget);
     expect(find.text('這次沒有錄到畫面，只能存圖片'), findsOneWidget);
     // 返回回到挑濾鏡，不會直接離開
-    await t.tap(find.byIcon(Icons.arrow_back_rounded));
+    await t.tap(find.byIcon(CupertinoIcons.back));
     await t.pump();
     expect(find.text('挑濾鏡'), findsOneWidget);
   });
@@ -102,13 +103,13 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.textContaining('開始拍照'));
     await t.pump();
-    await t.tap(find.byIcon(Icons.arrow_back_rounded));
+    await t.tap(find.byIcon(CupertinoIcons.back));
     await t.pumpAndSettle();
     expect(find.text('拍好的照片會不見喔。'), findsOneWidget);
     await t.tap(find.text('繼續'));
     await t.pumpAndSettle(const Duration(milliseconds: 100));
     expect(find.byType(BoothScreen), findsOneWidget);
-    await t.tap(find.byIcon(Icons.arrow_back_rounded));
+    await t.tap(find.byIcon(CupertinoIcons.back));
     await t.pump(const Duration(milliseconds: 300));
     await t.tap(find.text('離開'));
     await t.pump(const Duration(seconds: 6));
@@ -187,7 +188,7 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.text('第 3 張'));
     await t.pump();
-    await t.tap(find.byIcon(Icons.arrow_back_rounded));
+    await t.tap(find.byIcon(CupertinoIcons.back));
     await t.pump();
     await t.pump(const Duration(seconds: 4));
     expect(find.text('挑濾鏡'), findsOneWidget);

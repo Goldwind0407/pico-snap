@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/editor_screen.dart';
@@ -135,7 +136,7 @@ void main() {
     expect(find.byType(StickerItem), findsOneWidget);
     await t.drag(find.byType(StickerItem), const Offset(20, 30));
     await t.pumpAndSettle();
-    await t.tap(find.byIcon(Icons.flip_rounded));
+    await t.tap(find.byIcon(CupertinoIcons.arrow_left_right_square));
     await t.pumpAndSettle();
     await t.tap(find.text('儲存'));
     await t.pumpAndSettle();
@@ -153,7 +154,7 @@ void main() {
     expect(find.byType(PhotoStrip), findsOneWidget);
 
     // 按 ✎ 修改：改成條紋，存回同一個模板
-    await t.tap(find.byIcon(Icons.edit_outlined));
+    await t.tap(find.byIcon(CupertinoIcons.pencil));
     await t.pumpAndSettle();
     expect(find.text('修改模板'), findsOneWidget);
     await tab('圖案');
@@ -162,7 +163,7 @@ void main() {
     await t.pumpAndSettle();
     expect(customTemplates.single.pattern, FramePattern.stripes);
     expect(customTemplates.single.id, c.id);
-    await t.tap(find.byIcon(Icons.close_rounded));
+    await t.tap(find.byIcon(CupertinoIcons.xmark));
     await t.pumpAndSettle();
     await t.tap(find.text('刪除'));
     await t.pumpAndSettle();

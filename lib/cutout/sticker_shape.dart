@@ -2,15 +2,16 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 /// How the sticker is cut: along the subject's outline, or as a shape.
 enum StickerShape {
-  contour('輪廓', Icons.gesture_rounded),
-  square('方形', Icons.crop_square_rounded),
-  circle('圓形', Icons.circle_outlined),
-  star('星形', Icons.star_outline_rounded),
-  heart('愛心', Icons.favorite_border_rounded);
+  contour('輪廓', CupertinoIcons.scribble),
+  square('方形', CupertinoIcons.square),
+  circle('圓形', CupertinoIcons.circle),
+  star('星形', CupertinoIcons.star),
+  heart('愛心', CupertinoIcons.heart);
 
   final String label;
   final IconData icon;
@@ -115,10 +116,10 @@ Uint8List resizeMask(Uint8List m, int w, int h, int tw, int th) {
 /// What the sticker is printed on: plain, or the shiny finishes of real
 /// sticker sheets. Only the picture changes; the white border stays white.
 enum StickerFinish {
-  matte('霧面', Icons.crop_square_rounded),
-  glitter('亮片', Icons.auto_awesome_rounded),
-  holo('雷射', Icons.blur_on_rounded),
-  gem('寶石', Icons.diamond_outlined);
+  matte('霧面', CupertinoIcons.square),
+  glitter('亮片', CupertinoIcons.sparkles),
+  holo('雷射', CupertinoIcons.rays),
+  gem('寶石', CupertinoIcons.suit_diamond);
 
   final String label;
   final IconData icon;

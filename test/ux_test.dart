@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -164,7 +165,7 @@ void main() {
     await t.tap(find.text('素材'));
     await t.pumpAndSettle();
     expect(find.text('我的素材'), findsOneWidget);
-    expect(find.byIcon(Icons.arrow_back_rounded), findsNothing, reason: '分頁裡沒有返回箭頭');
+    expect(find.byIcon(CupertinoIcons.back), findsNothing, reason: '分頁裡沒有返回箭頭');
     await t.binding.handlePopRoute();
     await t.pumpAndSettle();
     expect(find.text('Create'), findsOneWidget, reason: '回到首頁分頁');

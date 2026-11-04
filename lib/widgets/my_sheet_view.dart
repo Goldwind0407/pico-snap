@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -47,7 +48,7 @@ class MySheetView extends StatelessWidget {
                   child: Stack(children: [
                     Positioned.fill(child: FittedBox(child: StickerVisual(id, size: 96))),
                     if (selected.contains(id))
-                      const Positioned(right: 0, top: 0, child: Icon(Icons.check_circle_rounded, color: coral, size: 20)),
+                      const Positioned(right: 0, top: 0, child: Icon(CupertinoIcons.checkmark_circle_fill, color: coral, size: 20)),
                   ]),
                 ),
               ),

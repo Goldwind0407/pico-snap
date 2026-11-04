@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -596,16 +597,16 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   Widget _topBar() => Padding(
     padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
     child: Row(children: [
-      IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
+      IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(CupertinoIcons.back, color: ink, size: 26)),
       Expanded(child: Text(switch (_stage) {
         _Stage.pick => '選底片',
         _Stage.aiming => _film.label,
         _ => '拍立得',
       }, style: const TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
       if (_canFlip && _stage == _Stage.aiming)
-        IconButton(tooltip: '切換鏡頭', onPressed: _flipCamera, icon: const Icon(Icons.cameraswitch_outlined), color: ink),
+        IconButton(tooltip: '切換鏡頭', onPressed: _flipCamera, icon: const Icon(CupertinoIcons.camera_rotate), color: ink),
       if (_stage == _Stage.pick || _stage == _Stage.aiming)
-        IconButton(tooltip: '設定', onPressed: _settings, icon: const Icon(Icons.settings_outlined), color: ink),
+        IconButton(tooltip: '設定', onPressed: _settings, icon: const Icon(CupertinoIcons.gear), color: ink),
     ]),
   );
 
@@ -626,7 +627,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
       child: SizedBox(width: double.infinity, child: FilledButton.icon(
         onPressed: _start,
-        icon: const Icon(Icons.photo_camera_rounded),
+        icon: const Icon(CupertinoIcons.camera_fill),
         label: const Text('開始拍照', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
         style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
       )),
@@ -808,7 +809,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     if (camera == null || !camera.value.isInitialized) {
       return ColoredBox(
         color: const Color(0xFF26282E),
-        child: Center(child: Icon(_cameraError != null ? Icons.no_photography_outlined : Icons.camera_alt_outlined, color: Colors.white38, size: 34)),
+        child: Center(child: Icon(_cameraError != null ? CupertinoIcons.exclamationmark_triangle : CupertinoIcons.camera, color: Colors.white38, size: 34)),
       );
     }
     final s = camera.value.previewSize!;
@@ -834,17 +835,17 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
   ]);
 
   Widget _controls() => Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-    _SideButton(icon: Icons.style_outlined, label: '換底片', onTap: _backToPick),
+    _SideButton(icon: CupertinoIcons.rectangle_stack, label: '換底片', onTap: _backToPick),
     GestureDetector(
       onTap: _shoot,
       child: Container(
         width: 78, height: 78,
         decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white, boxShadow: [BoxShadow(color: coral.withValues(alpha: .35), blurRadius: 16, offset: const Offset(0, 6))]),
         padding: const EdgeInsets.all(6),
-        child: Container(decoration: const BoxDecoration(shape: BoxShape.circle, color: coral), child: const Icon(Icons.camera_rounded, color: Colors.white, size: 32)),
+        child: Container(decoration: const BoxDecoration(shape: BoxShape.circle, color: coral), child: const Icon(CupertinoIcons.camera_fill, color: Colors.white, size: 32)),
       ),
     ),
-    _SideButton(icon: Icons.photo_library_outlined, label: '從相簿', onTap: _fromGallery),
+    _SideButton(icon: CupertinoIcons.photo_on_rectangle, label: '從相簿', onTap: _fromGallery),
   ]);
 
   Widget _bottom() => switch (_stage) {
@@ -877,19 +878,19 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Row(children: [
           Expanded(child: OutlinedButton.icon(
-            onPressed: _startFilter, icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+            onPressed: _startFilter, icon: const Icon(CupertinoIcons.sparkles, size: 18),
             label: Text(filtered ? _current!.filter.name : '濾鏡', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
             style: decor(lilac, lilacLine),
           )),
           const SizedBox(width: 8),
           Expanded(child: OutlinedButton.icon(
-            onPressed: _startWriting, icon: const Icon(Icons.edit_rounded, size: 18),
+            onPressed: _startWriting, icon: const Icon(CupertinoIcons.pencil, size: 18),
             label: Text(inked ? '修改手寫' : '手寫', style: const TextStyle(fontWeight: FontWeight.w800)),
             style: decor(blush, blushLine),
           )),
           const SizedBox(width: 8),
           Expanded(child: OutlinedButton.icon(
-            onPressed: _startStickers, icon: const Icon(Icons.emoji_emotions_outlined, size: 18),
+            onPressed: _startStickers, icon: const Icon(CupertinoIcons.smiley, size: 18),
             label: Text(stuck ? '修改貼紙' : '貼貼紙', style: const TextStyle(fontWeight: FontWeight.w800)),
             style: decor(butter, butterLine),
           )),
@@ -899,13 +900,13 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         const SizedBox(height: 12),
         Row(children: [
           Expanded(child: OutlinedButton.icon(
-            onPressed: _again, icon: const Icon(Icons.camera_alt_outlined, size: 18), label: const Text('再拍一張', style: TextStyle(fontWeight: FontWeight.w800)),
+            onPressed: _again, icon: const Icon(CupertinoIcons.camera, size: 18), label: const Text('再拍一張', style: TextStyle(fontWeight: FontWeight.w800)),
             style: OutlinedButton.styleFrom(foregroundColor: ink, side: const BorderSide(color: line, width: 1.4), padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
           )),
           const SizedBox(width: 10),
           Expanded(child: FilledButton.icon(
             onPressed: saved || _saving ? null : _save,
-            icon: Icon(saved ? Icons.check_rounded : Icons.download_rounded, size: 18),
+            icon: Icon(saved ? CupertinoIcons.checkmark : CupertinoIcons.arrow_down_to_line, size: 18),
             label: Text(_saving ? '儲存中…' : saved ? '已存到相簿' : '存到相簿', style: const TextStyle(fontWeight: FontWeight.w800)),
             style: FilledButton.styleFrom(
               backgroundColor: coral, disabledBackgroundColor: saved ? sage : null, disabledForegroundColor: saved ? ink : null,
@@ -945,11 +946,11 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
             )),
           const Spacer(),
           IconButton(
-            tooltip: '復原', icon: const Icon(Icons.undo_rounded),
+            tooltip: '復原', icon: const Icon(CupertinoIcons.arrow_uturn_left),
             onPressed: strokes.isEmpty ? null : () => _editInk((s) => s.removeLast()),
           ),
           IconButton(
-            tooltip: '全部清掉', icon: const Icon(Icons.delete_outline_rounded),
+            tooltip: '全部清掉', icon: const Icon(CupertinoIcons.trash),
             onPressed: strokes.isEmpty ? null : () => _editInk((s) => s.clear()),
           ),
           const SizedBox(width: 4),
@@ -1095,7 +1096,7 @@ class _Finder extends StatelessWidget {
       else Center(child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(error != null ? Icons.no_photography_outlined : Icons.camera_alt_outlined, color: Colors.white38, size: 34),
+          Icon(error != null ? CupertinoIcons.exclamationmark_triangle : CupertinoIcons.camera, color: Colors.white38, size: 34),
           if (error != null) ...[
             const SizedBox(height: 10),
             Text(error!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, height: 1.5, color: Colors.white70, fontWeight: FontWeight.w700)),

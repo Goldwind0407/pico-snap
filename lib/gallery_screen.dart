@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import 'services/my_works.dart';
@@ -39,7 +40,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
             padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
             child: Row(children: [
               if (widget.embedded) const SizedBox(width: 12, height: 48)
-              else IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
+              else IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(CupertinoIcons.back, color: ink, size: 26)),
               const Expanded(child: Text('作品集', style: TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
               if (MyWorks.works.isNotEmpty)
                 Text('${MyWorks.works.length} 件', style: const TextStyle(fontSize: 13, color: muted, fontWeight: FontWeight.w700)),
@@ -76,7 +77,7 @@ class _Empty extends StatelessWidget {
   Widget build(BuildContext context) => const Center(child: Padding(
     padding: EdgeInsets.fromLTRB(40, 0, 40, 80),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Icon(Icons.photo_library_outlined, size: 54, color: blushLine),
+      Icon(CupertinoIcons.photo_on_rectangle, size: 54, color: blushLine),
       SizedBox(height: 14),
       Text('還沒有作品', style: TextStyle(fontSize: 17, color: ink, fontWeight: FontWeight.w900)),
       SizedBox(height: 6),
@@ -189,7 +190,7 @@ class _WorkViewerState extends State<WorkViewer> {
       Padding(
         padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
         child: Row(children: [
-          IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_rounded, color: ink, size: 26)),
+          IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(CupertinoIcons.back, color: ink, size: 26)),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(_work.kind.label, style: const TextStyle(fontSize: 18, color: ink, fontWeight: FontWeight.w900)),
             Text('${_work.created.year}年${dayLabel(_work.created)} ${_time(_work.created)}',
@@ -218,7 +219,7 @@ class _WorkViewerState extends State<WorkViewer> {
         child: Row(children: [
           Expanded(child: OutlinedButton.icon(
             onPressed: _delete,
-            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            icon: const Icon(CupertinoIcons.trash, size: 18),
             label: const Text('刪除', style: TextStyle(fontWeight: FontWeight.w800)),
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFFB4483C), backgroundColor: Colors.white,
@@ -229,7 +230,7 @@ class _WorkViewerState extends State<WorkViewer> {
           const SizedBox(width: 10),
           Expanded(flex: 2, child: FilledButton.icon(
             onPressed: _busy ? null : _saveAgain,
-            icon: const Icon(Icons.download_rounded, size: 18),
+            icon: const Icon(CupertinoIcons.arrow_down_to_line, size: 18),
             label: Text(_busy ? '儲存中…' : _work.hasOriginal ? '再存一次到相簿' : '儲存預覽版（1400px 內）', style: const TextStyle(fontWeight: FontWeight.w800)),
             style: FilledButton.styleFrom(
               backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 13),
