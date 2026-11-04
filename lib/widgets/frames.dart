@@ -648,6 +648,8 @@ class StickerVisual extends StatelessWidget {
 /// a white sticker edge; [outline] is white letters in a thick coloured edge.
 enum TextLook {
   hand('手寫'),
+  /// 辰宇落雁體 throughout, Latin letters too.
+  luoyan('落雁體'),
   round('圓體'),
   outline('描邊');
 
@@ -693,6 +695,8 @@ class TextSticker extends StatelessWidget {
     final edge = words.color == Colors.white ? ink : outline ? words.color : Colors.white;
     final style = words.look == TextLook.hand
         ? hand(48, color: words.color)
+        : words.look == TextLook.luoyan
+        ? TextStyle(fontFamily: 'ChenYuluoyan', fontSize: 46, height: 1.15, color: words.color)
         : TextStyle(fontFamily: 'Nunito', fontSize: 42, height: 1.15, fontWeight: FontWeight.w900, color: outline ? Colors.white : words.color);
     return Padding(
       padding: const EdgeInsets.all(7),

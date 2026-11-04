@@ -32,6 +32,7 @@ flutter:
     - assets/sticker_sheets/
     - assets/instant/
     - assets/luts/
+    - assets/fonts/ChenYuluoyan-OFL.txt
   fonts:
     - family: Nunito
       fonts:
@@ -47,3 +48,8 @@ flutter:
       fonts:
         - asset: assets/fonts/Caveat-600.ttf
           weight: 600
+    # 辰宇落雁體 2.0 細體, SIL OFL 1.1 (assets/fonts/ChenYuluoyan-OFL.txt):
+    # shipped unmodified, the name is reserved for modified versions.
+    - family: ChenYuluoyan
+      fonts:
+        - asset: assets/fonts/ChenYuluoyan-2.0-Thin.ttf

@@ -1176,7 +1176,11 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
           controller: _textCtrl,
           maxLength: 20,
           onSubmitted: _addText,
-          style: _wordLook == TextLook.hand ? hand(24) : const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink),
+          style: switch (_wordLook) {
+            TextLook.hand => hand(24),
+            TextLook.luoyan => const TextStyle(fontFamily: 'ChenYuluoyan', fontSize: 22, color: ink),
+            _ => const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: ink),
+          },
           decoration: InputDecoration(
             isDense: true, filled: true, fillColor: cream, counterText: '', hintText: '想說的話…（可以拖曳、縮放）',
             hintStyle: const TextStyle(fontSize: 14, color: muted, fontFamily: 'Nunito'),
@@ -1195,10 +1199,10 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       const SizedBox(height: 10),
       // Looks, then colours; they also restyle the selected words.
       Row(children: [
-        for (final look in TextLook.values) Padding(padding: const EdgeInsets.only(right: 8), child: GestureDetector(
+        for (final look in TextLook.values) Expanded(child: Padding(padding: const EdgeInsets.only(right: 8), child: GestureDetector(
           onTap: () => _styleWords(look: look),
           child: Container(
-            height: 34, padding: const EdgeInsets.symmetric(horizontal: 12),
+            height: 34, padding: const EdgeInsets.symmetric(horizontal: 8),
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: _wordLook == look ? blush : Colors.white, borderRadius: BorderRadius.circular(17),
@@ -1206,7 +1210,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
             ),
             child: SizedBox(height: 24, child: FittedBox(child: TextSticker(TypedWords(look.label, look: look, color: _wordColor)))),
           ),
-        )),
+        ))),
       ]),
       const SizedBox(height: 10),
       Row(children: [

@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'home_screen.dart';
 import 'lut_files.dart';
@@ -9,6 +11,10 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // The handwritten Chinese font's licence, for the app's licence page.
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks(['辰宇落雁體 ChenYuluoyan'], await rootBundle.loadString('assets/fonts/ChenYuluoyan-OFL.txt'));
+  });
   final ready = Future.wait([MyLibrary.load(), MyWorks.load(), EditorDrafts.load()]);
   runApp(PicoSnapApp(ready: ready));
   // Filters from lookup files join the list a moment later.

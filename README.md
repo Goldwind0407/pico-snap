@@ -201,7 +201,7 @@
 - 用手機內建的編碼器做影片（Android 是 MediaCodec，iPhone 是 AVAssetWriter）。
 - **草稿**：編輯時自動存草稿（停手約 0.7 秒後、App 切到背景時）。草稿先寫照片檔、最後才寫內容，存到一半當掉也能讀回上一份。下次從首頁「繼續編輯草稿」接著做。已經存到相簿的作品拿去裝飾，什麼都沒改就離開，不會留草稿。
 - **標題列**：返回、玩法名稱（四格拍貼／拍立得拼貼／貼紙裝飾）、復原、重做、儲存；按鈕都在標題列，不會蓋到作品。
-- **文字**：上方切換「作品上的字」（四格底部、每張拍立得、對話泡泡）和「文字貼紙」。文字貼紙可以拖曳、縮放，選字型（手寫、圓體、描邊：白字加粗的彩色邊）和 9 種顏色；選中一張文字貼紙再點字型或顏色，就改那一張。中文字用手機內建的字型（App 沒有附中文字型）。以前存的文字貼紙（`text:` 開頭）照樣讀得到，是手寫、深色。
+- **文字**：上方切換「作品上的字」（四格底部、每張拍立得、對話泡泡）和「文字貼紙」。文字貼紙可以拖曳、縮放，選字型（手寫、落雁體、圓體、描邊：白字加粗的彩色邊）和 9 種顏色；選中一張文字貼紙再點字型或顏色，就改那一張。「手寫」的英文是 Caveat、中文是辰宇落雁體；「落雁體」整句都用辰宇落雁體；圓體和描邊的中文用手機內建的字型。App 裡其他手寫字（模板底部的字、日記）的中文也是辰宇落雁體。以前存的文字貼紙（`text:` 開頭）照樣讀得到，是手寫、深色。
 - **復原／重做**：照片、裁切位置、文字、模板、背景、貼紙、筆畫都算在內。
 - 模板分類跟拍貼機一樣是可以左右滑的圓角按鈕。
 - 選了貼紙工具，貼紙本會加高（四格旁邊稍微矮一點，免得窄條變得更細）。貼紙最大只能放大到控制鈕還在畫布裡，窄窄的四格上也點得到刪除、翻轉、縮放。
@@ -266,7 +266,7 @@
 | `assets/luts/` | 濾鏡檔（`.cube`、Hald PNG） |
 | `design/hald/` | Hald 原始色卡和自己調好的色卡 |
 | `assets/samples/` | 範例照片（佔位用） |
-| `assets/fonts/` | Nunito、Caveat 字型 |
+| `assets/fonts/` | Nunito、Caveat、辰宇落雁體字型（辰宇落雁體附授權檔 `ChenYuluoyan-OFL.txt`） |
 | `design/prompts/` | Gemini 提示詞 |
 | `test/` | 自動化測試 |
 | `integration_test/perf_test.dart` | 在手機上跑一遍拍立得到編輯器，記錄每一步的畫面耗時 |
@@ -279,7 +279,7 @@
 - `assets/samples/` 的人物照片是從 AI 示意圖裁切下來的，**只是佔位用**。正式發布前請換成有使用權的照片。
 - `assets/instant/` 的相機圖上原本有「instax」標誌，已經擦掉換成 App 名稱；相機外型仍然很像真實的 instax mini 7，上架前可以考慮換成自己的造型。
 - 實體拍貼機的參考照片（`design/拍貼機範本/`）有版權，只留在本機當設計參考，已加入 `.gitignore`。
-- 字型：[Nunito](https://fonts.google.com/specimen/Nunito)、[Caveat](https://fonts.google.com/specimen/Caveat)，兩者都採用 SIL Open Font License。
+- 字型：[Nunito](https://fonts.google.com/specimen/Nunito)、[Caveat](https://fonts.google.com/specimen/Caveat)、[辰宇落雁體 2.0 細體](https://github.com/Chenyu-otf/chenyuluoyan_thin)，都採用 SIL Open Font License 1.1，可以隨 App 散布。辰宇落雁體約 9.5 MB，原檔未修改：「辰宇落雁」是保留名稱，裁切字集之類的修改版不能用這個名字。授權文字在 `assets/fonts/ChenYuluoyan-OFL.txt`，App 啟動時也登記進授權清單（`LicenseRegistry`）。
 
 ## 開發
 

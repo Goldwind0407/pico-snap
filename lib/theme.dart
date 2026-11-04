@@ -20,8 +20,9 @@ const sage = Color(0xFFC6D4BB);
 const sky = Color(0xFFC8DDEA);
 
 /// Handwritten accent text.
+/// Handwriting: Caveat, and 辰宇落雁體 for Chinese.
 TextStyle hand(double size, {Color color = ink}) =>
-    TextStyle(fontFamily: 'Caveat', fontSize: size, color: color, fontWeight: FontWeight.w600, height: 1.1);
+    TextStyle(fontFamily: 'Caveat', fontFamilyFallback: const ['ChenYuluoyan'], fontSize: size, color: color, fontWeight: FontWeight.w600, height: 1.1);
 
 void showSoonToast(BuildContext context, String feature) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(
   content: Text('$feature：即將推出，敬請期待 ♡'),
