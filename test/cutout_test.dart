@@ -82,6 +82,9 @@ void main() {
       await tester.pump();
     }
     expect(find.textContaining('AI 這次認不出來，改用手動去背'), findsOneWidget);
+    expect(find.textContaining('改用手動去背'), findsOneWidget, reason: '已經是手動去背，不用再提一次');
+    // 自動找出來的不算修改：返回不會問
+    expect(tester.widgetList<PopScope<Object?>>(find.byWidgetPredicate((w) => w is PopScope)).last.canPop, isTrue);
 
     await tester.tap(find.text('完成'));
     for (var i = 0; i < 200 && result == null; i++) {

@@ -59,6 +59,8 @@ class _CutoutPageState extends State<CutoutPage> {
   String _status = '找主體中…';
   _Mode _mode = _Mode.select;
   bool _edited = false;
+  /// The subjects came from the manual cut-out already: no need to offer it.
+  bool _manual = false;
 
   /// One mask per subject (0–255, w × h), biggest first, and their bounds.
   List<Uint8List> _subjects = [];
@@ -149,6 +151,8 @@ class _CutoutPageState extends State<CutoutPage> {
     } else {
       await _findSubjects();
     }
+    // What it found by itself isn't the user's work: leaving now doesn't ask.
+    _edited = false;
     unawaited(_maybeShowTips());
   }
 
@@ -211,6 +215,7 @@ class _CutoutPageState extends State<CutoutPage> {
       final parts = await compute(_splitJob, (fg: fg, w: _w, h: _h));
       if (!mounted) return;
       _pushUndo();
+      _manual = true;
       _setSubjects(parts.isEmpty ? [fg] : parts, manual ? '用手動去背（依顏色和邊緣判斷）' : 'AI 這次認不出來，改用手動去背');
     }
     await _compose();
@@ -928,7 +933,7 @@ class _CutoutPageState extends State<CutoutPage> {
         _Mode.select => [
           _tip(_status.isEmpty ? '點一下選或不選，可以多選；長按只留那一個' : _status),
           _tip('黏在一起？在中間畫一條線就能切開', icon: CupertinoIcons.scissors),
-          Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+          if (!_manual) Align(alignment: Alignment.centerLeft, child: TextButton.icon(
             onPressed: _busy ? null : () => _findSubjects(manual: true),
             style: TextButton.styleFrom(foregroundColor: ink, padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
             icon: const Icon(CupertinoIcons.wand_stars, size: 17),
@@ -1030,11 +1035,9 @@ Future<void> showCutoutTips(BuildContext context) => showGlassDialog<void>(
       title: '去背小技巧',
       actions: [GlassAction('知道了', () => Navigator.pop(context))],
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        row(CupertinoIcons.hand_point_right, '選主體', '點一下選或不選，可以多選；長按只留按到的那一個。'),
-        row(CupertinoIcons.scissors, '黏在一起', '在兩個人中間畫一條線就能切開。'),
-        row(CupertinoIcons.delete_left, '多出來的東西', '選「擦掉」，在上面畫一筆或點一下，會沿著邊緣整塊擦掉。'),
-        row(CupertinoIcons.paintbrush, '少了的地方', '選「補回」畫一筆。'),
-        row(CupertinoIcons.zoom_in, '細的地方', '兩指放大，打開「細修」用筆刷慢慢修；按住「原圖」對照。'),
+        // The three that matter first; the rest is on the tools themselves.
+        row(CupertinoIcons.hand_point_right, '選主體', '點一下選或不選；黏在一起的，在中間畫一條線切開。'),
+        row(CupertinoIcons.delete_left, '擦掉、補回', '在多出來或少了的地方畫一筆；兩指放大、打開「細修」可以慢慢修。'),
         row(CupertinoIcons.square_on_circle, '外框', '也可以做成方形、圓形、星形、愛心貼紙。'),
       ]),
     );
