@@ -1,8 +1,10 @@
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
 import 'models.dart';
+import 'widgets/collage_layout.dart';
 import 'widgets/doodle.dart';
 import 'widgets/frames.dart';
 import 'widgets/instant_print.dart';
@@ -22,6 +24,23 @@ class EditorDocument {
   final String templateKey, bubble;
   final String? stripCaption;
   final int format, pattern, backdrop;
+  /// 拍立得拼貼: how many prints show, and how they lie.
+  final int count;
+  final CollageArrangement arrangement;
+
+  /// Photo windows a piece of [mode] keeps: a collage holds up to six prints.
+  static int cellsOf(EditorMode mode) => switch (mode) {
+        EditorMode.sticker => 1,
+        EditorMode.fourCut => 4,
+        EditorMode.polaroid => 6,
+      };
+
+  /// Captions a collage's prints start with.
+  static const collageCaptions = ['good day', '今天好開心', 'sunny!', '我們 ♡', 'little joy', '小確幸'];
+
+  /// Lists from before collages held six prints, filled up with defaults.
+  static List<T> _pad<T>(List<T> list, int length, T Function(int) fill) =>
+      [...list.take(length), for (var i = list.length; i < length; i++) fill(i)];
 
   EditorDocument(
       {required this.mode,
@@ -39,12 +58,14 @@ class EditorDocument {
       required this.backdrop,
       required this.bubble,
       this.stripCaption,
-      this.subject})
-      : photos = List.unmodifiable(photos),
-        fits = List.unmodifiable(fits),
-        films = List.unmodifiable(films),
-        filters = List.unmodifiable(filters),
-        captions = List.unmodifiable(captions),
+      this.subject,
+      this.count = 4,
+      this.arrangement = CollageArrangement.scatter})
+      : photos = List.unmodifiable(_pad(photos, cellsOf(mode), (_) => null)),
+        fits = List.unmodifiable(_pad(fits, cellsOf(mode), (_) => const PhotoFit())),
+        films = List.unmodifiable(_pad(films, max(4, cellsOf(mode)), (_) => FilmStock.white)),
+        filters = List.unmodifiable(_pad(filters, cellsOf(mode), (_) => '')),
+        captions = List.unmodifiable(_pad(captions, max(4, cellsOf(mode)), (i) => collageCaptions[i])),
         stickers = List.unmodifiable(stickers),
         strokes = copyStrokes(strokes),
         handwriting = [for (final lines in handwriting) copyStrokes(lines)];
@@ -57,7 +78,7 @@ class EditorDocument {
         fits: List.filled(4, const PhotoFit()),
         films: List.filled(4, FilmStock.white),
         filters: [for (var i = 0; i < 4; i++) i < filters.length ? filters[i] : ''], // '': the first filter
-        captions: const ['good day', 'little joy', 'sunny!', 'us ♡'],
+        captions: collageCaptions,
         stickers: const [],
         strokes: const [],
         handwriting: const [],
@@ -116,6 +137,8 @@ class EditorDocument {
         'format': format,
         'pattern': pattern,
         'backdrop': backdrop,
+        'count': count,
+        'arrangement': arrangement.name,
         'bubble': bubble,
         'stripCaption': stripCaption,
         'stickers': [
@@ -141,12 +164,15 @@ class EditorDocument {
       throw const FormatException('Unsupported draft version');
     }
     final mode = EditorMode.values.byName(json['mode'] as String);
-    final cells = mode == EditorMode.sticker ? 1 : 4;
-    if (photos.length != cells ||
-        (json['fits'] as List).length != cells ||
-        (json['filters'] as List).length != cells ||
-        (json['films'] as List).length != 4 ||
-        (json['captions'] as List).length != 4) {
+    // A collage from before six prints has four of everything.
+    final cells = EditorDocument.cellsOf(mode);
+    final ok = {cells, if (mode == EditorMode.polaroid) 4};
+    final perPrint = {max(4, cells), 4};
+    if (!ok.contains(photos.length) ||
+        !ok.contains((json['fits'] as List).length) ||
+        !ok.contains((json['filters'] as List).length) ||
+        !perPrint.contains((json['films'] as List).length) ||
+        !perPrint.contains((json['captions'] as List).length)) {
       throw const FormatException('Invalid draft cells');
     }
     List<Stroke> lines(List values) => [
@@ -179,6 +205,8 @@ class EditorDocument {
       format: (json['format'] as int).clamp(0, formats.length - 1),
       pattern: (json['pattern'] as int).clamp(0, ginghamPatterns.length - 1),
       backdrop: (json['backdrop'] as int).clamp(0, backdrops.length - 1),
+      count: ((json['count'] as int?) ?? 4).clamp(1, cells),
+      arrangement: CollageArrangement.values.asNameMap()[json['arrangement']] ?? CollageArrangement.scatter,
       bubble: json['bubble'] as String,
       stripCaption: json['stripCaption'] as String?,
       stickers: [

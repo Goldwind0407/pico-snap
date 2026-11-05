@@ -160,18 +160,21 @@ void main() {
       if (box.value != album) await tester.tap(find.text('也存到手機相簿'));
       await tester.pump();
       await tester.tap(find.text('完成').last);
-      for (var i = 0; i < 100 && find.byType(SnackBar).evaluate().isEmpty; i++) {
+      for (var i = 0; i < 100 && find.byType(SnackBar).evaluate().isEmpty && find.text('收進作品集了 ♡').evaluate().isEmpty; i++) {
         await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
         await tester.pump();
       }
       await tester.pump(const Duration(milliseconds: 500)); // the sheet closing
     }
     await finish(album: false);
-    expect(find.text('收進作品集了 ♡'), findsOneWidget);
-    expect(MyWorks.works.single.kind, WorkKind.collage);
-    expect(find.widgetWithText(SnackBarAction, '存到相簿'), findsOneWidget, reason: '改變主意可以馬上存到相簿');
-    ScaffoldMessenger.of(tester.element(find.byType(EditorScreen))).removeCurrentSnackBar();
     await tester.pumpAndSettle();
+    expect(find.text('收進作品集了 ♡'), findsOneWidget, reason: '完成後給看作品、選下一步');
+    expect(MyWorks.works.single.kind, WorkKind.collage);
+    expect(find.widgetWithText(OutlinedButton, '存到相簿'), findsOneWidget, reason: '改變主意可以馬上存到相簿');
+    expect(find.text('看作品、分享'), findsOneWidget);
+    await tester.tap(find.text('繼續編輯'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EditorScreen), findsOneWidget);
     // 也存到相簿：測試裡沒有相簿外掛，會顯示錯誤但不會當掉
     await finish(album: true);
     expect(find.byType(SnackBar), findsOneWidget);

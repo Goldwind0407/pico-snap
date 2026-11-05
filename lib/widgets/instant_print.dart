@@ -88,13 +88,15 @@ class InstantPrint extends StatelessWidget {
   /// Shown in an empty window.
   final Widget? placeholder;
   final bool selected;
+  /// Outline the caption: it is the one being typed.
+  final bool captionSelected;
   final PhotoFit fit;
   final double? aspect;
   final ValueChanged<PhotoFit>? onFit;
   final PhotoFilter? filter;
   const InstantPrint({
     super.key, this.image, this.film = FilmStock.white, this.develop = 1, required this.caption, this.handwriting = const [], this.handwritingVersion = 0, this.handwritingRepaint,
-    this.onCaption, this.onTap, this.placeholder, this.selected = false, this.fit = const PhotoFit(), this.aspect, this.onFit, this.filter,
+    this.onCaption, this.onTap, this.placeholder, this.selected = false, this.captionSelected = false, this.fit = const PhotoFit(), this.aspect, this.onFit, this.filter,
   });
 
   @override
@@ -112,6 +114,10 @@ class InstantPrint extends StatelessWidget {
       if (selected)
         Positioned.fromRect(rect: w.inflate(1), child: IgnorePointer(child: DecoratedBox(
           decoration: BoxDecoration(border: Border.all(color: coral, width: 3)),
+        ))),
+      if (captionSelected)
+        Positioned(left: 6, right: 6, top: w.bottom + 4, bottom: 4, child: IgnorePointer(child: DecoratedBox(
+          decoration: BoxDecoration(border: Border.all(color: coral, width: 2.5), borderRadius: BorderRadius.circular(6)),
         ))),
       Positioned(left: 8, right: 8, top: w.bottom + 2, bottom: 4, child: GestureDetector(
         key: const ValueKey('instant-caption'),

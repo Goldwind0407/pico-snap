@@ -13,12 +13,14 @@ import 'package:image_picker/image_picker.dart';
 import 'cutout/cutout_page.dart';
 import 'filters.dart';
 import 'editor_document.dart';
+import 'gallery_screen.dart';
 import 'services/editor_drafts.dart';
 import 'models.dart';
 import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
 import 'services/timelapse_recorder.dart';
 import 'theme.dart';
+import 'widgets/collage_layout.dart';
 import 'widgets/doodle.dart';
 import 'widgets/filter_thumbs.dart';
 import 'widgets/frames.dart';
@@ -34,6 +36,7 @@ enum _Tool {
   text(CupertinoIcons.textformat, '文字'),
   brush(CupertinoIcons.paintbrush, '畫筆'),
   cutout(CupertinoIcons.scissors, '去背'),
+  film(CupertinoIcons.film, '底片'),
   filter(CupertinoIcons.color_filter, '濾鏡'),
   /// Adjusting the selected photo; opened by tapping a photo, not a tab.
   photo(CupertinoIcons.photo, '照片');
@@ -45,13 +48,13 @@ enum _Tool {
 
 const _captionIdeas = ['cute caption ♡', 'best day ever', 'say cheese!', 'us ♡', 'good vibes'];
 
-// Polaroid centres (normalised) and tilt, zig-zagging down the page like a photo album.
-const _scatter = [(Offset(.31, .22), -.07), (Offset(.69, .38), .06), (Offset(.32, .61), -.05), (Offset(.68, .80), .07)];
 const _tapes = [
   [Color(0xFFB9C9AE), Color(0xFFE3EBD9)],
   [Color(0xFFF4B183), Color(0xFFFCE3CF)],
   [Color(0xFFF59E95), Color(0xFFFFD9D4)],
   [Color(0xFF9FC3DE), Color(0xFFDDEBF5)],
+  [Color(0xFFD3B8E8), Color(0xFFF0E6F8)],
+  [Color(0xFFF2D27A), Color(0xFFFBF0CF)],
 ];
 
 class EditorScreen extends StatefulWidget {
@@ -84,15 +87,20 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   /// What gets saved: the canvas without the shadow around it.
   final _shotKey = GlobalKey();
   final _textCtrl = TextEditingController();
-  late final int _cells = widget.mode == EditorMode.sticker ? 1 : 4;
+  late final int _cells = EditorDocument.cellsOf(widget.mode);
   late final List<ImageProvider?> _photos = List<ImageProvider?>.filled(_cells, null);
   /// Original files of [_photos], for cutting out.
   late final List<Uint8List?> _photoBytes = List<Uint8List?>.filled(_cells, null);
   /// How each photo sits in its cell, and its width / height (for moving it).
   late final List<PhotoFit> _fits = List<PhotoFit>.filled(_cells, const PhotoFit());
   late final List<double?> _aspects = List<double?>.filled(_cells, null);
-  /// Polaroid mode: white or black film per print.
-  late final List<FilmStock> _films = [for (var i = 0; i < 4; i++) i < widget.films.length ? widget.films[i] : FilmStock.white];
+  /// Polaroid mode: the film of each print.
+  late final List<FilmStock> _films = [for (var i = 0; i < max(4, _cells); i++) i < widget.films.length ? widget.films[i] : FilmStock.white];
+  /// 拍立得拼貼: how many prints show (1–6), and how they lie.
+  late int _count = widget.photos.length > 4 ? min(6, widget.photos.length) : 4;
+  CollageArrangement _arrangement = CollageArrangement.scatter;
+  /// Where tapping a photo came from: closing the photo tool goes back there.
+  _Tool? _backTool;
   /// Filter per photo (photos only; frames and stickers aren't filtered).
   late final List<PhotoFilter> _filters = [for (var i = 0; i < _cells; i++) i < widget.filters.length ? widget.filters[i] : photoFilters.first];
   /// Sticker mode: the cut-out subject (PNG with a white die-cut border).
@@ -108,7 +116,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   /// state. Immutable photo bytes retain their identity across checkpoints.
   Object _contentKey() => Object.hashAll([
     Object.hashAll(_photoBytes), Object.hashAll(_fits.map((f) => Object.hash(f.scale, f.align))), Object.hashAll(_films), Object.hashAll([for (final f in _filters) f.id]),
-    _template, _format, _pattern, _backdrop, _stripCaption, Object.hashAll(_polaroidCaptions), _bubble, _subject,
+    _template, _format, _pattern, _backdrop, _count, _arrangement, _stripCaption, Object.hashAll(_polaroidCaptions), _bubble, _subject,
     Object.hashAll(_stickers.map((s) => Object.hash(s.sticker, s.center, s.scale, s.rotation, s.flipped))), Object.hashAll(_strokes.map((s) => Object.hash(s.color, s.width, s.style, Object.hashAll(s.points)))), _strokes.isEmpty ? 0 : _strokes.last.points.length,
   ]);
 
@@ -119,7 +127,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   bool _withVideo = true;
   /// 完成 also saves to the phone's album: off unless asked, remembered.
   static bool _toAlbum = false;
-  final _polaroidCaptions = ['good day', 'little joy', 'sunny!', 'us ♡'];
+  final _polaroidCaptions = List.of(EditorDocument.collageCaptions);
   late int _template = widget.template;
   late String _category = allStripTemplates[widget.template].category;
   String? _stripCaption;
@@ -154,7 +162,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     captions: _polaroidCaptions, stickers: _stickers, strokes: _strokes,
     handwriting: _handwriting, templateKey: EditorDocument.keyForTemplate(_template),
     format: _format, pattern: _pattern, backdrop: _backdrop, bubble: _bubble,
-    stripCaption: _stripCaption, subject: _subject);
+    stripCaption: _stripCaption, subject: _subject, count: _count, arrangement: _arrangement);
 
   void _restore(EditorDocument d) {
     _photoBytes.setAll(0, d.photos);
@@ -166,6 +174,8 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     _handwriting = d.handwriting; _template = d.templateIndex;
     _category = allStripTemplates[_template].category;
     _format = d.format; _pattern = d.pattern; _backdrop = d.backdrop;
+    _count = d.count; _arrangement = d.arrangement;
+    if (widget.mode == EditorMode.polaroid) _selectedCell = min(_selectedCell, _count - 1);
     _bubble = d.bubble; _stripCaption = d.stripCaption; _subject = d.subject;
     _selectedSticker = null; _textCtrl.text = _text;
     for (var i = 0; i < _cells; i++) { _aspects[i] = null; _measure(i); }
@@ -192,7 +202,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
 
   List<_Tool> get _tools => switch (widget.mode) {
     EditorMode.fourCut => const [_Tool.template, _Tool.sticker, _Tool.text, _Tool.brush, _Tool.filter],
-    EditorMode.polaroid => const [_Tool.layout, _Tool.sticker, _Tool.text, _Tool.brush, _Tool.filter],
+    EditorMode.polaroid => const [_Tool.layout, _Tool.film, _Tool.sticker, _Tool.text, _Tool.brush, _Tool.filter],
     EditorMode.sticker => const [_Tool.sticker, _Tool.pattern, _Tool.text, _Tool.brush, _Tool.cutout],
   };
 
@@ -272,19 +282,28 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     _fits[i] = const PhotoFit();
     _aspects[i] = null;
     if (widget.mode == EditorMode.sticker) _subject = null;
-    _tool = _tools.first;
+    _closePhoto();
   });
+
+  /// Leave the photo tool for the tool it was opened from.
+  void _closePhoto() {
+    if (_tool == _Tool.photo) _tool = _backTool ?? _tools.first;
+  }
 
   /// How many photo windows the piece shows.
   int get _slots => switch (widget.mode) {
     EditorMode.fourCut => min(_cells, allStripTemplates[_template].art?.cells.length ?? 4),
-    EditorMode.polaroid => 4,
+    EditorMode.polaroid => _count,
     EditorMode.sticker => 1,
   };
 
-  /// Pick photos for every empty window at once, filled in order.
+  /// Pick photos for every empty window at once, filled in order. A
+  /// collage takes as many as were picked (up to six) when it is blank or
+  /// all its prints are full (the photos are swapped).
   Future<void> _pickMany() async {
-    final empty = [for (var i = 0; i < _slots; i++) if (_photos[i] == null) i];
+    final collage = widget.mode == EditorMode.polaroid;
+    final fresh = collage && (_photos.every((p) => p == null) || _photos.take(_count).every((p) => p != null));
+    final empty = fresh ? [for (var i = 0; i < _cells; i++) i] : [for (var i = 0; i < _slots; i++) if (_photos[i] == null) i];
     if (empty.length < 2) return _pickPhoto(empty.firstOrNull);
     final files = await _picker.pickMultiImage(imageQuality: 95, limit: empty.length);
     if (files.isEmpty) return;
@@ -292,6 +311,10 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     if (!mounted) return;
     setState(() {
       _remember();
+      if (fresh) {
+        _count = bytes.length;
+        _selectedCell = min(_selectedCell, _count - 1);
+      }
       for (final (k, b) in bytes.indexed) {
         final i = empty[k];
         _photos[i] = photoImage(b);
@@ -311,7 +334,10 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     if (file == null) return;
     final bytes = await file.readAsBytes();
     if (!mounted) return;
-    if (widget.mode != EditorMode.sticker) _tool = _Tool.photo;
+    if (widget.mode != EditorMode.sticker && _tool != _Tool.photo) {
+      _backTool = _tool;
+      _tool = _Tool.photo;
+    }
     setState(() {
       _remember();
       _photos[i] = photoImage(bytes);
@@ -477,6 +503,8 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       if (error == null) _savedKey = _contentKey();
     });
     final work = kept == null ? null : MyWorks.works.where((w) => w.id == kept.id).firstOrNull;
+    // Done: show the piece and where to go from here.
+    if (error == null && work != null) return _showDone(work, album: album);
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(SnackBar(
       content: Text(error ?? saved),
@@ -494,18 +522,99 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     ));
   }
 
+  /// After 完成: the piece as it went into the gallery, and what next.
+  Future<void> _showDone(Work work, {required bool album}) async {
+    var inAlbum = album, busy = false;
+    final next = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+      builder: (context) => StatefulBuilder(builder: (context, setSheet) => SafeArea(child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 12),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('收進作品集了 ♡', style: TextStyle(fontSize: 19, color: ink, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Text(inAlbum ? '手機相簿裡也有一張' : '在作品集可以分享、再編輯；想留在手機相簿就按「存到相簿」',
+            textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 14),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: min(240, MediaQuery.sizeOf(context).height * .3)),
+            child: DecoratedBox(
+              decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .14), blurRadius: 14, offset: const Offset(0, 6))]),
+              child: Image(image: work.image, fit: BoxFit.contain),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(children: [
+            Expanded(child: OutlinedButton.icon(
+              onPressed: inAlbum || busy ? null : () async {
+                setSheet(() => busy = true);
+                final failed = await PhotoSaveService.saveWork(MyWorks.works.firstWhere((w) => w.id == work.id, orElse: () => work));
+                if (!context.mounted) return;
+                setSheet(() { busy = false; inAlbum = failed == null; });
+                if (failed != null) showMessage(context, failed, error: true);
+              },
+              icon: Icon(inAlbum ? CupertinoIcons.checkmark_alt : CupertinoIcons.arrow_down_to_line, size: 18),
+              label: Text(inAlbum ? '已在相簿' : busy ? '存檔中…' : '存到相簿', style: const TextStyle(fontWeight: FontWeight.w800)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: ink, side: const BorderSide(color: line, width: 1.3), padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: FilledButton.icon(
+              onPressed: () => Navigator.pop(context, 'view'),
+              icon: const Icon(CupertinoIcons.photo_on_rectangle, size: 18),
+              label: const Text('看作品、分享', style: TextStyle(fontWeight: FontWeight.w800)),
+              style: FilledButton.styleFrom(
+                backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            )),
+          ]),
+          const SizedBox(height: 4),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            TextButton(onPressed: () => Navigator.pop(context), style: TextButton.styleFrom(foregroundColor: muted),
+              child: const Text('繼續編輯', style: TextStyle(fontWeight: FontWeight.w800))),
+            const Text('·', style: TextStyle(color: muted)),
+            TextButton(onPressed: () => Navigator.pop(context, 'home'), style: TextButton.styleFrom(foregroundColor: muted),
+              child: const Text('回首頁', style: TextStyle(fontWeight: FontWeight.w800))),
+          ]),
+        ]),
+      ))),
+    );
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    switch (next) {
+      case 'view':
+        final works = MyWorks.works;
+        final i = works.indexWhere((w) => w.id == work.id);
+        await navigator.pushReplacement(MaterialPageRoute(builder: (_) => WorkViewer(works: List.of(works), initial: max(0, i))));
+      case 'home':
+        navigator.popUntil((route) => route.isFirst);
+    }
+  }
+
   void _tapCell(int i) {
+    // These tools work on one photo at a time: tapping one picks which.
+    final perPhoto = _tool == _Tool.film || _tool == _Tool.filter || (_tool == _Tool.text && widget.mode == EditorMode.polaroid);
     setState(() {
       _selectedCell = i;
       _selectedSticker = null;
       _textCtrl.text = _text;
-      if (_photos[i] != null) _tool = _Tool.photo;
+      if (_photos[i] != null && !perPhoto) {
+        if (_tool != _Tool.photo) _backTool = _tool;
+        _tool = _Tool.photo;
+      }
     });
-    if (_photos[i] == null) _pickPhoto(i);
+    if (_photos[i] == null && _tool != _Tool.film) _pickPhoto(i);
   }
 
   /// Outline the chosen photo only while a tool works on one photo.
-  bool get _showCell => !_capturing && (_tool == _Tool.photo || _tool == _Tool.filter || (_tool == _Tool.text && widget.mode == EditorMode.polaroid));
+  bool get _showCell => !_capturing && (_tool == _Tool.photo || _tool == _Tool.filter || _tool == _Tool.film);
+  /// The collage's text tool: outline the chosen print's caption instead.
+  bool get _showCaption => !_capturing && _tool == _Tool.text && widget.mode == EditorMode.polaroid && !_wordSticker;
 
   /// The template prints its own words: typed text goes on as a sticker.
   bool get _printedText => widget.mode == EditorMode.fourCut && allStripTemplates[_template].art != null;
@@ -529,6 +638,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
 
   void _selectTool(_Tool tool) => setState(() {
     _tool = tool;
+    _backTool = null;
     if (tool == _Tool.text) _textCtrl.text = _text;
     if (tool == _Tool.brush) _selectedSticker = null;
   });
@@ -672,7 +782,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
           Positioned(left: 0, right: 0, bottom: 28, child: Center(child: FilledButton.icon(
             onPressed: _pickMany,
             icon: const Icon(CupertinoIcons.photo_on_rectangle, size: 20),
-            label: Text(_slots > 1 ? '選照片（一次可以選 $_slots 張）' : '先選一張照片', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+            label: Text(widget.mode == EditorMode.polaroid ? '選照片（1～6 張）' : _slots > 1 ? '選照片（一次可以選 $_slots 張）' : '先選一張照片', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
             style: FilledButton.styleFrom(
               backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
               shape: const StadiumBorder(), elevation: 3, shadowColor: ink.withValues(alpha: .3),
@@ -687,7 +797,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       Expanded(child: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 20, color: ink, fontWeight: FontWeight.w900))),
       _IconButton(icon: CupertinoIcons.arrow_uturn_left, tooltip: '復原', onTap: _history.isEmpty ? null : _undo),
       _IconButton(icon: CupertinoIcons.arrow_uturn_right, tooltip: '重做', onTap: _redoHistory.isEmpty ? null : _redo),
-      if (widget.mode == EditorMode.fourCut) _IconButton(icon: CupertinoIcons.photo_on_rectangle, tooltip: '從相簿選照片', onTap: _pickMany),
+      if (widget.mode != EditorMode.sticker) _IconButton(icon: CupertinoIcons.photo_on_rectangle, tooltip: '從相簿選照片', onTap: _pickMany),
       const SizedBox(width: 6),
       _TopButton(label: _saving ? '儲存中…' : '完成', filled: true, onTap: _askSave),
     ]),
@@ -699,7 +809,8 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       decoration: BoxDecoration(boxShadow: [BoxShadow(color: ink.withValues(alpha: .10), blurRadius: 18, offset: const Offset(0, 8))]),
       child: PhotoCapture(key: _shotKey, child: Stack(key: _canvasKey, clipBehavior: Clip.none, children: [
         Positioned.fill(child: GestureDetector(
-          onTap: () => setState(() => _selectedSticker = null),
+          // Tapping the page beside the photos puts the photo tool away.
+          onTap: () => setState(() { _selectedSticker = null; _closePhoto(); }),
           child: _artwork(size),
         )),
         for (var i = 0; i < _stickers.length; i++)
@@ -745,9 +856,9 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   };
 
   Widget _polaroidArtwork(Size size) {
-    final w = min(size.width * .37, size.height * .26);
+    final places = collageLayout(_count, _arrangement, size.aspectRatio);
     // Draw the selected print last so it sits on top.
-    final order = [for (var i = 0; i < 4; i++) if (i != _selectedCell) i, _selectedCell];
+    final order = [for (var i = 0; i < _count; i++) if (i != _selectedCell) i, if (_selectedCell < _count) _selectedCell];
     Widget doodle(double x, double y, Widget child) => Positioned(left: x * size.width, top: y * size.height, child: child);
     return Container(
       color: backdrops[_backdrop].$2,
@@ -761,9 +872,10 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
         doodle(.55, .53, const DoodleHeart(size: 11, color: Color(0xFFD9C3F0))),
         doodle(.10, .86, const DoodleHeart(size: 13)),
         for (final i in order)
+          if ((places[i], places[i].width * size.width) case (final at, final w))
           if (w / _films[i].aspect case final h) Positioned(
-            left: _scatter[i].$1.dx * size.width - w / 2, top: _scatter[i].$1.dy * size.height - h / 2, width: w, height: h,
-            child: Transform.rotate(angle: _scatter[i].$2, child: FittedBox(child: SizedBox(
+            left: at.center.dx * size.width - w / 2, top: at.center.dy * size.height - h / 2, width: w, height: h,
+            child: Transform.rotate(angle: at.angle, child: FittedBox(child: SizedBox(
               width: InstantPrint.width, height: InstantPrint.heightOf(_films[i]),
               child: Stack(clipBehavior: Clip.none, children: [
                 Positioned.fill(child: DecoratedBox(
@@ -773,7 +885,9 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                     handwriting: i < _handwriting.length ? _handwriting[i] : const [],
                     placeholder: _capturing ? null : const AddPhotoHint(scale: 1.3),
                     selected: _showCell && _selectedCell == i, onTap: () => _tapCell(i),
+                    captionSelected: _showCaption && _selectedCell == i,
                     onCaption: () => setState(() {
+                      _wordSticker = false;
                       _selectedCell = i;
                       _tool = _Tool.text;
                       _textCtrl.text = _polaroidCaptions[i];
@@ -782,7 +896,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                   ),
                 )),
                 Positioned(top: -4, left: i.isOdd ? null : -22, right: i.isOdd ? -22 : null,
-                  child: WashiTape(width: 64, height: 22, angle: i.isOdd ? .75 : -.75, colors: _tapes[i])),
+                  child: WashiTape(width: 64, height: 22, angle: i.isOdd ? .75 : -.75, colors: _tapes[i % _tapes.length])),
               ]),
             ))),
           ),
@@ -843,6 +957,8 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       // less beside the narrow four-cut strip, which shouldn't get thinner.
       SizedBox(
         height: _tool == _Tool.sticker ? max(168.0, MediaQuery.sizeOf(context).height * (widget.mode == EditorMode.fourCut ? .3 : .36))
+            // The collage's tools are all one height: the page doesn't jump between them.
+            : widget.mode == EditorMode.polaroid ? 216
             : _tool == _Tool.text ? (_printedText ? 168 : 206) : 168,
         child: _toolView(),
       ),
@@ -869,6 +985,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     _Tool.sticker => _stickerTool(),
     _Tool.cutout => _cutoutTool(),
     _Tool.photo => _photoTool(),
+    _Tool.film => _filmTool(),
     _Tool.filter => _filterTool(),
     _Tool.text => _textTool(),
     _Tool.brush => _brushTool(),
@@ -891,32 +1008,48 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     ]);
   }
 
+  /// A row of the layout tool: a label and its choices.
+  Widget _layoutRow(String label, Widget choices) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(children: [
+      SizedBox(width: 44, child: Text(label, style: const TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800))),
+      Expanded(child: choices),
+    ]),
+  );
+
+  /// One choice of several, side by side.
+  Widget _segments(List<String> labels, int selected, ValueChanged<int> onTap) => Container(
+    padding: const EdgeInsets.all(3),
+    decoration: BoxDecoration(color: cream, borderRadius: BorderRadius.circular(14), border: Border.all(color: line, width: 1.3)),
+    child: Row(children: [
+      for (var i = 0; i < labels.length; i++)
+        Expanded(child: GestureDetector(
+          onTap: () => onTap(i),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            decoration: BoxDecoration(color: selected == i ? blush : Colors.transparent, borderRadius: BorderRadius.circular(11)),
+            child: Text(labels[i], textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: ink, fontWeight: selected == i ? FontWeight.w900 : FontWeight.w600)),
+          ),
+        )),
+    ]),
+  );
+
+  void _setCount(int n) => setState(() {
+    _remember();
+    _count = n;
+    _selectedCell = min(_selectedCell, n - 1);
+  });
+
   Widget _layoutTool() => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-      const SizedBox(width: 44, child: Text('比例', style: TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800))),
-      Expanded(child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(color: cream, borderRadius: BorderRadius.circular(16), border: Border.all(color: line, width: 1.3)),
-        child: Row(children: [
-          for (var i = 0; i < formats.length; i++)
-            Expanded(child: GestureDetector(
-              onTap: () => setState(() { _remember(); _format = i; }),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                decoration: BoxDecoration(color: _format == i ? blush : Colors.transparent, borderRadius: BorderRadius.circular(12)),
-                child: Text(formats[i].$1, textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: ink, fontWeight: _format == i ? FontWeight.w900 : FontWeight.w600)),
-              ),
-            )),
-        ]),
-      )),
-      ]),
-      const SizedBox(height: 10),
-      Row(children: [
-        const SizedBox(width: 44, child: Text('背景', style: TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800))),
+      _layoutRow('張數', _segments(const ['1', '2', '3', '4', '5', '6'], _count - 1, (i) => _setCount(i + 1))),
+      _layoutRow('排法', _segments([for (final a in CollageArrangement.values) a.label], _arrangement.index,
+        (i) => setState(() { _remember(); _arrangement = CollageArrangement.values[i]; }))),
+      _layoutRow('比例', _segments([for (final f in formats) f.$1], _format, (i) => setState(() { _remember(); _format = i; }))),
+      _layoutRow('背景', Row(children: [
         for (var i = 0; i < backdrops.length; i++)
           Padding(
             padding: const EdgeInsets.only(right: 10),
@@ -929,45 +1062,57 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
               ),
             ),
           ),
-      ]),
-      const SizedBox(height: 10),
-      Row(children: [
-        const SizedBox(width: 44, child: Text('底片', style: TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800))),
-        Expanded(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
-            for (final f in FilmStock.values) ...[
-              if (f == FilmStock.values.firstWhere((x) => x.group == f.group))
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Text(f.group, style: const TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w800)),
-                ),
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () => setState(() {
-                    _remember();
-                    for (var i = 0; i < _films.length; i++) {
-                      _films[i] = f;
-                    }
-                  }),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: _films.every((x) => x == f) ? blush : cream, borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: _films.every((x) => x == f) ? blushLine : line),
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Container(width: 11, height: 13, decoration: BoxDecoration(color: f.swatch, borderRadius: BorderRadius.circular(2), border: Border.all(color: line))),
-                      const SizedBox(width: 6),
-                      Text(f.label, style: TextStyle(fontSize: 13, color: ink, fontWeight: _films.every((x) => x == f) ? FontWeight.w900 : FontWeight.w600)),
-                    ]),
-                  ),
-                ),
-              ),
-            ],
-        ]))),
-      ]),
+      ])),
     ]),
   );
+
+  void _setFilm(FilmStock f, {bool all = false}) => setState(() {
+    _remember();
+    for (var i = 0; i < _films.length; i++) {
+      if (all || i == _selectedCell) _films[i] = f;
+    }
+  });
+
+  /// Film for each print: the chosen one's photo shown in every stock.
+  Widget _filmTool() {
+    final cell = _selectedCell.clamp(0, _count - 1);
+    final current = _films[cell];
+    final allSame = _films.take(_count).every((f) => f == current);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 10, 12, 0),
+        child: Row(children: [
+          Expanded(child: Text(_count > 1 ? '第 ${cell + 1} 張的底片（點畫面上的照片換一張）' : '底片',
+            maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13, color: ink, fontWeight: FontWeight.w800))),
+          if (_count > 1)
+            TextButton(
+              onPressed: allSame ? null : () => _setFilm(current, all: true),
+              style: TextButton.styleFrom(foregroundColor: coral, visualDensity: VisualDensity.compact),
+              child: Text(allSame ? '已套用到全部' : '套用到全部', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+            ),
+        ]),
+      ),
+      Expanded(child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+        children: [
+          for (final f in FilmStock.values) ...[
+            // Each series starts with its name.
+            if (f == FilmStock.values.firstWhere((x) => x.group == f.group))
+              Padding(
+                padding: EdgeInsets.only(left: f.index == 0 ? 0 : 6, right: 6, top: 30),
+                child: Text(f.group, style: const TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w800)),
+              ),
+            _FilmThumb(
+              film: f, image: _photos[cell], fit: _fits[cell], aspect: _aspects[cell],
+              selected: current == f, onTap: () => _setFilm(f),
+            ),
+          ],
+        ],
+      )),
+    ]);
+  }
 
   Widget _patternTool() => ListView.separated(
     scrollDirection: Axis.horizontal,
@@ -1042,7 +1187,16 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(widget.mode == EditorMode.sticker ? '照片' : '第 ${_selectedCell + 1} 張照片', style: const TextStyle(fontSize: 17, color: ink, fontWeight: FontWeight.w800)),
+        Row(children: [
+          Expanded(child: Text(widget.mode == EditorMode.sticker ? '照片' : '第 ${_selectedCell + 1} 張照片', style: const TextStyle(fontSize: 17, color: ink, fontWeight: FontWeight.w800))),
+          if (widget.mode != EditorMode.sticker)
+            TextButton.icon(
+              onPressed: () => setState(_closePhoto),
+              icon: const Icon(CupertinoIcons.chevron_down, size: 16),
+              label: const Text('收起', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+              style: TextButton.styleFrom(foregroundColor: muted, visualDensity: VisualDensity.compact),
+            ),
+        ]),
         const SizedBox(height: 4),
         Text('在照片上拖曳可以移動，兩指可以放大縮小', style: TextStyle(fontSize: 12, color: muted.withValues(alpha: .95), fontWeight: FontWeight.w600)),
         const Spacer(),
@@ -1406,6 +1560,37 @@ class _ToolTab extends StatelessWidget {
       )),
     );
   }
+}
+
+/// One film stock in the film tool: a little print with the photo in it.
+class _FilmThumb extends StatelessWidget {
+  final FilmStock film;
+  final ImageProvider? image;
+  final PhotoFit fit;
+  final double? aspect;
+  final bool selected;
+  final VoidCallback onTap;
+  const _FilmThumb({required this.film, required this.image, required this.fit, required this.aspect, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: Column(children: [
+        Container(
+          width: 66, height: 88, padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: selected ? coral : Colors.transparent, width: 2.5),
+          ),
+          child: IgnorePointer(child: FittedBox(child: InstantPrint(image: image, film: film, caption: '', fit: fit, aspect: aspect))),
+        ),
+        const SizedBox(height: 4),
+        Text(film.label, style: TextStyle(fontSize: 11, color: selected ? ink : muted, fontWeight: selected ? FontWeight.w900 : FontWeight.w700)),
+      ]),
+    ),
+  );
 }
 
 /// A plain icon in the top bar, greyed out when it can't be used.

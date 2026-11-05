@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/booth_screen.dart';
 import 'package:pico_snap/editor_screen.dart';
+import 'package:pico_snap/filters.dart' show PhotoCapture;
 import 'package:pico_snap/home_screen.dart';
 import 'package:pico_snap/library_screen.dart';
 import 'package:pico_snap/models.dart';
@@ -77,12 +78,42 @@ void main() {
     expect(find.text('換照片'), findsNothing, reason: '回到原本的工具');
   });
 
-  testWidgets('拍立得拼貼：可以換成黑底片', (t) async {
+  testWidgets('拍立得拼貼：每張可以選自己的底片，也可以一次套用到全部', (t) async {
     await _phone(t, const EditorScreen(mode: EditorMode.polaroid));
-    expect(find.byWidgetPredicate((w) => w is InstantPrint && w.film == FilmStock.white), findsNWidgets(4));
+    // The prints on the page (the film tool's little samples have no caption).
+    Finder prints(FilmStock f) => find.byWidgetPredicate((w) => w is InstantPrint && w.film == f && w.caption.isNotEmpty);
+    expect(prints(FilmStock.white), findsNWidgets(4));
+    await t.tap(find.text('底片'));
+    await t.pumpAndSettle();
     await t.tap(find.text('黑底片'));
     await t.pumpAndSettle();
-    expect(find.byWidgetPredicate((w) => w is InstantPrint && w.film == FilmStock.black), findsNWidgets(4));
+    expect(prints(FilmStock.black), findsOneWidget, reason: '只換選到的那張');
+    await t.tap(find.text('套用到全部'));
+    await t.pumpAndSettle();
+    expect(prints(FilmStock.black), findsNWidgets(4));
+  });
+
+  testWidgets('拍立得拼貼：張數 1～6、三種排法，每種比例都放得下', (t) async {
+    await _phone(t, const EditorScreen(mode: EditorMode.polaroid));
+    for (final n in ['1', '2', '3', '4', '5', '6']) {
+      await t.tap(find.text(n).last);
+      await t.pumpAndSettle();
+      for (final a in ['隨意', '整齊', '疊放']) {
+        await t.tap(find.text(a));
+        await t.pumpAndSettle();
+        for (final f in ['9:16', '1:1', '4:5', '3:4']) {
+          await t.tap(find.text(f));
+          await t.pumpAndSettle();
+          final shown = find.byWidgetPredicate((w) => w is InstantPrint && w.caption.isNotEmpty);
+          expect(shown, findsNWidgets(int.parse(n)));
+          final canvas = t.getRect(find.byType(PhotoCapture));
+          for (final e in shown.evaluate()) {
+            final r = t.getRect(find.byWidget(e.widget));
+            expect(canvas.inflate(4).contains(r.topLeft) && canvas.inflate(4).contains(r.bottomRight), isTrue, reason: '$n 張 $a $f：每張都在頁面裡');
+          }
+        }
+      }
+    }
   });
 
   testWidgets('相機：底片分系列，切到三麗鷗只看到三麗鷗的底片', (t) async {
@@ -194,12 +225,16 @@ void main() {
     final tabs = t.getRect(find.text('版面'));
     expect(tabs.left, greaterThan(canvas.right), reason: '工具在右邊');
     // 摺回去：同一個畫面變窄，工具回到下面，作品還在
+    await t.tap(find.text('底片'));
+    await t.pumpAndSettle();
     await t.tap(find.text('黑底片'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('套用到全部'));
     await t.pumpAndSettle();
     t.view.physicalSize = const Size(390, 844);
     await t.pumpAndSettle();
     expect(t.getRect(find.text('版面')).top, greaterThan(t.getRect(find.byType(InstantPrint).first).bottom));
-    expect(find.byWidgetPredicate((w) => w is InstantPrint && w.film == FilmStock.black), findsNWidgets(4), reason: '改過的還在');
+    expect(find.byWidgetPredicate((w) => w is InstantPrint && w.film == FilmStock.black && w.caption.isNotEmpty), findsNWidgets(4), reason: '改過的還在');
 
     t.view.physicalSize = const Size(820, 900);
     await t.pumpWidget(const MaterialApp(home: HomeScreen()));
