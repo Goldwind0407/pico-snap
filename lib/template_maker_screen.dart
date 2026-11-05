@@ -21,7 +21,7 @@ const _patterns = [
   (FramePattern.checker, '棋盤格'), (FramePattern.waves, '波浪'),
 ];
 
-const _cells = [(CellShape.square, '方形'), (CellShape.rounded, '圓角'), (CellShape.cloud, '雲朵'), (CellShape.wavy, '波浪邊'), (CellShape.heart, '愛心'), (CellShape.star, '星星')];
+const _cells = [(CellShape.square, '方形'), (CellShape.rounded, '圓角'), (CellShape.cloud, '雲朵'), (CellShape.heart, '愛心'), (CellShape.star, '星星')];
 
 const _footers = [(FooterStyle.caption, '手寫字'), (FooterStyle.logoDate, '標誌＋日期'), (FooterStyle.title, '大標題')];
 

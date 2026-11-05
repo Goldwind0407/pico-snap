@@ -311,107 +311,62 @@ class CellClipper extends CustomClipper<Path> {
       case CellShape.rounded:
         return Path()..addRRect(RRect.fromRectAndRadius(rect, const Radius.circular(18)));
       case CellShape.cloud:
-        return _cloud(size);
-      case CellShape.wavy:
-        return _wavy(size);
+        return _fit(_cloud, size);
       case CellShape.heart:
-        return _heartIn(size);
+        return _fit(_heart, size);
       case CellShape.star:
-        return _starIn(size);
+        return _fit(_star, size);
     }
   }
 
-  /// Puffs all the way round, big and small by turns, over a rounded box:
-  /// a cloud, not a box with bumps on top.
-  static Path _cloud(Size size) {
-    final w = size.width, h = size.height;
-    final r = h * .16;
-    final body = Rect.fromLTRB(r * .9, r * .9, w - r * .9, h - r * .9);
-    var path = Path()..addRRect(RRect.fromRectAndRadius(body, Radius.circular(r)));
-    void puffs(Offset from, Offset to, int n, int phase) {
-      for (var k = 0; k < n; k++) {
-        final c = Offset.lerp(from, to, n == 1 ? .5 : k / (n - 1))!;
-        final big = (k + phase).isEven;
-        path = Path.combine(PathOperation.union, path, Path()..addOval(Rect.fromCircle(center: c, radius: big ? r : r * .78)));
-      }
+  /// [shape] stretched to fill the window, edge to edge: wide windows get
+  /// wide, chubby shapes, and nothing reaches past the window.
+  static Path _fit(Path shape, Size size) {
+    final b = shape.getBounds();
+    final m = Matrix4.identity()
+      ..translateByDouble(1, 1, 0, 1)
+      ..scaleByDouble((size.width - 2) / b.width, (size.height - 2) / b.height, 1, 1)
+      ..translateByDouble(-b.left, -b.top, 0, 1);
+    return shape.transform(m.storage);
+  }
+
+  /// A puffy cloud: a few big round lobes, three along the top and two
+  /// below, one each side, over a filled middle.
+  static final _cloud = () {
+    var path = Path()..addRRect(RRect.fromRectAndRadius(const Rect.fromLTRB(-.62, -.3, .62, .38), const Radius.circular(.2)));
+    for (final (x, y, r) in const [
+      (-.46, -.26, .36), (.02, -.4, .44), (.5, -.24, .36),
+      (-.72, .1, .3), (.74, .14, .3),
+      (-.28, .36, .36), (.32, .38, .34),
+    ]) {
+      path = Path.combine(PathOperation.union, path, Path()..addOval(Rect.fromCircle(center: Offset(x, y), radius: r)));
     }
-    final inset = r * 1.02;
-    final across = max(3, (w / (r * 1.75)).round()), down = max(2, (h / (r * 1.75)).round());
-    puffs(Offset(inset, inset), Offset(w - inset, inset), across, 0);
-    puffs(Offset(inset, h - inset), Offset(w - inset, h - inset), across, 1);
-    puffs(Offset(inset, inset), Offset(inset, h - inset), down, 0);
-    puffs(Offset(w - inset, inset), Offset(w - inset, h - inset), down, 1);
     return path;
-  }
+  }();
 
-  /// Even waves along every side, a whole number of them per side so they
-  /// meet at the corners.
-  static Path _wavy(Size size) {
-    const amp = 6.0, length = 26.0;
-    final w = size.width, h = size.height;
-    final path = Path();
-    // How far in the edge is at [t] (0–1) along a side of [n] waves.
-    double inward(double t, int n) => amp * (1 - cos(t * n * 2 * pi)) / 2;
-    final nx = max(2, (w / length).round()), ny = max(2, (h / length).round());
-    const steps = 6;
-    path.moveTo(0, 0);
-    for (var k = 1; k <= nx * steps; k++) {
-      final t = k / (nx * steps);
-      path.lineTo(t * w, inward(t, nx));
-    }
-    for (var k = 1; k <= ny * steps; k++) {
-      final t = k / (ny * steps);
-      path.lineTo(w - inward(t, ny), t * h);
-    }
-    for (var k = 1; k <= nx * steps; k++) {
-      final t = k / (nx * steps);
-      path.lineTo(w - t * w, h - inward(t, nx));
-    }
-    for (var k = 1; k <= ny * steps; k++) {
-      final t = k / (ny * steps);
-      path.lineTo(inward(t, ny), h - t * h);
-    }
-    return path..close();
-  }
+  /// A round, full heart (stretched wide by [_fit]).
+  static final _heart = Path()
+    ..moveTo(0, -.52)
+    ..cubicTo(-.2, -.98, -1, -.92, -1, -.32)
+    ..cubicTo(-1, .2, -.46, .56, 0, .92)
+    ..cubicTo(.46, .56, 1, .2, 1, -.32)
+    ..cubicTo(1, -.92, .2, -.98, 0, -.52)
+    ..close();
 
-  /// The biggest heart that fits, in the middle.
-  static Path _heartIn(Size size) {
-    final s = min(size.height, size.width / 1.12);
-    final cx = size.width / 2, top = (size.height - s) / 2;
-    final w = s * 1.12;
-    double x(double f) => cx + f * w / 2;
-    double y(double f) => top + f * s;
-    return Path()
-      ..moveTo(x(0), y(.27))
-      ..cubicTo(x(-.18), y(-.05), x(-1), y(-.02), x(-.98), y(.34))
-      ..cubicTo(x(-.96), y(.62), x(-.42), y(.8), x(0), y(1))
-      ..cubicTo(x(.42), y(.8), x(.96), y(.62), x(.98), y(.34))
-      ..cubicTo(x(1), y(-.02), x(.18), y(-.05), x(0), y(.27))
-      ..close();
-  }
-
-  /// The biggest five-pointed star that fits, with softened tips.
-  static Path _starIn(Size size) {
-    // A star's height is about .95 of its outer diameter, its width .95 too.
-    final r = min(size.height / 1.81, size.width / 1.9);
-    final c = Offset(size.width / 2, size.height / 2 + r * .1);
-    final pts = [
-      for (var k = 0; k < 10; k++) c + Offset.fromDirection(-pi / 2 + k * pi / 5, k.isEven ? r : r * .5),
-    ];
+  /// A chubby five-pointed star: short, fat points with round tips.
+  static final _star = () {
+    final pts = [for (var k = 0; k < 10; k++) Offset.fromDirection(-pi / 2 + k * pi / 5, k.isEven ? 1 : .6)];
     final path = Path();
     for (var k = 0; k < 10; k++) {
       final p = pts[k], prev = pts[(k + 9) % 10], next = pts[(k + 1) % 10];
-      if (k.isEven) {
-        // Round each tip: come in short of it, curve round, go on.
-        final a = Offset.lerp(p, prev, .12)!, b = Offset.lerp(p, next, .12)!;
-        k == 0 ? path.moveTo(a.dx, a.dy) : path.lineTo(a.dx, a.dy);
-        path.quadraticBezierTo(p.dx, p.dy, b.dx, b.dy);
-      } else {
-        path.lineTo(p.dx, p.dy);
-      }
+      // Every corner rounded, the tips most.
+      final cut = k.isEven ? .34 : .18;
+      final a = Offset.lerp(p, prev, cut)!, b = Offset.lerp(p, next, cut)!;
+      k == 0 ? path.moveTo(a.dx, a.dy) : path.lineTo(a.dx, a.dy);
+      path.quadraticBezierTo(p.dx, p.dy, b.dx, b.dy);
     }
     return path..close();
-  }
+  }();
 
   @override
   bool shouldReclip(CellClipper oldClipper) => oldClipper.shape != shape;

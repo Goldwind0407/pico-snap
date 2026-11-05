@@ -143,11 +143,11 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
-  test('每格的形狀存檔讀回來一樣；舊的只有一個形狀的模板讀成四格一樣', () {
-    final c = CustomTemplate(id: 'a', frame: const Color(0xFFF9CACB), cellShapes: const [CellShape.heart, CellShape.star, CellShape.wavy, CellShape.cloud]);
+  test('每格的形狀存檔讀回來一樣；舊的只有一個形狀的模板讀成四格一樣（拿掉的波浪變成雲朵）', () {
+    final c = CustomTemplate(id: 'a', frame: const Color(0xFFF9CACB), cellShapes: const [CellShape.heart, CellShape.star, CellShape.rounded, CellShape.cloud]);
     expect(CustomTemplate.fromJson(c.toJson()).cellShapes, c.cellShapes);
     final old = c.toJson()..remove('cellShapes')..['cellShape'] = 'wavy';
-    expect(CustomTemplate.fromJson(old).cellShapes, List.filled(4, CellShape.wavy));
+    expect(CustomTemplate.fromJson(old).cellShapes, List.filled(4, CellShape.cloud), reason: '拿掉的波浪變成雲朵');
   });
 
   testWidgets('設計模板：選項會存進模板，模板頁可以刪除', (t) async {

@@ -15,7 +15,7 @@ const samplePhotos = <ImageProvider>[
 ];
 const sampleDuo = AssetImage('assets/samples/duo.jpg');
 
-enum CellShape { square, rounded, cloud, wavy, heart, star }
+enum CellShape { square, rounded, cloud, heart, star }
 
 enum FramePattern { none, dots, paws, confetti, gingham, stripes, hearts, stars, flowers, checker, waves }
 
@@ -172,7 +172,7 @@ const drawnTemplates = [
   StripTemplate(
     name: 'Paw Party', category: '可愛', caption: '快趣拍', subtitle: 'meow meow',
     frame: Color(0xFFFAD9D7), cell: Color(0xFF2A2730), pattern: FramePattern.paws, patternColor: Color(0xFFFFF4F2),
-    cellShape: CellShape.wavy, footer: FooterStyle.title, captionColor: Color(0xFF2D3FA8), outline: false,
+    cellShape: CellShape.cloud, footer: FooterStyle.title, captionColor: Color(0xFF2D3FA8), outline: false,
     decos: [
       Deco('assets/stickers/bunny.png', Offset(34, 138), size: 52, angle: -.2),
       Deco('assets/stickers/bear.png', Offset(168, 408), size: 56, angle: .15),
@@ -393,6 +393,9 @@ class CustomTemplate {
     );
   }
 
+  /// A saved shape; 波浪 (wavy) is gone, and became a cloud.
+  static CellShape _shapeNamed(String? name) => name == 'wavy' ? CellShape.cloud : CellShape.values.asNameMap()[name] ?? CellShape.square;
+
   Map<String, Object?> toJson() => {
     'id': id, 'caption': caption, 'frame': frame.toARGB32(), 'frame2': frame2?.toARGB32(),
     // cellShape: the first, for a version of the App before per-window shapes.
@@ -410,9 +413,9 @@ class CustomTemplate {
     frame2: j['frame2'] == null ? null : Color(j['frame2']! as int),
     pattern: FramePattern.values.byName(j['pattern']! as String),
     cellShapes: j['cellShapes'] is List
-      ? [for (final s in (j['cellShapes']! as List).cast<String>()) CellShape.values.asNameMap()[s] ?? CellShape.square]
+      ? [for (final s in (j['cellShapes']! as List).cast<String>()) _shapeNamed(s)]
       : null,
-    cellShape: CellShape.values.asNameMap()[j['cellShape']] ?? CellShape.square,
+    cellShape: _shapeNamed(j['cellShape'] as String?),
     footer: FooterStyle.values.byName(j['footer']! as String),
     stickers: j['decos'] is List
       ? [
