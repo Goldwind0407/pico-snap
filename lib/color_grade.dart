@@ -443,14 +443,26 @@ void finishFilm(Uint8List rgba, Uint8List source, int w, int h,
     }
   }
   if (grain > 0) {
+    // Work in a photo-relative grain grid. Pixel-sized noise disappears when
+    // a 2K/4K photo is displayed in a small print or phone preview.
+    final cell = filmGrainCellSize(math.max(w, h).toDouble());
+    final gw = ((w - 1) / cell).floor() + 2, gh = ((h - 1) / cell).floor() + 2;
+    final field = Float32List(gw * gh);
+    for (var y = 0; y < gh; y++) {
+      for (var x = 0; x < gw; x++) { field[y * gw + x] = filmGrainAt(x, y); }
+    }
     for (var y = 0; y < h; y++) {
+      final gy = y / cell, y0 = gy.floor();
+      final ty = _smooth(0, 1, gy - y0);
       for (var x = 0; x < w; x++) {
         final i = (y * w + x) * 4;
+        if (rgba[i + 3] == 0) continue;
         final l = (.2126 * rgba[i] + .7152 * rgba[i + 1] + .0722 * rgba[i + 2]) / 255;
-        // Mid tones carry the most grain, like silver halide density.
-        final a = grain * 30 * (.2 + 3.2 * l * (1 - l));
-        // Two octaves: fine grain with a little clumping.
-        final v = (_noise(x, y) * .7 + _noise(x >> 1, (y >> 1) + 9173) * .3) * a;
+        final a = grain * filmGrainAmplitude * (.2 + 3.2 * l * (1 - l));
+        final gx = x / cell, x0 = gx.floor(), tx = _smooth(0, 1, gx - x0);
+        final top = field[y0 * gw + x0] * (1 - tx) + field[y0 * gw + x0 + 1] * tx;
+        final bottom = field[(y0 + 1) * gw + x0] * (1 - tx) + field[(y0 + 1) * gw + x0 + 1] * tx;
+        final v = (top * (1 - ty) + bottom * ty) * a;
         for (var c = 0; c < 3; c++) {
           rgba[i + c] = (rgba[i + c] + v).round().clamp(0, 255);
         }
@@ -458,6 +470,11 @@ void finishFilm(Uint8List rgba, Uint8List source, int w, int h,
     }
   }
 }
+
+// Keep the GPU equivalents in shaders/film.frag in sync.
+const filmGrainAmplitude = 44.0;
+double filmGrainCellSize(double longestSide) => math.max(1.0, longestSide / 480);
+double filmGrainAt(int x, int y) => _noise(x, y) * .65 + _noise(x >> 1, (y >> 1) + 9173) * .35;
 
 /// Deterministic noise in −1…1, the same for the same pixel every time.
 double _noise(int x, int y) {

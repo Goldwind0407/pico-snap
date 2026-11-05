@@ -22,12 +22,20 @@ void main() {
     expect(filterById('lut:retro_soft').table, isNull);
   });
 
-  test('negative retains the original LUT and original film settings', () async {
+  test('negative retains the original LUT with visible film grain', () async {
     final filter = filterById('lut:fuji_classic_neg_raw');
     final source = parseCube(await rootBundle.loadString('assets/luts/fuji_classic_neg_raw.cube'));
     expect(filter.lut, orderedEquals(resampleLut(source.table, source.size, lutSize)));
-    expect(filter.grain, 0);
+    expect(filter.grain, greaterThan(0));
     expect(filter.soften, 0);
+  });
+
+  test('film presets enable grain while clean looks stay clean', () {
+    for (final id in ['instant_golden', 'instant_cool', 'lut:fuji_classic_neg_raw', 'lut:teal_amber_street', 'lut:retro_soft']) {
+      expect(filterById(id).grain, greaterThan(0), reason: id);
+    }
+    expect(filterById('none').grain, 0);
+    expect(filterById('korean_cream').grain, 0);
   });
 
   test('instant looks retain skin and smooth tonal separation', () {

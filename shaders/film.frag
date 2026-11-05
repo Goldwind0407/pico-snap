@@ -51,6 +51,19 @@ float noise(vec2 p) {
   return fract((p.x + p.y) * p.x) * 2.0 - 1.0;
 }
 
+float grainAt(vec2 p) {
+  return noise(p) * .65 + noise(floor(p * .5) + vec2(0.0, 9173.0)) * .35;
+}
+
+float filmGrain(vec2 px) {
+  // Match color_grade.dart: fixed density across previews and 2K/4K exports.
+  float cell = max(1.0, max(uSize.x, uSize.y) / 480.0);
+  vec2 p = (px - .5) / cell;
+  vec2 base = floor(p), f = smoothstep(vec2(0.0), vec2(1.0), fract(p));
+  return mix(mix(grainAt(base), grainAt(base + vec2(1.0, 0.0)), f.x),
+    mix(grainAt(base + vec2(0.0, 1.0)), grainAt(base + vec2(1.0, 1.0)), f.x), f.y);
+}
+
 void main() {
   vec2 px = FlutterFragCoord().xy;
   vec4 c0 = src(px);
@@ -93,9 +106,8 @@ void main() {
   if (uFx.z > 0.0) {
     // Mid tones carry the most grain, like silver halide density.
     float l = luma(c);
-    float a = uFx.z * 30.0 / 255.0 * (.2 + 3.2 * l * (1.0 - l));
-    vec2 ip = floor(px);
-    c += (noise(ip) * .7 + noise(floor(ip * .5) + 9173.0) * .3) * a;
+    float a = uFx.z * 44.0 / 255.0 * (.2 + 3.2 * l * (1.0 - l));
+    c += filmGrain(px) * a;
   }
   fragColor = vec4(clamp(c, 0.0, 1.0) * c0.a, c0.a);
 }

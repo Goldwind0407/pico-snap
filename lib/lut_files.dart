@@ -105,9 +105,9 @@ class LutLook {
 /// 濾鏡檔的中文名字和底片效果（key 是檔名，不含副檔名）。
 const lutLooks = <String, LutLook>{
   // Preserve the original deliberately strong contrast and colour mapping.
-  'fuji_classic_neg_raw': LutLook('濃烈負片'),
+  'fuji_classic_neg_raw': LutLook('濃烈負片', grain: .34),
   // Warm amber skin against cool teal backgrounds, like Japanese street snaps.
-  'teal_amber_street': LutLook('日系街拍', grain: .2, vignette: .12, soften: .2, halation: .1),
+  'teal_amber_street': LutLook('日系街拍', grain: .32, vignette: .12, soften: .2, halation: .1),
   // Our own grades, made on design/hald/hald_identity_8.png in a photo app
   // (exported as JPEG, so smoothed a touch before saving as PNG).
   'cool': LutLook('冷調'),
@@ -115,7 +115,7 @@ const lutLooks = <String, LutLook>{
   'soft': LutLook('柔軟', soften: .32),
   'late_autumn': LutLook('深秋'),
   'warm_cool': LutLook('冷暖對比'),
-  'retro_soft': LutLook('復古柔和', grade: retroSoftGrade, soften: .18),
+  'retro_soft': LutLook('復古柔和', grade: retroSoftGrade, grain: .26, soften: .18),
   'macaron': LutLook('馬卡龍'),
   'cyberpunk': LutLook('賽博朋克'),
   'mono': LutLook('黑白'),

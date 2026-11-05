@@ -84,12 +84,12 @@ class _FilterLayerState extends State<FilterLayer> {
     if (existing != null && _shaderFor == key) return existing;
     existing?.dispose();
     final (hr, hg, hb) = f.halationColor;
-    // Floats 0–1 are the size, set by the engine. Grain is per pixel: a
-    // small viewfinder gets less, like a thumbnail.
+    // Floats 0–1 are the size, set by the engine. The shader sizes grain
+    // relative to the image; don't also attenuate it in small viewfinders.
     final shader = program.fragmentShader()
       ..setFloat(2, f.soften)
       ..setFloat(3, f.halation)
-      ..setFloat(4, f.grain * math.min(1.0, side / 900))
+      ..setFloat(4, f.grain)
       ..setFloat(5, 0)
       ..setFloat(6, hr)
       ..setFloat(7, hg)

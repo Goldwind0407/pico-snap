@@ -87,10 +87,10 @@ final photoFilters = <PhotoFilter>[
   const PhotoFilter('none', '原圖', Grade.none),
   const PhotoFilter('korean_cream', '韓系奶油', koreanCreamGrade, soften: .18),
   const PhotoFilter('instant_golden', '拍立得暖金', instantGoldenGrade,
-    grain: .28, vignette: .16, soften: .42, halation: .12,
+    grain: .40, vignette: .16, soften: .42, halation: .12,
     halationColor: (1, .66, .32)),
   const PhotoFilter('instant_cool', '拍立得冷閃', instantCoolGrade,
-    grain: .32, vignette: .22, soften: .18, halation: .10,
+    grain: .48, vignette: .22, soften: .18, halation: .10,
     halationColor: (1, .42, .24)),
 ];
 
@@ -124,11 +124,9 @@ class FilteredImage extends ImageProvider<FilteredImage> {
     return _work.run(() async {
       final pixels = await _pixels(base, maxSide);
       final w = pixels.w, h = pixels.h;
-      // Grain is per pixel: a tiny thumbnail gets less so it reads the same.
-      final grain = filter.grain * math.min(1.0, math.max(w, h) / 900);
       final graded = await compute(_gradeJob, (
         rgba: pixels.rgba, lut: filter.lut, w: w, h: h,
-        soften: filter.soften, halation: filter.halation, color: filter.halationColor, grain: grain,
+        soften: filter.soften, halation: filter.halation, color: filter.halationColor, grain: filter.grain,
       ));
       final c = Completer<ui.Image>();
       ui.decodeImageFromPixels(graded, w, h, ui.PixelFormat.rgba8888, c.complete);
@@ -369,7 +367,7 @@ class FilterEffects extends StatelessWidget {
             DecoratedBox(decoration: BoxDecoration(gradient: RadialGradient(
               radius: .85, colors: [Colors.transparent, Colors.black.withValues(alpha: f.vignette)], stops: const [.52, 1],
             ))),
-          if (grain) CustomPaint(painter: _GrainPainter(f.grain)),
+          if (grain) RepaintBoundary(child: CustomPaint(painter: _GrainPainter(f.grain), isComplex: true)),
           if (f.date) Align(alignment: const Alignment(.88, .86), child: _DateStamp(size: c.biggest.shortestSide * .085)),
         ]),
       )))),
@@ -383,15 +381,28 @@ class _GrainPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Fixed seed: the grain doesn't crawl when the picture repaints.
-    final rnd = math.Random(42);
-    final n = (size.width * size.height / 18 * amount).round();
-    final light = Paint()..color = Colors.white.withValues(alpha: .07 * amount + .03);
-    final dark = Paint()..color = Colors.black.withValues(alpha: .09 * amount + .03);
-    for (var i = 0; i < n; i++) {
-      final p = Offset(rnd.nextDouble() * size.width, rnd.nextDouble() * size.height);
-      canvas.drawCircle(p, .35 + rnd.nextDouble() * .45, i.isEven ? light : dark);
+    // Dense, fixed grain for devices without the film shader. Batch by
+    // opacity so drawing the texture needs only 16 calls, not one per dot.
+    final cell = filmGrainCellSize(size.longestSide);
+    final buckets = List.generate(16, (_) => <Offset>[]);
+    for (var y = 0; y * cell < size.height; y++) {
+      for (var x = 0; x * cell < size.width; x++) {
+        final bucket = ((filmGrainAt(x, y) + 1) * 8).floor().clamp(0, 15);
+        buckets[bucket].add(Offset((x + .5) * cell, (y + .5) * cell));
+      }
     }
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    for (var i = 0; i < buckets.length; i++) {
+      final noise = (i + .5) / 8 - 1;
+      final paint = Paint()
+        ..color = (noise < 0 ? Colors.black : Colors.white).withValues(alpha: (noise.abs() * amount * filmGrainAmplitude / 127.5).clamp(0, 1))
+        ..strokeWidth = cell
+        ..strokeCap = StrokeCap.square
+        ..isAntiAlias = false;
+      canvas.drawPoints(ui.PointMode.points, buckets[i], paint);
+    }
+    canvas.restore();
   }
 
   @override
