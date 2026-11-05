@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'collage_templates.dart';
 import 'cutout/cutout_page.dart';
 import 'filters.dart';
 import 'editor_document.dart';
@@ -113,6 +114,8 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   Uint8List? _backdropBytes;
   ImageProvider? _backdropImage;
   bool _backdropBlur = true;
+  /// A built-in background picture, when one is chosen.
+  String? _backdropScene;
   /// The look over the whole page, and the filter tab showing it rather
   /// than the photo filters.
   PageTexture _texture = PageTexture.none;
@@ -137,7 +140,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   /// state. Immutable photo bytes retain their identity across checkpoints.
   Object _contentKey() => Object.hashAll([
     Object.hashAll(_photoBytes), Object.hashAll(_fits.map((f) => Object.hash(f.scale, f.align))), Object.hashAll(_films), Object.hashAll([for (final f in _filters) f.id]),
-    _template, _format, _pattern, _backdrop, _count, _arrangement, _backdropPattern, Object.hashAll(_places), _backdropBytes, _backdropBlur, _texture, _textureStrength, _stripCaption, Object.hashAll(_polaroidCaptions), _bubble, _subject,
+    _template, _format, _pattern, _backdrop, _count, _arrangement, _backdropPattern, Object.hashAll(_places), _backdropBytes, _backdropBlur, _backdropScene, _texture, _textureStrength, _stripCaption, Object.hashAll(_polaroidCaptions), _bubble, _subject,
     Object.hashAll(_stickers.map((s) => Object.hash(s.sticker, s.center, s.scale, s.rotation, s.flipped))), Object.hashAll(_strokes.map((s) => Object.hash(s.color, s.width, s.style, Object.hashAll(s.points)))), _strokes.isEmpty ? 0 : _strokes.last.points.length,
   ]);
 
@@ -184,7 +187,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     handwriting: _handwriting, templateKey: EditorDocument.keyForTemplate(_template),
     format: _format, pattern: _pattern, backdrop: _backdrop, bubble: _bubble,
     stripCaption: _stripCaption, subject: _subject, count: _count, arrangement: _arrangement, backdropPattern: _backdropPattern, places: _places,
-    backdropPhoto: _backdropBytes, backdropBlur: _backdropBlur, texture: _texture, textureStrength: _textureStrength);
+    backdropPhoto: _backdropBytes, backdropBlur: _backdropBlur, backdropScene: _backdropScene, texture: _texture, textureStrength: _textureStrength);
 
   void _restore(EditorDocument d) {
     _photoBytes.setAll(0, d.photos);
@@ -202,7 +205,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       _backdropBytes = d.backdropPhoto;
       _backdropImage = d.backdropPhoto == null ? null : photoImage(d.backdropPhoto!);
     }
-    _backdropBlur = d.backdropBlur; _texture = d.texture; _textureStrength = d.textureStrength;
+    _backdropBlur = d.backdropBlur; _backdropScene = d.backdropScene; _texture = d.texture; _textureStrength = d.textureStrength;
     if (widget.mode == EditorMode.polaroid) _selectedCell = min(_selectedCell, _count - 1);
     _bubble = d.bubble; _stripCaption = d.stripCaption; _subject = d.subject;
     _selectedSticker = null; _textCtrl.text = _text;
@@ -230,7 +233,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
 
   List<_Tool> get _tools => switch (widget.mode) {
     EditorMode.fourCut => const [_Tool.template, _Tool.sticker, _Tool.text, _Tool.brush, _Tool.filter],
-    EditorMode.polaroid => const [_Tool.layout, _Tool.backdrop, _Tool.film, _Tool.sticker, _Tool.text, _Tool.brush, _Tool.filter],
+    EditorMode.polaroid => const [_Tool.template, _Tool.layout, _Tool.backdrop, _Tool.film, _Tool.sticker, _Tool.text, _Tool.brush, _Tool.filter],
     EditorMode.sticker => const [_Tool.sticker, _Tool.pattern, _Tool.text, _Tool.brush, _Tool.cutout],
   };
 
@@ -1087,7 +1090,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
         child: SafeArea(top: false, child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
           child: Row(children: [
-            for (final t in _tools) Expanded(child: _ToolTab(tool: t, selected: _tool == t, onTap: () => _selectTool(t))),
+            for (final t in _tools) Expanded(child: _ToolTab(tool: t, selected: _tool == t, compact: _tools.length > 6, onTap: () => _selectTool(t))),
           ]),
         )),
       ),
@@ -1095,7 +1098,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   );
 
   Widget _toolView() => switch (_tool) {
-    _Tool.template => _templateTool(),
+    _Tool.template => widget.mode == EditorMode.polaroid ? _collageTemplateTool() : _templateTool(),
     _Tool.layout => _layoutTool(),
     _Tool.backdrop => _backdropTool(),
     _Tool.pattern => _patternTool(),
@@ -1107,6 +1110,63 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     _Tool.text => _textTool(),
     _Tool.brush => _brushTool(),
   };
+
+  /// Puts the collage into [t]: its page, prints, paper bits and look; the
+  /// photos stay. null: back to a plain page.
+  void _applyTemplate(CollageTemplate? t) => setState(() {
+    _remember();
+    _closePhoto();
+    _selectedCell = 0;
+    _selectedSticker = null;
+    _places.fillRange(0, _places.length, null);
+    _backdropBytes = null; _backdropImage = null;
+    if (t == null) {
+      _count = 4; _format = 3; _arrangement = CollageArrangement.scatter;
+      _backdrop = 1; _backdropPattern = BackdropPattern.plain; _backdropScene = null; _backdropBlur = true;
+      _texture = PageTexture.none;
+      _films.fillRange(0, _films.length, FilmStock.white);
+      _polaroidCaptions.setAll(0, EditorDocument.collageCaptions);
+      _stickers = [for (final s in _stickers) if (!s.sticker.startsWith('deco:')) s];
+      return;
+    }
+    _format = formats.indexWhere((f) => f.$1 == '9:16');
+    _count = t.places.length;
+    _places.setAll(0, t.places);
+    _films.setAll(0, t.films);
+    _polaroidCaptions.setAll(0, t.captions);
+    _backdropPattern = BackdropPattern.photo; _backdropScene = t.backdrop; _backdropBlur = false;
+    _texture = t.texture; _textureStrength = t.strength;
+    // The user's own stickers stay; the last template's paper bits go.
+    _stickers = [for (final s in _stickers) if (!s.sticker.startsWith('deco:')) s, ...t.stickers];
+  });
+
+  Widget _collageTemplateTool() => ListView.separated(
+    scrollDirection: Axis.horizontal,
+    padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+    itemCount: collageTemplates.length + 1,
+    separatorBuilder: (_, __) => const SizedBox(width: 12),
+    itemBuilder: (_, i) {
+      final t = i == 0 ? null : collageTemplates[i - 1];
+      return GestureDetector(
+        onTap: () => _applyTemplate(t),
+        child: Column(children: [
+          Expanded(child: AspectRatio(aspectRatio: 9 / 16, child: Container(
+            decoration: BoxDecoration(
+              color: backdrops[1].$2, borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: line, width: 1.3),
+              boxShadow: [BoxShadow(color: ink.withValues(alpha: .08), blurRadius: 6, offset: const Offset(0, 2))],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: t == null
+              ? const Center(child: Icon(CupertinoIcons.plus, color: muted))
+              : _TemplatePreview(template: t),
+          ))),
+          const SizedBox(height: 5),
+          Text(t?.name ?? '空白', style: const TextStyle(fontSize: 12, color: ink, fontWeight: FontWeight.w800)),
+        ]),
+      );
+    },
+  );
 
   Widget _templateTool() {
     final visible = [for (var i = 0; i < allStripTemplates.length; i++) if (allStripTemplates[i].category == _category) i];
@@ -1171,7 +1231,11 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   );
 
   /// The 照片 backdrop: one picked for it, else the first print's photo.
-  ImageProvider? get _backdropPhoto => _backdropImage ?? _photos.take(_count).nonNulls.firstOrNull;
+  ImageProvider? get _backdropPhoto {
+    if (_backdropImage case final image?) return image;
+    if (sceneBackdrop(_backdropScene) case final scene?) return AssetImage(scene.asset);
+    return _photos.take(_count).nonNulls.firstOrNull;
+  }
 
   Future<void> _pickBackdrop() async {
     final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 95);
@@ -1182,6 +1246,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       _remember();
       _backdropBytes = bytes;
       _backdropImage = photoImage(bytes);
+      _backdropScene = null;
       _backdropPattern = BackdropPattern.photo;
     });
   }
@@ -1193,13 +1258,40 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       SizedBox(height: 112, child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 4),
-        itemCount: BackdropPattern.values.length,
+        itemCount: BackdropPattern.values.length + sceneBackdrops.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (_, i) {
+          if (i >= BackdropPattern.values.length) {
+            final scene = sceneBackdrops[i - BackdropPattern.values.length];
+            final selected = _backdropPattern == BackdropPattern.photo && _backdropScene == scene.id && _backdropBytes == null;
+            return GestureDetector(
+              onTap: () => setState(() {
+                _remember();
+                _backdropPattern = BackdropPattern.photo;
+                _backdropScene = scene.id;
+                _backdropBytes = null; _backdropImage = null;
+                _backdropBlur = false;
+              }),
+              child: Column(children: [
+                Container(
+                  width: 60, height: 66, padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: selected ? coral : line, width: selected ? 2.5 : 1.3)),
+                  child: ClipRRect(borderRadius: BorderRadius.circular(11), child: Image(image: scene.thumb, fit: BoxFit.cover)),
+                ),
+                const SizedBox(height: 4),
+                Text(scene.label, style: TextStyle(fontSize: 11, color: selected ? ink : muted, fontWeight: selected ? FontWeight.w900 : FontWeight.w700)),
+              ]),
+            );
+          }
           final p = BackdropPattern.values[i];
-          final selected = _backdropPattern == p;
+          // 照片 is the user's own photo; a scene shows as its own item.
+          final selected = _backdropPattern == p && (p != BackdropPattern.photo || _backdropScene == null || _backdropBytes != null);
           return GestureDetector(
-            onTap: () => setState(() { _remember(); _backdropPattern = p; }),
+            onTap: () => setState(() {
+              _remember();
+              _backdropPattern = p;
+              if (p == BackdropPattern.photo) _backdropScene = null;
+            }),
             child: Column(children: [
               Container(
                 width: 60, height: 66, padding: const EdgeInsets.all(2),
@@ -1209,7 +1301,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                 ),
                 child: ClipRRect(borderRadius: BorderRadius.circular(11), child: Backdrop(
                   color: color, pattern: p, cells: 7, blur: _backdropBlur,
-                  photo: _backdropPhoto ?? samplePhotos.first,
+                  photo: (_backdropScene == null ? _backdropPhoto : _backdropImage ?? _photos.take(_count).nonNulls.firstOrNull) ?? samplePhotos.first,
                 )),
               ),
               const SizedBox(height: 4),
@@ -1832,8 +1924,10 @@ class _TemplateThumb extends StatelessWidget {
 class _ToolTab extends StatelessWidget {
   final _Tool tool;
   final bool selected;
+  /// Many tabs: narrower padding.
+  final bool compact;
   final VoidCallback onTap;
-  const _ToolTab({required this.tool, required this.selected, required this.onTap});
+  const _ToolTab({required this.tool, required this.selected, required this.onTap, this.compact = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1843,7 +1937,7 @@ class _ToolTab extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Center(child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 12, vertical: 6),
         decoration: BoxDecoration(color: selected ? blush : Colors.transparent, borderRadius: BorderRadius.circular(14)),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Icon(tool.icon, size: 24, color: color),
@@ -1853,6 +1947,31 @@ class _ToolTab extends StatelessWidget {
       )),
     );
   }
+}
+
+/// A collage template in little: its background and where its prints lie.
+class _TemplatePreview extends StatelessWidget {
+  final CollageTemplate template;
+  const _TemplatePreview({required this.template});
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, c) => Stack(fit: StackFit.expand, children: [
+    Image(image: template.scene.thumb, fit: BoxFit.cover),
+    for (final (i, p) in template.places.indexed)
+      Positioned(
+        left: p.center.dx * c.maxWidth - p.width * c.maxWidth / 2,
+        top: p.center.dy * c.maxHeight - p.width * c.maxWidth / .75 / 2,
+        width: p.width * c.maxWidth, height: p.width * c.maxWidth / .75,
+        child: Transform.rotate(angle: p.angle, child: Container(
+          padding: EdgeInsets.fromLTRB(p.width * c.maxWidth * .1, p.width * c.maxWidth * .1, p.width * c.maxWidth * .1, p.width * c.maxWidth * .32),
+          decoration: BoxDecoration(
+            color: template.films[i].dark ? const Color(0xFF1E1E20) : Colors.white,
+            boxShadow: [BoxShadow(color: ink.withValues(alpha: .25), blurRadius: 3, offset: const Offset(0, 1))],
+          ),
+          child: const ColoredBox(color: Color(0xFFCFC8C0)),
+        )),
+      ),
+  ]));
 }
 
 /// One film stock in the film tool: a little print with the photo in it.

@@ -31,6 +31,7 @@ flutter:
     - assets/templates/
     - assets/sticker_sheets/
     - assets/instant/
+    - assets/backdrops/
     - assets/luts/
     - assets/fonts/ChenYuluoyan-OFL.txt
   fonts:

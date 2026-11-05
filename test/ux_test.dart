@@ -160,6 +160,35 @@ void main() {
     expect(page().pattern, BackdropPattern.gingham);
   });
 
+  testWidgets('拍立得拼貼：一開始是模板；套用模板換背景、張數、位置、裝飾和質感，空白回到原樣，可以復原', (t) async {
+    await _phone(t, const EditorScreen(mode: EditorMode.polaroid));
+    Finder prints() => find.byType(PrintItem);
+    expect(find.text('校園走廊'), findsOneWidget, reason: '一開始在模板');
+    expect(prints(), findsNWidgets(4));
+    await t.tap(find.text('彩虹天空'));
+    await t.pumpAndSettle();
+    expect(prints(), findsNWidgets(3));
+    final page = t.widget<Backdrop>(find.byWidgetPredicate((w) => w is Backdrop && w.cells == 22));
+    expect(page.pattern, BackdropPattern.photo);
+    expect(page.blur, isFalse);
+    expect((page.photo as AssetImage).assetName, 'assets/backdrops/rainbow_sky.jpg');
+    expect(t.widget<TexturedPage>(find.byWidgetPredicate((w) => w is TexturedPage && w.child is Stack)).texture, PageTexture.warm);
+    expect([for (final s in t.widgetList<StickerItem>(find.byType(StickerItem))) s.data.sticker].every((id) => id.startsWith('deco:')), isTrue);
+    final decos = t.widgetList(find.byType(StickerItem)).length;
+    expect(decos, greaterThan(0));
+    // Another template: its own paper bits replace the last one's.
+    await t.tap(find.text('校園走廊'));
+    await t.pumpAndSettle();
+    expect(find.byType(StickerItem), findsNWidgets(3));
+    await t.tap(find.text('空白'));
+    await t.pumpAndSettle();
+    expect(prints(), findsNWidgets(4));
+    expect(find.byType(StickerItem), findsNothing);
+    await t.tap(find.byIcon(CupertinoIcons.arrow_uturn_left));
+    await t.pumpAndSettle();
+    expect(find.byType(StickerItem), findsNWidgets(3), reason: '復原回到校園走廊');
+  });
+
   testWidgets('拍立得拼貼：整頁質感蓋在整頁上，可以調強度、復原', (t) async {
     await _phone(t, const EditorScreen(mode: EditorMode.polaroid));
     // The page's own (the samples are at full strength).
@@ -201,6 +230,8 @@ void main() {
 
   testWidgets('拍立得拼貼：張數 1～6、三種排法，每種比例都放得下', (t) async {
     await _phone(t, const EditorScreen(mode: EditorMode.polaroid));
+    await t.tap(find.text('版面'));
+    await t.pumpAndSettle();
     for (final n in ['1', '2', '3', '4', '5', '6']) {
       await t.tap(find.text(n).last);
       await t.pumpAndSettle();

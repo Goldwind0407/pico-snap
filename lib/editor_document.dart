@@ -37,6 +37,8 @@ class EditorDocument {
   /// print's), and whether it is blurred.
   final Uint8List? backdropPhoto;
   final bool backdropBlur;
+  /// 拍立得拼貼: a built-in background picture ([sceneBackdrops]' id).
+  final String? backdropScene;
   /// 拍立得拼貼: the look over the whole page.
   final PageTexture texture;
   final double textureStrength;
@@ -78,6 +80,7 @@ class EditorDocument {
       List<PrintPlace?> places = const [],
       this.backdropPhoto,
       this.backdropBlur = true,
+      this.backdropScene,
       this.texture = PageTexture.none,
       this.textureStrength = .7})
       : photos = List.unmodifiable(_pad(photos, cellsOf(mode), (_) => null)),
@@ -163,6 +166,7 @@ class EditorDocument {
         'places': [for (final p in places) p == null ? null : [p.center.dx, p.center.dy, p.width, p.angle]],
         'backdropPhoto': backdropFile,
         'backdropBlur': backdropBlur,
+        'backdropScene': backdropScene,
         'texture': texture.name,
         'textureStrength': textureStrength,
         'bubble': bubble,
@@ -236,6 +240,7 @@ class EditorDocument {
       backdropPattern: BackdropPattern.values.asNameMap()[json['backdropPattern']] ?? BackdropPattern.plain,
       backdropPhoto: backdropPhoto,
       backdropBlur: json['backdropBlur'] as bool? ?? true,
+      backdropScene: json['backdropScene'] as String?,
       texture: PageTexture.values.asNameMap()[json['texture']] ?? PageTexture.none,
       textureStrength: ((json['textureStrength'] as num?) ?? .7).toDouble().clamp(0, 1),
       places: [
