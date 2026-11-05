@@ -15,6 +15,9 @@ import 'package:pico_snap/services/my_library.dart';
 import 'package:pico_snap/widgets/backdrop.dart';
 import 'package:pico_snap/widgets/frames.dart';
 import 'package:pico_snap/widgets/instant_print.dart';
+import 'package:pico_snap/widgets/page_texture.dart';
+import 'package:pico_snap/widgets/print_item.dart';
+import 'package:pico_snap/widgets/sticker_motion.dart';
 import 'package:pico_snap/widgets/sticker_item.dart';
 
 /// A wide photo (3:2), so it can be moved sideways in a squarish window.
@@ -49,32 +52,51 @@ void main() {
     customTemplates.clear();
   });
 
-  testWidgets('照片：點有照片的格子可以拖曳移動、置中、移除', (t) async {
+  testWidgets('拍立得拼貼：拍立得可以自由拖曳、轉正、拿掉；照片要按「調整」才在框裡移動', (t) async {
     final photo = (await t.runAsync(_photo))!;
     await _phone(t, EditorScreen(key: UniqueKey(), mode: EditorMode.polaroid, photos: [photo]));
     await _settleImages(t);
-    InstantPrint first() => t.widget<InstantPrint>(find.byType(InstantPrint).first);
-    // The selected print is drawn last; the first print is the one with the photo.
     final withPhoto = find.byWidgetPredicate((w) => w is InstantPrint && w.image != null);
+    PrintItem item() => t.widget<PrintItem>(find.ancestor(of: withPhoto, matching: find.byType(PrintItem)));
     expect(withPhoto, findsOneWidget);
-    expect(first().image, isNull, reason: '照片在第 1 張，畫在最後面（選取中）');
 
     await t.tap(find.descendant(of: withPhoto, matching: find.byType(FittedPhoto)));
     await t.pumpAndSettle();
     expect(find.text('換照片'), findsOneWidget);
-    expect(find.text('移除'), findsOneWidget);
+    expect(find.text('拿掉'), findsOneWidget);
 
+    // Dragging moves the whole print, not the photo inside.
+    final before = item().place.center, fit = t.widget<InstantPrint>(withPhoto).fit;
+    await t.drag(find.descendant(of: withPhoto, matching: find.byType(FittedPhoto)), const Offset(40, 30));
+    await t.pumpAndSettle();
+    expect(item().place.center.dx, greaterThan(before.dx));
+    expect(item().place.center.dy, greaterThan(before.dy));
+    expect(t.widget<InstantPrint>(withPhoto).fit.align, fit.align);
+    // Undo puts it back.
+    await t.tap(find.byIcon(CupertinoIcons.arrow_uturn_left));
+    await t.pumpAndSettle();
+    expect(item().place.center, before);
+
+    // 調整: now dragging moves the photo in its window.
+    await t.tap(find.descendant(of: withPhoto, matching: find.byType(FittedPhoto)));
+    await t.pumpAndSettle();
+    await t.tap(find.text('調整'));
+    await t.pumpAndSettle();
     await t.drag(find.descendant(of: withPhoto, matching: find.byType(FittedPhoto)), const Offset(30, 0));
     await t.pumpAndSettle();
-    final moved = t.widget<InstantPrint>(withPhoto).fit;
-    expect(moved.align.x, lessThan(0), reason: '往右拖，看到照片左邊');
-
-    await t.tap(find.text('置中'));
+    expect(t.widget<InstantPrint>(withPhoto).fit.align.x, lessThan(0), reason: '往右拖，看到照片左邊');
+    expect(item().place.center, before, reason: '拍立得沒動');
+    await t.tap(find.text('調好了'));
     await t.pumpAndSettle();
-    expect(t.widget<InstantPrint>(withPhoto).fit.align, Alignment.center);
 
-    await t.tap(find.text('移除'));
+    await t.tap(find.text('擺正'));
     await t.pumpAndSettle();
+    expect(item().place.angle, 0);
+
+    expect(find.byType(PrintItem), findsNWidgets(4));
+    await t.tap(find.text('拿掉'));
+    await t.pumpAndSettle();
+    expect(find.byType(PrintItem), findsNWidgets(3));
     expect(withPhoto, findsNothing);
     expect(find.text('換照片'), findsNothing, reason: '回到原本的工具');
   });
@@ -136,6 +158,45 @@ void main() {
     await t.pumpAndSettle();
     expect(page().color, before);
     expect(page().pattern, BackdropPattern.gingham);
+  });
+
+  testWidgets('拍立得拼貼：整頁質感蓋在整頁上，可以調強度、復原', (t) async {
+    await _phone(t, const EditorScreen(mode: EditorMode.polaroid));
+    // The page's own (the samples are at full strength).
+    TexturedPage page() => t.widget<TexturedPage>(find.byWidgetPredicate((w) => w is TexturedPage && w.child is Stack && (w.child as Stack).key != null));
+    expect(page().texture, PageTexture.none);
+    await t.tap(find.text('濾鏡'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('整頁質感'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('漏光'));
+    await t.pumpAndSettle();
+    expect(page().texture, PageTexture.leak);
+    await t.drag(find.byType(Slider), const Offset(-200, 0));
+    await t.pumpAndSettle();
+    expect(page().strength, lessThan(.7));
+    await t.tap(find.byIcon(CupertinoIcons.arrow_uturn_left));
+    await t.pumpAndSettle();
+    expect(page().strength, .7);
+    await t.tap(find.byIcon(CupertinoIcons.arrow_uturn_left));
+    await t.pumpAndSettle();
+    expect(page().texture, PageTexture.none);
+  });
+
+  testWidgets('貼紙本：「裝飾」有紙膠帶、撕紙、便利貼，點了貼到作品上，用不完', (t) async {
+    await _phone(t, const EditorScreen(mode: EditorMode.polaroid));
+    await t.tap(find.byIcon(CupertinoIcons.smiley));
+    await t.pumpAndSettle();
+    await t.tap(find.text('裝飾'));
+    await t.pumpAndSettle();
+    expect(find.text('紙膠帶'), findsOneWidget);
+    for (var k = 0; k < 2; k++) {
+      await t.tap(find.byType(PeelableSticker).first);
+      await t.pumpAndSettle();
+    }
+    final ids = [for (final s in t.widgetList<StickerItem>(find.byType(StickerItem))) s.data.sticker];
+    expect(ids, hasLength(2));
+    expect(ids.every((id) => id.startsWith('deco:')), isTrue);
   });
 
   testWidgets('拍立得拼貼：張數 1～6、三種排法，每種比例都放得下', (t) async {

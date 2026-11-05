@@ -169,22 +169,25 @@ class Backdrop extends StatelessWidget {
   final Color color;
   final BackdropPattern pattern;
   final ImageProvider? photo;
+  /// The photo blurred and tinted with the colour, or sharp as it is.
+  final bool blur;
   final double cells;
   final Widget? child;
-  const Backdrop({super.key, required this.color, required this.pattern, this.photo, this.cells = 22, this.child});
+  const Backdrop({super.key, required this.color, required this.pattern, this.photo, this.blur = true, this.cells = 22, this.child});
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, c) {
     final usePhoto = pattern == BackdropPattern.photo && photo != null;
     return Stack(fit: StackFit.expand, children: [
       CustomPaint(painter: BackdropPainter(color, pattern, cells: cells)),
-      if (usePhoto) ...[
+      if (usePhoto && blur) ...[
         ClipRect(child: ImageFiltered(
           imageFilter: ImageFilter.blur(sigmaX: c.maxWidth * .045, sigmaY: c.maxWidth * .045, tileMode: TileMode.mirror),
           child: Image(image: photo!, fit: BoxFit.cover, gaplessPlayback: true),
         )),
         ColoredBox(color: color.withValues(alpha: .28)),
-      ],
+      ] else if (usePhoto)
+        Image(image: photo!, fit: BoxFit.cover, gaplessPlayback: true),
       if (child != null) child!,
     ]);
   });

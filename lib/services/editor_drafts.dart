@@ -135,7 +135,7 @@ abstract final class EditorDrafts {
     for (final bytes in document.photos) {
       photos.add(await asset(bytes));
     }
-    final json = document.toJson(photos, await asset(document.subject));
+    final json = document.toJson(photos, await asset(document.subject), backdropFile: await asset(document.backdropPhoto));
     final now = DateTime.now();
     json['updated'] = now.millisecondsSinceEpoch;
     final encoded = await compute(jsonEncode, json);
@@ -168,7 +168,7 @@ abstract final class EditorDrafts {
     for (final file in json['photos'] as List) {
       photos.add(await asset(file));
     }
-    return EditorDocument.fromJson(json, photos, await asset(json['subject']));
+    return EditorDocument.fromJson(json, photos, await asset(json['subject']), backdropPhoto: await asset(json['backdropPhoto']));
   }
 
   static Future<void> remove(String id) => _writer.run(() async {

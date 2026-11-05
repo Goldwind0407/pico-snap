@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../filters.dart';
 import '../models.dart';
 import '../theme.dart';
+import 'deco_sticker.dart';
 
 /// How a photo sits in its cell: zoom (1 = just covers the cell) and which
 /// part is in view (like [Image.alignment]). Independent of the cell's size,
@@ -755,6 +756,7 @@ class StickerVisual extends StatelessWidget {
         errorBuilder: (_, __, ___) => SizedBox.square(dimension: size));
     }
     if (TypedWords.parse(sticker) case final words?) return SizedBox.square(dimension: size, child: FittedBox(child: TextSticker(words)));
+    if (parseDeco(sticker) case (final kind, final color)) return DecoSticker(kind, color, size: size);
     if (sticker.startsWith('my:')) {
       final custom = customStickers[sticker];
       final path = customStickerPaths[sticker];

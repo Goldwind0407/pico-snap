@@ -6,6 +6,7 @@ import '../models.dart';
 import '../services/my_library.dart';
 import '../sticker_book.dart';
 import '../theme.dart';
+import 'deco_sticker.dart';
 import 'frames.dart';
 import 'my_sheet_view.dart';
 import 'sticker_motion.dart';
@@ -50,7 +51,7 @@ class _StickerBookViewState extends State<StickerBookView> with SingleTickerProv
   void initState() {
     super.initState();
     // Opens on the first built-in sheet when the user has no stickers yet.
-    _page = customStickers.isEmpty ? _mine.length : 0;
+    _page = customStickers.isEmpty ? _mine.length + 1 : 0;
     _pages = PageController(initialPage: _page);
     // Made now, not on first use: a lazy one would first be made in dispose().
     _lift = AnimationController(vsync: this, duration: stickerPeelDuration);
@@ -102,7 +103,7 @@ class _StickerBookViewState extends State<StickerBookView> with SingleTickerProv
     valueListenable: MyLibrary.changes,
     builder: (context, _, __) {
       final mine = _mine;
-      final labels = [for (final s in mine) s.name, for (final b in stickerBooks) b.label];
+      final labels = [for (final s in mine) s.name, '裝飾', for (final b in stickerBooks) b.label];
       return Column(children: [
         SizedBox(height: 46, child: Row(children: [
           Padding(
@@ -159,7 +160,7 @@ class _StickerBookViewState extends State<StickerBookView> with SingleTickerProv
               controller: _pages,
               itemCount: labels.length,
               onPageChanged: (i) => setState(() => _page = i),
-              itemBuilder: (_, i) => i < mine.length ? _mySheet(mine[i]) : _sheet(i - mine.length),
+              itemBuilder: (_, i) => i < mine.length ? _mySheet(mine[i]) : i == mine.length ? _decorations() : _sheet(i - mine.length - 1),
             )),
       ]);
     },
@@ -172,6 +173,34 @@ class _StickerBookViewState extends State<StickerBookView> with SingleTickerProv
         padding: const EdgeInsets.fromLTRB(12, 2, 12, 16),
         child: MySheetView(sheet: sheet, peelOnTap: true, onTap: (id) => widget.onPick(id, 1)),
       );
+
+  /// Tape, torn paper, sticky notes and tags in every colour: they never run out.
+  Widget _decorations() => ListView(
+    padding: const EdgeInsets.fromLTRB(12, 2, 12, 16),
+    children: [
+      for (final kind in DecoKind.values) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 6, 0, 2),
+          child: Text(kind.label, style: const TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w800)),
+        ),
+        SizedBox(height: 64, child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            for (final id in decoStickers)
+              if (parseDeco(id)?.$1 == kind)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: SizedBox.square(dimension: 64, child: PeelableSticker(
+                    key: ValueKey(id),
+                    onPick: () => widget.onPick(id, 1.3),
+                    child: StickerVisual(id, size: 64),
+                  )),
+                ),
+          ],
+        )),
+      ],
+    ],
+  );
 
   /// The user's stickers whose name, or whose sheet's name, has [_query].
   Widget _results() {

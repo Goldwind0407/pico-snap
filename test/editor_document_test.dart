@@ -9,7 +9,9 @@ import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/models.dart';
 import 'package:pico_snap/services/editor_drafts.dart';
 import 'package:pico_snap/services/my_works.dart';
+import 'package:pico_snap/widgets/backdrop.dart';
 import 'package:pico_snap/widgets/doodle.dart';
+import 'package:pico_snap/widgets/page_texture.dart';
 import 'package:pico_snap/widgets/frames.dart';
 import 'package:pico_snap/widgets/instant_print.dart';
 import 'package:pico_snap/widgets/sticker_book_view.dart';
@@ -81,6 +83,36 @@ void main() {
       await EditorDrafts.remove(id);
       expect(EditorDrafts.entries, isEmpty);
       expect(await dir.list().isEmpty, isTrue);
+    } finally {
+      EditorDrafts.reset();
+      await dir.delete(recursive: true);
+    }
+  });
+
+  test('a collage draft keeps moved prints, its own background photo and the page look', () async {
+    final dir = await Directory.systemTemp.createTemp('pico_draft_test_');
+    try {
+      await EditorDrafts.load(directory: dir);
+      final id = EditorDrafts.newId();
+      final back = Uint8List.fromList([9, 8, 7]);
+      final d = EditorDocument(
+        mode: EditorMode.polaroid, photos: const [], fits: const [], films: const [], filters: const [], captions: const [],
+        stickers: const [], strokes: const [], handwriting: const [], templateKey: EditorDocument.keyForTemplate(0),
+        format: 0, pattern: 0, backdrop: 3, bubble: '',
+        places: [null, (center: const Offset(.3, .4), width: .5, angle: .2)],
+        backdropPattern: BackdropPattern.photo, backdropPhoto: back, backdropBlur: false,
+        texture: PageTexture.leak, textureStrength: .4,
+      );
+      expect(d.photos.length, 6, reason: '拼貼補滿 6 張');
+      expect(await EditorDrafts.save(id, d), isTrue);
+      final restored = await EditorDrafts.read(id);
+      expect(restored.places[1], (center: const Offset(.3, .4), width: .5, angle: .2));
+      expect(restored.places[0], isNull);
+      expect(restored.backdropPhoto, back);
+      expect(restored.backdropBlur, isFalse);
+      expect(restored.backdropPattern, BackdropPattern.photo);
+      expect(restored.texture, PageTexture.leak);
+      expect(restored.textureStrength, .4);
     } finally {
       EditorDrafts.reset();
       await dir.delete(recursive: true);

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'models.dart';
 import 'widgets/backdrop.dart';
 import 'widgets/collage_layout.dart';
+import 'widgets/page_texture.dart';
 import 'widgets/doodle.dart';
 import 'widgets/frames.dart';
 import 'widgets/instant_print.dart';
@@ -30,6 +31,15 @@ class EditorDocument {
   final CollageArrangement arrangement;
   /// 拍立得拼貼: what the paper looks like (drawn in the [backdrop] colour).
   final BackdropPattern backdropPattern;
+  /// 拍立得拼貼: where each print was moved to; null follows the arrangement.
+  final List<PrintPlace?> places;
+  /// 拍立得拼貼: a photo of its own behind everything (else the first
+  /// print's), and whether it is blurred.
+  final Uint8List? backdropPhoto;
+  final bool backdropBlur;
+  /// 拍立得拼貼: the look over the whole page.
+  final PageTexture texture;
+  final double textureStrength;
 
   /// Photo windows a piece of [mode] keeps: a collage holds up to six prints.
   static int cellsOf(EditorMode mode) => switch (mode) {
@@ -64,12 +74,18 @@ class EditorDocument {
       this.subject,
       this.count = 4,
       this.arrangement = CollageArrangement.scatter,
-      this.backdropPattern = BackdropPattern.plain})
+      this.backdropPattern = BackdropPattern.plain,
+      List<PrintPlace?> places = const [],
+      this.backdropPhoto,
+      this.backdropBlur = true,
+      this.texture = PageTexture.none,
+      this.textureStrength = .7})
       : photos = List.unmodifiable(_pad(photos, cellsOf(mode), (_) => null)),
         fits = List.unmodifiable(_pad(fits, cellsOf(mode), (_) => const PhotoFit())),
         films = List.unmodifiable(_pad(films, max(4, cellsOf(mode)), (_) => FilmStock.white)),
         filters = List.unmodifiable(_pad(filters, cellsOf(mode), (_) => '')),
         captions = List.unmodifiable(_pad(captions, max(4, cellsOf(mode)), (i) => collageCaptions[i])),
+        places = List.unmodifiable(_pad(places, mode == EditorMode.polaroid ? cellsOf(mode) : 0, (_) => null)),
         stickers = List.unmodifiable(stickers),
         strokes = copyStrokes(strokes),
         handwriting = [for (final lines in handwriting) copyStrokes(lines)];
@@ -125,7 +141,7 @@ class EditorDocument {
       };
 
   /// Binary assets live alongside this JSON, and are only written once.
-  Map<String, Object?> toJson(List<String?> photoFiles, String? subjectFile) =>
+  Map<String, Object?> toJson(List<String?> photoFiles, String? subjectFile, {String? backdropFile}) =>
       {
         'version': 1,
         'mode': mode.name,
@@ -144,6 +160,11 @@ class EditorDocument {
         'count': count,
         'arrangement': arrangement.name,
         'backdropPattern': backdropPattern.name,
+        'places': [for (final p in places) p == null ? null : [p.center.dx, p.center.dy, p.width, p.angle]],
+        'backdropPhoto': backdropFile,
+        'backdropBlur': backdropBlur,
+        'texture': texture.name,
+        'textureStrength': textureStrength,
         'bubble': bubble,
         'stripCaption': stripCaption,
         'stickers': [
@@ -164,7 +185,7 @@ class EditorDocument {
       };
 
   factory EditorDocument.fromJson(
-      Map<String, dynamic> json, List<Uint8List?> photos, Uint8List? subject) {
+      Map<String, dynamic> json, List<Uint8List?> photos, Uint8List? subject, {Uint8List? backdropPhoto}) {
     if (json['version'] != 1) {
       throw const FormatException('Unsupported draft version');
     }
@@ -213,6 +234,14 @@ class EditorDocument {
       count: ((json['count'] as int?) ?? 4).clamp(1, cells),
       arrangement: CollageArrangement.values.asNameMap()[json['arrangement']] ?? CollageArrangement.scatter,
       backdropPattern: BackdropPattern.values.asNameMap()[json['backdropPattern']] ?? BackdropPattern.plain,
+      backdropPhoto: backdropPhoto,
+      backdropBlur: json['backdropBlur'] as bool? ?? true,
+      texture: PageTexture.values.asNameMap()[json['texture']] ?? PageTexture.none,
+      textureStrength: ((json['textureStrength'] as num?) ?? .7).toDouble().clamp(0, 1),
+      places: [
+        for (final p in (json['places'] as List?) ?? const [])
+          p == null ? null : (center: Offset((p[0] as num).toDouble(), (p[1] as num).toDouble()), width: (p[2] as num).toDouble(), angle: (p[3] as num).toDouble())
+      ],
       bubble: json['bubble'] as String,
       stripCaption: json['stripCaption'] as String?,
       stickers: [
