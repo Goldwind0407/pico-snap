@@ -15,7 +15,7 @@ const samplePhotos = <ImageProvider>[
 ];
 const sampleDuo = AssetImage('assets/samples/duo.jpg');
 
-enum CellShape { square, rounded, cloud, wavy }
+enum CellShape { square, rounded, cloud, wavy, heart, star }
 
 enum FramePattern { none, dots, paws, confetti, gingham, stripes, hearts, stars, flowers, checker, waves }
 
@@ -58,6 +58,8 @@ class StripTemplate {
   final FramePattern pattern;
   final Color patternColor;
   final CellShape cellShape;
+  /// A shape per window, when they differ (else every one is [cellShape]).
+  final List<CellShape>? cellShapes;
   final FooterStyle footer;
   /// Thin brown doodle outline around the frame and cells.
   final bool outline;
@@ -71,9 +73,12 @@ class StripTemplate {
   const StripTemplate({
     required this.name, required this.category, required this.caption, this.subtitle = '',
     required this.frame, this.frame2, required this.cell, this.captionColor = ink,
-    this.pattern = FramePattern.none, this.patternColor = Colors.white, this.cellShape = CellShape.square,
+    this.pattern = FramePattern.none, this.patternColor = Colors.white, this.cellShape = CellShape.square, this.cellShapes,
     this.footer = FooterStyle.caption, this.outline = true, this.tape = false, this.mono = false, this.decos = const [], this.art,
   });
+
+  /// Window [i]'s shape.
+  CellShape shapeOf(int i) => cellShapes != null && i < cellShapes!.length ? cellShapes![i] : cellShape;
 
   /// Size of the strip in PhotoStrip design units (always 200 wide).
   Size get designSize => Size(200, art == null ? 620 : 200 / art!.aspect);
@@ -322,15 +327,19 @@ class CustomTemplate {
   /// Bottom colour of a vertical gradient; null for a plain frame.
   final Color? frame2;
   final FramePattern pattern;
-  final CellShape cellShape;
+  /// The four windows' shapes, top to bottom.
+  final List<CellShape> cellShapes;
   final FooterStyle footer;
   /// Stickers printed on the strip, placed like stickers on a canvas
   /// ([StickerData.center] normalised over the 200 × 620 strip).
   final List<StickerData> stickers;
-  const CustomTemplate({
+  CustomTemplate({
     required this.id, this.caption = '', required this.frame, this.frame2, this.pattern = FramePattern.none,
-    this.cellShape = CellShape.square, this.footer = FooterStyle.caption, this.stickers = const [],
-  });
+    List<CellShape>? cellShapes, CellShape cellShape = CellShape.square, this.footer = FooterStyle.caption, this.stickers = const [],
+  }) : cellShapes = List.unmodifiable(cellShapes ?? List.filled(4, cellShape));
+
+  /// The first window's shape (all four's, when they're the same).
+  CellShape get cellShape => cellShapes.first;
 
   static const _strip = Size(200, 620);
 
@@ -344,7 +353,7 @@ class CustomTemplate {
 
   /// A starting point copied from a built-in drawn template.
   factory CustomTemplate.from(StripTemplate t) => CustomTemplate(
-    id: '', caption: t.caption, frame: t.frame, frame2: t.frame2, pattern: t.pattern, cellShape: t.cellShape, footer: t.footer,
+    id: '', caption: t.caption, frame: t.frame, frame2: t.frame2, pattern: t.pattern, cellShapes: [for (var i = 0; i < 4; i++) t.shapeOf(i)], footer: t.footer,
     stickers: [
       for (final d in t.decos)
         if (!d.bubble)
@@ -356,10 +365,10 @@ class CustomTemplate {
   );
 
   CustomTemplate copyWith({String? id, String? caption, Color? frame, Color? Function()? frame2, FramePattern? pattern,
-      CellShape? cellShape, FooterStyle? footer, List<StickerData>? stickers}) => CustomTemplate(
+      List<CellShape>? cellShapes, FooterStyle? footer, List<StickerData>? stickers}) => CustomTemplate(
     id: id ?? this.id, caption: caption ?? this.caption, frame: frame ?? this.frame,
     frame2: frame2 == null ? this.frame2 : frame2(), pattern: pattern ?? this.pattern,
-    cellShape: cellShape ?? this.cellShape, footer: footer ?? this.footer, stickers: stickers ?? this.stickers,
+    cellShapes: cellShapes ?? this.cellShapes, footer: footer ?? this.footer, stickers: stickers ?? this.stickers,
   );
 
   StripTemplate get template {
@@ -375,7 +384,7 @@ class CustomTemplate {
       patternColor: darkTop ? Colors.white.withValues(alpha: .35)
           : frame.computeLuminance() > .8 ? Color.lerp(frame, const Color(0xFFD9BFA8), .55)!
           : Color.lerp(frame, Colors.white, .6)!,
-      cellShape: cellShape, footer: footer, outline: !darkTop,
+      cellShape: cellShape, cellShapes: cellShapes.toSet().length > 1 ? cellShapes : null, footer: footer, outline: !darkTop,
       decos: [
         for (final s in stickers)
           Deco(s.sticker, Offset(s.center.dx * _strip.width, s.center.dy * _strip.height),
@@ -386,7 +395,8 @@ class CustomTemplate {
 
   Map<String, Object?> toJson() => {
     'id': id, 'caption': caption, 'frame': frame.toARGB32(), 'frame2': frame2?.toARGB32(),
-    'pattern': pattern.name, 'cellShape': cellShape.name, 'footer': footer.name,
+    // cellShape: the first, for a version of the App before per-window shapes.
+    'pattern': pattern.name, 'cellShape': cellShape.name, 'cellShapes': [for (final s in cellShapes) s.name], 'footer': footer.name,
     'decos': [
       for (final s in stickers)
         {'sticker': s.sticker, 'x': s.center.dx, 'y': s.center.dy, 'scale': s.scale, 'rotation': s.rotation, 'flipped': s.flipped},
@@ -399,7 +409,10 @@ class CustomTemplate {
     frame: Color(j['frame']! as int),
     frame2: j['frame2'] == null ? null : Color(j['frame2']! as int),
     pattern: FramePattern.values.byName(j['pattern']! as String),
-    cellShape: CellShape.values.byName(j['cellShape']! as String),
+    cellShapes: j['cellShapes'] is List
+      ? [for (final s in (j['cellShapes']! as List).cast<String>()) CellShape.values.asNameMap()[s] ?? CellShape.square]
+      : null,
+    cellShape: CellShape.values.asNameMap()[j['cellShape']] ?? CellShape.square,
     footer: FooterStyle.values.byName(j['footer']! as String),
     stickers: j['decos'] is List
       ? [

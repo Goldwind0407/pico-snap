@@ -248,7 +248,7 @@ void main() {
   });
 
   testWidgets('我的素材：點模板直接用它拍四格', (t) async {
-    MyLibrary.addTemplate(const CustomTemplate(id: 't1', caption: 'mine!', frame: Color(0xFFB9C9AE)));
+    MyLibrary.addTemplate(CustomTemplate(id: 't1', caption: 'mine!', frame: Color(0xFFB9C9AE)));
     await _phone(t, const LibraryScreen());
     await t.tap(find.text('模板'));
     await t.pumpAndSettle();

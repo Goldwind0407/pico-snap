@@ -186,6 +186,7 @@ class PhotoStrip extends StatelessWidget {
             for (var i = 0; i < 4; i++) ...[
               SizedBox(height: 128, width: double.infinity, child: _StripCell(
                 template: t,
+                shape: t.shapeOf(i),
                 photo: _photo(i),
                 placeholder: placeholder,
                 selected: selected == i,
@@ -278,11 +279,12 @@ class _StripCell extends StatelessWidget {
   final Widget? placeholder;
   final bool selected;
   final VoidCallback? onTap;
-  const _StripCell({required this.template, this.photo, this.placeholder, this.selected = false, this.onTap});
+  final CellShape shape;
+  const _StripCell({required this.template, required this.shape, this.photo, this.placeholder, this.selected = false, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final clipper = CellClipper(template.cellShape);
+    final clipper = CellClipper(shape);
     Widget content = photo ?? Center(child: placeholder ?? const SizedBox.shrink());
     if (template.mono && photo != null) content = ColorFiltered(colorFilter: _grayscale, child: content);
     final strokeWidth = selected ? 3.5 : (template.outline ? 1.4 : 0.0);
@@ -309,33 +311,106 @@ class CellClipper extends CustomClipper<Path> {
       case CellShape.rounded:
         return Path()..addRRect(RRect.fromRectAndRadius(rect, const Radius.circular(18)));
       case CellShape.cloud:
-        // A rounded box with a row of puffs along the top edge.
-        const puffs = 5;
-        final r = size.width / puffs / 2;
-        var path = Path()..addRRect(RRect.fromRectAndRadius(Rect.fromLTRB(0, r * .8, size.width, size.height), const Radius.circular(16)));
-        for (var i = 0; i < puffs; i++) {
-          path = Path.combine(PathOperation.union, path, Path()..addOval(Rect.fromCircle(center: Offset(r + i * 2 * r, r * 1.05), radius: r * 1.02)));
-        }
-        return path;
+        return _cloud(size);
       case CellShape.wavy:
-        // Torn-paper style wobbly edge.
-        const amp = 2.6, step = 4.0;
-        final path = Path()..moveTo(amp, amp);
-        double wob(double t) => amp + amp * sin(t * .55);
-        for (var x = 0.0; x <= size.width; x += step) {
-          path.lineTo(x, wob(x));
-        }
-        for (var y = 0.0; y <= size.height; y += step) {
-          path.lineTo(size.width - wob(y + 3), y);
-        }
-        for (var x = size.width; x >= 0; x -= step) {
-          path.lineTo(x, size.height - wob(x + 7));
-        }
-        for (var y = size.height; y >= 0; y -= step) {
-          path.lineTo(wob(y + 11), y);
-        }
-        return path..close();
+        return _wavy(size);
+      case CellShape.heart:
+        return _heartIn(size);
+      case CellShape.star:
+        return _starIn(size);
     }
+  }
+
+  /// Puffs all the way round, big and small by turns, over a rounded box:
+  /// a cloud, not a box with bumps on top.
+  static Path _cloud(Size size) {
+    final w = size.width, h = size.height;
+    final r = h * .16;
+    final body = Rect.fromLTRB(r * .9, r * .9, w - r * .9, h - r * .9);
+    var path = Path()..addRRect(RRect.fromRectAndRadius(body, Radius.circular(r)));
+    void puffs(Offset from, Offset to, int n, int phase) {
+      for (var k = 0; k < n; k++) {
+        final c = Offset.lerp(from, to, n == 1 ? .5 : k / (n - 1))!;
+        final big = (k + phase).isEven;
+        path = Path.combine(PathOperation.union, path, Path()..addOval(Rect.fromCircle(center: c, radius: big ? r : r * .78)));
+      }
+    }
+    final inset = r * 1.02;
+    final across = max(3, (w / (r * 1.75)).round()), down = max(2, (h / (r * 1.75)).round());
+    puffs(Offset(inset, inset), Offset(w - inset, inset), across, 0);
+    puffs(Offset(inset, h - inset), Offset(w - inset, h - inset), across, 1);
+    puffs(Offset(inset, inset), Offset(inset, h - inset), down, 0);
+    puffs(Offset(w - inset, inset), Offset(w - inset, h - inset), down, 1);
+    return path;
+  }
+
+  /// Even waves along every side, a whole number of them per side so they
+  /// meet at the corners.
+  static Path _wavy(Size size) {
+    const amp = 6.0, length = 26.0;
+    final w = size.width, h = size.height;
+    final path = Path();
+    // How far in the edge is at [t] (0–1) along a side of [n] waves.
+    double inward(double t, int n) => amp * (1 - cos(t * n * 2 * pi)) / 2;
+    final nx = max(2, (w / length).round()), ny = max(2, (h / length).round());
+    const steps = 6;
+    path.moveTo(0, 0);
+    for (var k = 1; k <= nx * steps; k++) {
+      final t = k / (nx * steps);
+      path.lineTo(t * w, inward(t, nx));
+    }
+    for (var k = 1; k <= ny * steps; k++) {
+      final t = k / (ny * steps);
+      path.lineTo(w - inward(t, ny), t * h);
+    }
+    for (var k = 1; k <= nx * steps; k++) {
+      final t = k / (nx * steps);
+      path.lineTo(w - t * w, h - inward(t, nx));
+    }
+    for (var k = 1; k <= ny * steps; k++) {
+      final t = k / (ny * steps);
+      path.lineTo(inward(t, ny), h - t * h);
+    }
+    return path..close();
+  }
+
+  /// The biggest heart that fits, in the middle.
+  static Path _heartIn(Size size) {
+    final s = min(size.height, size.width / 1.12);
+    final cx = size.width / 2, top = (size.height - s) / 2;
+    final w = s * 1.12;
+    double x(double f) => cx + f * w / 2;
+    double y(double f) => top + f * s;
+    return Path()
+      ..moveTo(x(0), y(.27))
+      ..cubicTo(x(-.18), y(-.05), x(-1), y(-.02), x(-.98), y(.34))
+      ..cubicTo(x(-.96), y(.62), x(-.42), y(.8), x(0), y(1))
+      ..cubicTo(x(.42), y(.8), x(.96), y(.62), x(.98), y(.34))
+      ..cubicTo(x(1), y(-.02), x(.18), y(-.05), x(0), y(.27))
+      ..close();
+  }
+
+  /// The biggest five-pointed star that fits, with softened tips.
+  static Path _starIn(Size size) {
+    // A star's height is about .95 of its outer diameter, its width .95 too.
+    final r = min(size.height / 1.81, size.width / 1.9);
+    final c = Offset(size.width / 2, size.height / 2 + r * .1);
+    final pts = [
+      for (var k = 0; k < 10; k++) c + Offset.fromDirection(-pi / 2 + k * pi / 5, k.isEven ? r : r * .5),
+    ];
+    final path = Path();
+    for (var k = 0; k < 10; k++) {
+      final p = pts[k], prev = pts[(k + 9) % 10], next = pts[(k + 1) % 10];
+      if (k.isEven) {
+        // Round each tip: come in short of it, curve round, go on.
+        final a = Offset.lerp(p, prev, .12)!, b = Offset.lerp(p, next, .12)!;
+        k == 0 ? path.moveTo(a.dx, a.dy) : path.lineTo(a.dx, a.dy);
+        path.quadraticBezierTo(p.dx, p.dy, b.dx, b.dy);
+      } else {
+        path.lineTo(p.dx, p.dy);
+      }
+    }
+    return path..close();
   }
 
   @override

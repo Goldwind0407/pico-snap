@@ -121,6 +121,35 @@ void main() {
     expect(_listed(), FramePattern.values.length, reason: '每一種都可以選');
   });
 
+  testWidgets('設計模板：照片格可以四格一起換，也可以每格不同（點預覽的格子選）', (t) async {
+    await phone(t, const TemplateMakerScreen());
+    await t.tap(find.text('照片格'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('雲朵'));
+    await t.pumpAndSettle();
+    StripTemplate strip() => t.widget<PhotoStrip>(find.byType(PhotoStrip)).template;
+    expect([for (var i = 0; i < 4; i++) strip().shapeOf(i)], List.filled(4, CellShape.cloud));
+    await t.tap(find.descendant(of: find.byType(Row), matching: find.text('2')).first);
+    await t.pumpAndSettle();
+    await t.tap(find.text('愛心'));
+    await t.pumpAndSettle();
+    // 點預覽的第 4 格，換成星星
+    final cells = find.descendant(of: find.byType(PhotoStrip), matching: find.byType(ClipPath));
+    await t.tap(cells.at(3));
+    await t.pumpAndSettle();
+    await t.tap(find.text('星星'));
+    await t.pumpAndSettle();
+    expect([for (var i = 0; i < 4; i++) strip().shapeOf(i)], [CellShape.cloud, CellShape.heart, CellShape.cloud, CellShape.star]);
+    expect(t.takeException(), isNull);
+  });
+
+  test('每格的形狀存檔讀回來一樣；舊的只有一個形狀的模板讀成四格一樣', () {
+    final c = CustomTemplate(id: 'a', frame: const Color(0xFFF9CACB), cellShapes: const [CellShape.heart, CellShape.star, CellShape.wavy, CellShape.cloud]);
+    expect(CustomTemplate.fromJson(c.toJson()).cellShapes, c.cellShapes);
+    final old = c.toJson()..remove('cellShapes')..['cellShape'] = 'wavy';
+    expect(CustomTemplate.fromJson(old).cellShapes, List.filled(4, CellShape.wavy));
+  });
+
   testWidgets('設計模板：選項會存進模板，模板頁可以刪除', (t) async {
     final sticker = MyLibrary.addSticker(_tinyPng);
     // 從「我的素材」的模板頁進去，儲存後回到那一頁
@@ -185,7 +214,7 @@ void main() {
 
   testWidgets('編輯器只能使用我的素材，不能新增或刪除', (t) async {
     final sticker = MyLibrary.addSticker(_tinyPng);
-    MyLibrary.addTemplate(const CustomTemplate(id: 't1', caption: 'mine!', frame: Color(0xFFB9C9AE)));
+    MyLibrary.addTemplate(CustomTemplate(id: 't1', caption: 'mine!', frame: Color(0xFFB9C9AE)));
     await phone(t, const EditorScreen());
 
     // 模板：多一個「我的」分類，選了之後可以改文字（不是印好字的插畫模板）

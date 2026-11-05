@@ -21,7 +21,7 @@ const _patterns = [
   (FramePattern.checker, '棋盤格'), (FramePattern.waves, '波浪'),
 ];
 
-const _cells = [(CellShape.square, '方形'), (CellShape.rounded, '圓角'), (CellShape.cloud, '雲朵'), (CellShape.wavy, '波浪邊')];
+const _cells = [(CellShape.square, '方形'), (CellShape.rounded, '圓角'), (CellShape.cloud, '雲朵'), (CellShape.wavy, '波浪邊'), (CellShape.heart, '愛心'), (CellShape.star, '星星')];
 
 const _footers = [(FooterStyle.caption, '手寫字'), (FooterStyle.logoDate, '標誌＋日期'), (FooterStyle.title, '大標題')];
 
@@ -54,7 +54,7 @@ class TemplateMakerScreen extends StatefulWidget {
 }
 
 class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
-  late CustomTemplate _t = widget.initial ?? const CustomTemplate(id: '', caption: 'my little day', frame: Color(0xFFF9CACB));
+  late CustomTemplate _t = widget.initial ?? CustomTemplate(id: '', caption: 'my little day', frame: Color(0xFFF9CACB));
   late final _caption = TextEditingController(text: _t.caption);
   final _canvasKey = GlobalKey();
   _Tab _tab = _Tab.color;
@@ -148,7 +148,12 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
       child: Stack(key: _canvasKey, clipBehavior: Clip.none, children: [
         Positioned.fill(child: GestureDetector(
           onTap: () => setState(() => _selected = null),
-          child: FittedBox(child: PhotoStrip(template: strip)),
+          // On the 照片格 tab a window can be tapped to shape just that one.
+          child: FittedBox(child: PhotoStrip(
+            template: strip,
+            selected: _tab == _Tab.cell ? _cellTarget : null,
+            onTapCell: _tab == _Tab.cell ? (i) => setState(() => _cellTarget = _cellTarget == i ? null : i) : null,
+          )),
         )),
         for (var i = 0; i < _t.stickers.length; i++)
           StickerItem(
@@ -178,11 +183,11 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
     ),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
       // The sticker book wants room to show part of a sheet.
-      SizedBox(height: _tab == _Tab.sticker ? 230 : 150, child: switch (_tab) {
+      SizedBox(height: switch (_tab) { _Tab.sticker => 230, _Tab.cell => 180, _ => 150 }, child: switch (_tab) {
         _Tab.start => _startTool(),
         _Tab.color => _colorTool(),
         _Tab.pattern => _chips([for (final (p, l) in _patterns) (l, _t.pattern == p, () => _update(_t.copyWith(pattern: p)))]),
-        _Tab.cell => _chips([for (final (c, l) in _cells) (l, _t.cellShape == c, () => _update(_t.copyWith(cellShape: c)))]),
+        _Tab.cell => _cellTool(),
         _Tab.text => _textTool(),
         _Tab.sticker => _stickerTool(),
       }),
@@ -272,6 +277,36 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
         swatches('下', _t.frame2, (c) => _update(_t.copyWith(frame2: () => c))),
       ],
     ]);
+  }
+
+  /// Which window a shape goes to: null for all four.
+  int? _cellTarget;
+
+  /// The windows' shapes: for all four at once, or one at a time (pick it
+  /// here or tap it on the strip).
+  Widget _cellTool() {
+    final shapes = _t.cellShapes;
+    bool on(CellShape c) => _cellTarget == null ? shapes.every((s) => s == c) : shapes[_cellTarget!] == c;
+    void apply(CellShape c) => _update(_t.copyWith(cellShapes: [
+      for (var i = 0; i < 4; i++) _cellTarget == null || _cellTarget == i ? c : shapes[i],
+    ]));
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Text('哪一格', style: TextStyle(fontSize: 13, color: muted, fontWeight: FontWeight.w800)),
+          const SizedBox(width: 10),
+          Expanded(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+            for (final (i, l) in [(null, '全部'), (0, '1'), (1, '2'), (2, '3'), (3, '4')]) Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: _Chip(label: l, selected: _cellTarget == i, onTap: () => setState(() => _cellTarget = i)),
+            ),
+          ]))),
+        ]),
+        const SizedBox(height: 12),
+        Wrap(spacing: 8, runSpacing: 8, children: [for (final (c, l) in _cells) _Chip(label: l, selected: on(c), onTap: () => apply(c))]),
+      ]),
+    );
   }
 
   Widget _chips(List<(String, bool, VoidCallback)> items) => Padding(
