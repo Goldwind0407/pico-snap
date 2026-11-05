@@ -20,6 +20,7 @@ import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
 import 'services/timelapse_recorder.dart';
 import 'theme.dart';
+import 'widgets/backdrop.dart';
 import 'widgets/collage_layout.dart';
 import 'widgets/doodle.dart';
 import 'widgets/filter_thumbs.dart';
@@ -31,6 +32,7 @@ import 'widgets/sticker_item.dart';
 enum _Tool {
   template(CupertinoIcons.square_split_1x2, '模板'),
   layout(CupertinoIcons.square_grid_2x2, '版面'),
+  backdrop(CupertinoIcons.square_stack_3d_down_right, '背景'),
   pattern(CupertinoIcons.circle_grid_3x3, '底紋'),
   sticker(CupertinoIcons.smiley, '貼紙'),
   text(CupertinoIcons.textformat, '文字'),
@@ -99,6 +101,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   /// 拍立得拼貼: how many prints show (1–6), and how they lie.
   late int _count = widget.photos.length > 4 ? min(6, widget.photos.length) : 4;
   CollageArrangement _arrangement = CollageArrangement.scatter;
+  BackdropPattern _backdropPattern = BackdropPattern.plain;
   /// Where tapping a photo came from: closing the photo tool goes back there.
   _Tool? _backTool;
   /// Filter per photo (photos only; frames and stickers aren't filtered).
@@ -116,7 +119,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   /// state. Immutable photo bytes retain their identity across checkpoints.
   Object _contentKey() => Object.hashAll([
     Object.hashAll(_photoBytes), Object.hashAll(_fits.map((f) => Object.hash(f.scale, f.align))), Object.hashAll(_films), Object.hashAll([for (final f in _filters) f.id]),
-    _template, _format, _pattern, _backdrop, _count, _arrangement, _stripCaption, Object.hashAll(_polaroidCaptions), _bubble, _subject,
+    _template, _format, _pattern, _backdrop, _count, _arrangement, _backdropPattern, _stripCaption, Object.hashAll(_polaroidCaptions), _bubble, _subject,
     Object.hashAll(_stickers.map((s) => Object.hash(s.sticker, s.center, s.scale, s.rotation, s.flipped))), Object.hashAll(_strokes.map((s) => Object.hash(s.color, s.width, s.style, Object.hashAll(s.points)))), _strokes.isEmpty ? 0 : _strokes.last.points.length,
   ]);
 
@@ -162,7 +165,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     captions: _polaroidCaptions, stickers: _stickers, strokes: _strokes,
     handwriting: _handwriting, templateKey: EditorDocument.keyForTemplate(_template),
     format: _format, pattern: _pattern, backdrop: _backdrop, bubble: _bubble,
-    stripCaption: _stripCaption, subject: _subject, count: _count, arrangement: _arrangement);
+    stripCaption: _stripCaption, subject: _subject, count: _count, arrangement: _arrangement, backdropPattern: _backdropPattern);
 
   void _restore(EditorDocument d) {
     _photoBytes.setAll(0, d.photos);
@@ -174,7 +177,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     _handwriting = d.handwriting; _template = d.templateIndex;
     _category = allStripTemplates[_template].category;
     _format = d.format; _pattern = d.pattern; _backdrop = d.backdrop;
-    _count = d.count; _arrangement = d.arrangement;
+    _count = d.count; _arrangement = d.arrangement; _backdropPattern = d.backdropPattern;
     if (widget.mode == EditorMode.polaroid) _selectedCell = min(_selectedCell, _count - 1);
     _bubble = d.bubble; _stripCaption = d.stripCaption; _subject = d.subject;
     _selectedSticker = null; _textCtrl.text = _text;
@@ -202,7 +205,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
 
   List<_Tool> get _tools => switch (widget.mode) {
     EditorMode.fourCut => const [_Tool.template, _Tool.sticker, _Tool.text, _Tool.brush, _Tool.filter],
-    EditorMode.polaroid => const [_Tool.layout, _Tool.film, _Tool.sticker, _Tool.text, _Tool.brush, _Tool.filter],
+    EditorMode.polaroid => const [_Tool.layout, _Tool.backdrop, _Tool.film, _Tool.sticker, _Tool.text, _Tool.brush, _Tool.filter],
     EditorMode.sticker => const [_Tool.sticker, _Tool.pattern, _Tool.text, _Tool.brush, _Tool.cutout],
   };
 
@@ -895,8 +898,8 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     // Draw the selected print last so it sits on top.
     final order = [for (var i = 0; i < _count; i++) if (i != _selectedCell) i, if (_selectedCell < _count) _selectedCell];
     Widget doodle(double x, double y, Widget child) => Positioned(left: x * size.width, top: y * size.height, child: child);
-    return Container(
-      color: backdrops[_backdrop].$2,
+    return Backdrop(
+      color: backdrops[_backdrop].$2, pattern: _backdropPattern, photo: _backdropPhoto,
       child: Stack(children: [
         doodle(.62, .07, const Sparkle(size: 16)),
         doodle(.70, .11, const Sparkle(size: 10)),
@@ -1016,6 +1019,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   Widget _toolView() => switch (_tool) {
     _Tool.template => _templateTool(),
     _Tool.layout => _layoutTool(),
+    _Tool.backdrop => _backdropTool(),
     _Tool.pattern => _patternTool(),
     _Tool.sticker => _stickerTool(),
     _Tool.cutout => _cutoutTool(),
@@ -1084,22 +1088,60 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       _layoutRow('排法', _segments([for (final a in CollageArrangement.values) a.label], _arrangement.index,
         (i) => setState(() { _remember(); _arrangement = CollageArrangement.values[i]; }))),
       _layoutRow('比例', _segments([for (final f in formats) f.$1], _format, (i) => setState(() { _remember(); _format = i; }))),
-      _layoutRow('背景', Row(children: [
-        for (var i = 0; i < backdrops.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: GestureDetector(
-              onTap: () => setState(() { _remember(); _backdrop = i; }),
-              child: Container(
-                width: 36, height: 36, padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: _backdrop == i ? outline.withValues(alpha: .6) : Colors.transparent, width: 2)),
-                child: Container(decoration: BoxDecoration(color: backdrops[i].$2, shape: BoxShape.circle, border: Border.all(color: line, width: 1.3))),
-              ),
-            ),
-          ),
-      ])),
     ]),
   );
+
+  /// The photo a 照片 backdrop blurs: the first print's.
+  ImageProvider? get _backdropPhoto => _photos.take(_count).nonNulls.firstOrNull;
+
+  /// The collage's paper: a pattern, then its colour.
+  Widget _backdropTool() {
+    final color = backdrops[_backdrop].$2;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SizedBox(height: 112, child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 4),
+        itemCount: BackdropPattern.values.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (_, i) {
+          final p = BackdropPattern.values[i];
+          final selected = _backdropPattern == p;
+          return GestureDetector(
+            onTap: () => setState(() { _remember(); _backdropPattern = p; }),
+            child: Column(children: [
+              Container(
+                width: 60, height: 66, padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: selected ? coral : line, width: selected ? 2.5 : 1.3),
+                ),
+                child: ClipRRect(borderRadius: BorderRadius.circular(11), child: Backdrop(
+                  color: color, pattern: p, cells: 7,
+                  photo: _backdropPhoto ?? samplePhotos.first,
+                )),
+              ),
+              const SizedBox(height: 4),
+              Text(p.label, style: TextStyle(fontSize: 11, color: selected ? ink : muted, fontWeight: selected ? FontWeight.w900 : FontWeight.w700)),
+            ]),
+          );
+        },
+      )),
+      Expanded(child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+        itemCount: backdrops.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 4),
+        itemBuilder: (_, i) => GestureDetector(
+          onTap: () => setState(() { _remember(); _backdrop = i; }),
+          child: Container(
+            width: 40, height: 40, padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: _backdrop == i ? outline.withValues(alpha: .6) : Colors.transparent, width: 2)),
+            child: Container(decoration: BoxDecoration(color: backdrops[i].$2, shape: BoxShape.circle, border: Border.all(color: line, width: 1.3))),
+          ),
+        ),
+      )),
+    ]);
+  }
 
   void _setFilm(FilmStock f, {bool all = false}) => setState(() {
     _remember();

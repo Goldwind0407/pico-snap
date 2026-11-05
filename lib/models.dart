@@ -261,11 +261,22 @@ const ginghamPatterns = [
   GinghamPattern('Mint', Color(0xFFC5E8D2)),
 ];
 
+/// The collage's paper colours. Drafts keep the index: add new ones at the end.
 const backdrops = <(String, Color)>[
   ('White', Color(0xFFFFFFFF)),
   ('Beige', Color(0xFFEFE5D7)),
   ('Tan', Color(0xFFD9C3A5)),
   ('Black', Color(0xFF2B2422)),
+  ('Butter', Color(0xFFFFF1BF)),
+  ('Peach', Color(0xFFFFD8D2)),
+  ('Pink', Color(0xFFF9C6D8)),
+  ('Lilac', Color(0xFFE2D8F4)),
+  ('Sky', Color(0xFFCFE4F4)),
+  ('Mint', Color(0xFFD2EDDC)),
+  ('Sage', Color(0xFFC6D2B8)),
+  ('Caramel', Color(0xFFB98D66)),
+  ('Wine', Color(0xFF6E2F38)),
+  ('Navy', Color(0xFF2F3A56)),
 ];
 
 const formats = <(String, double)>[('9:16', 9 / 16), ('1:1', 1), ('4:5', 4 / 5), ('3:4', 3 / 4)];

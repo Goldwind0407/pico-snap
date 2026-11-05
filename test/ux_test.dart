@@ -12,6 +12,7 @@ import 'package:pico_snap/library_screen.dart';
 import 'package:pico_snap/models.dart';
 import 'package:pico_snap/polaroid_camera_screen.dart';
 import 'package:pico_snap/services/my_library.dart';
+import 'package:pico_snap/widgets/backdrop.dart';
 import 'package:pico_snap/widgets/frames.dart';
 import 'package:pico_snap/widgets/instant_print.dart';
 import 'package:pico_snap/widgets/sticker_item.dart';
@@ -114,6 +115,27 @@ void main() {
     expect(prints(), findsNWidgets(2));
     expect(find.byWidgetPredicate((w) => w is InstantPrint && w.caption.isNotEmpty && w.image != null), findsNWidgets(2));
     expect(find.text('同時做「製作過程」縮時影片'), findsOneWidget, reason: '接著照常完成');
+  });
+
+  testWidgets('拍立得拼貼：背景可以選圖案和顏色，復原會回去', (t) async {
+    await _phone(t, const EditorScreen(mode: EditorMode.polaroid));
+    await t.tap(find.text('背景'));
+    await t.pumpAndSettle();
+    // The page's paper is the biggest backdrop on screen.
+    BackdropPainter page() => (t.widgetList<CustomPaint>(find.byType(CustomPaint)).map((c) => c.painter).whereType<BackdropPainter>().toList()
+      ..sort((a, b) => a.cells.compareTo(b.cells))).last;
+    expect(page().pattern, BackdropPattern.plain);
+    await t.tap(find.text('格紋'));
+    await t.pumpAndSettle();
+    expect(page().pattern, BackdropPattern.gingham);
+    final before = page().color;
+    await t.tap(find.byWidgetPredicate((w) => w is Container && w.decoration is BoxDecoration && (w.decoration as BoxDecoration).color == backdrops[5].$2));
+    await t.pumpAndSettle();
+    expect(page().color, backdrops[5].$2);
+    await t.tap(find.byIcon(CupertinoIcons.arrow_uturn_left));
+    await t.pumpAndSettle();
+    expect(page().color, before);
+    expect(page().pattern, BackdropPattern.gingham);
   });
 
   testWidgets('拍立得拼貼：張數 1～6、三種排法，每種比例都放得下', (t) async {
