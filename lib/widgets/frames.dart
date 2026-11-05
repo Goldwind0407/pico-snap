@@ -167,14 +167,16 @@ class PhotoStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = template;
     if (t.art != null) return _artStrip(t.art!);
+    // Clean edges: nothing pokes out past the strip (what's saved is only
+    // the strip anyway), and the outline is drawn last, over a sticker or
+    // the tape at the edge.
     return SizedBox(
       width: 200, height: 620,
-      child: Stack(clipBehavior: Clip.none, children: [
+      child: Stack(clipBehavior: Clip.hardEdge, children: [
         Positioned.fill(child: DecoratedBox(
           decoration: BoxDecoration(
             color: t.frame2 == null ? t.frame : null,
             gradient: t.frame2 == null ? null : LinearGradient(colors: [t.frame, t.frame2!], begin: Alignment.topCenter, end: Alignment.bottomCenter),
-            border: t.outline ? Border.all(color: outline, width: 1.6) : null,
           ),
           child: CustomPaint(painter: _FramePatternPainter(t.pattern, t.patternColor)),
         )),
@@ -205,6 +207,8 @@ class PhotoStrip extends StatelessWidget {
               child: d.bubble ? SpeechBubble(d.content, fontSize: d.size * 1.3) : Transform.flip(flipX: d.flipped, child: StickerVisual(d.content, size: d.size)),
             ))),
           ),
+        if (t.outline)
+          Positioned.fill(child: IgnorePointer(child: DecoratedBox(decoration: BoxDecoration(border: Border.all(color: outline, width: 1.6))))),
       ]),
     );
   }
@@ -362,30 +366,26 @@ class _FramePatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = color;
-    // Patterns drawn past the edge (a grid's last row) stay on the strip.
-    canvas.clipRect(Offset.zero & size);
+    // A clean band of plain frame colour inside the edges: nothing touches
+    // the outline, and a motif is drawn whole or not at all, never cut in
+    // half by the edge.
+    final area = (Offset.zero & size).deflate(_inset);
+    bool fits(Offset p, double reach) => area.deflate(reach).contains(p);
+    canvas.clipRect(area);
     switch (pattern) {
       case FramePattern.none:
         return;
       case FramePattern.dots:
-        for (var y = 6.0, row = 0; y < size.height; y += 12, row++) {
-          for (var x = row.isEven ? 6.0 : 12.0; x < size.width; x += 12) {
-            canvas.drawCircle(Offset(x, y), 2.6, paint);
-          }
-        }
+        _grid(canvas, size, _step / 2, 2.4, fits, (row, col) => canvas.drawCircle(Offset.zero, 2.4, paint));
       case FramePattern.paws:
-        for (var y = 10.0, row = 0; y < size.height; y += 26, row++) {
-          for (var x = row.isEven ? 10.0 : 23.0; x < size.width; x += 26) {
-            canvas.save();
-            canvas.translate(x, y);
-            canvas.rotate((row + x) % 3 * .3 - .3);
-            canvas.drawOval(Rect.fromCenter(center: const Offset(0, 2.5), width: 7, height: 6), paint);
-            for (final toe in const [Offset(-4, -2.5), Offset(0, -4.5), Offset(4, -2.5)]) {
-              canvas.drawCircle(toe, 1.7, paint);
-            }
-            canvas.restore();
+        _grid(canvas, size, _step, 4.4, fits, (row, col) {
+          canvas.rotate((row + col) % 3 * .3 - .3);
+          canvas.scale(.72);
+          canvas.drawOval(Rect.fromCenter(center: const Offset(0, 2.5), width: 7, height: 6), paint);
+          for (final toe in const [Offset(-4, -2.5), Offset(0, -4.5), Offset(4, -2.5)]) {
+            canvas.drawCircle(toe, 1.7, paint);
           }
-        }
+        });
       case FramePattern.confetti:
         // Its own bright colours (the pattern colour is often a pale tint of
         // the frame, which wouldn't show), dense enough that the narrow
@@ -400,9 +400,12 @@ class _FramePatternPainter extends CustomPainter {
             ..color = colors[rnd.nextInt(colors.length)]
             ..strokeWidth = 2.2
             ..strokeCap = StrokeCap.round;
+          final turn = rnd.nextDouble() * pi;
+          // Only the strip's own edges matter: under a photo is fine.
+          if (!fits(p, 4)) continue;
           canvas.save();
           canvas.translate(p.dx, p.dy);
-          canvas.rotate(rnd.nextDouble() * pi);
+          canvas.rotate(turn);
           switch (i % 3) {
             case 0:
               canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: 7, height: 3), const Radius.circular(1)), c);
@@ -420,23 +423,23 @@ class _FramePatternPainter extends CustomPainter {
           canvas.drawRect(Rect.fromLTWH(x, 0, 8, size.height), paint);
         }
       case FramePattern.hearts:
-        _grid(canvas, size, 24, (row, col) {
+        _grid(canvas, size, _step, 4.4, fits, (row, col) {
           canvas.rotate((row + col).isEven ? -.25 : .25);
-          canvas.drawPath(_heart(6.5), paint);
+          canvas.drawPath(_heart(3.6), paint);
         });
       case FramePattern.stars:
-        _grid(canvas, size, 24, (row, col) {
+        _grid(canvas, size, _step, 4.4, fits, (row, col) {
           canvas.rotate((row * 3 + col) % 5 * .25);
-          canvas.drawPath(_star(7), paint);
+          canvas.drawPath(_star(4.4), paint);
         });
       case FramePattern.flowers:
         final middle = Paint()..color = const Color(0xFFF5C84C);
-        _grid(canvas, size, 24, (row, col) {
+        _grid(canvas, size, _step, 4.4, fits, (row, col) {
           canvas.rotate((row + col) % 3 * .4);
           for (var k = 0; k < 5; k++) {
-            canvas.drawCircle(Offset.fromDirection(k * 2 * pi / 5, 4), 3.1, paint);
+            canvas.drawCircle(Offset.fromDirection(k * 2 * pi / 5, 2.4), 1.9, paint);
           }
-          canvas.drawCircle(Offset.zero, 2.4, middle);
+          canvas.drawCircle(Offset.zero, 1.5, middle);
         });
       case FramePattern.checker:
         const step = 14.0;
@@ -462,11 +465,22 @@ class _FramePatternPainter extends CustomPainter {
     }
   }
 
-  /// [draw] at every point of a staggered grid [step] apart, the canvas
-  /// moved there (and restored after).
-  static void _grid(Canvas canvas, Size size, double step, void Function(int row, int col) draw) {
-    for (var y = step / 2, row = 0; y < size.height + step; y += step, row++) {
-      for (var x = row.isEven ? step / 2 : step, col = 0; x < size.width + step; x += step, col++) {
+  /// How far in from the strip's edges patterns stop.
+  static const _inset = 3.5;
+
+  /// Motifs sit on a grid that lines up with the strip's bare frame: the
+  /// first column in the middle of the side margin (x 8, then every 23 to
+  /// 192) and rows through the top margin and every gap between the photos
+  /// (y 9, 147, 285, 423, every 23), so each margin gets a row of whole
+  /// motifs and none is cut by an edge.
+  static const _step = 23.0, _origin = Offset(8, 9);
+
+  /// [draw] at every grid point [step] apart where a motif of [reach] fits
+  /// whole inside the strip, the canvas moved there (and restored after).
+  static void _grid(Canvas canvas, Size size, double step, double reach, bool Function(Offset p, double reach) fits, void Function(int row, int col) draw) {
+    for (var y = _origin.dy, row = 0; y <= size.height; y += step, row++) {
+      for (var x = _origin.dx, col = 0; x <= size.width; x += step, col++) {
+        if (!fits(Offset(x, y), reach)) continue;
         canvas.save();
         canvas.translate(x, y);
         draw(row, col);
