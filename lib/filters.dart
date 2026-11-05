@@ -87,10 +87,10 @@ final photoFilters = <PhotoFilter>[
   const PhotoFilter('none', '原圖', Grade.none),
   const PhotoFilter('korean_cream', '韓系奶油', koreanCreamGrade, soften: .18),
   const PhotoFilter('instant_golden', '拍立得暖金', instantGoldenGrade,
-    grain: .40, vignette: .16, soften: .42, halation: .12,
+    grain: .27, vignette: .16, soften: .42, halation: .12,
     halationColor: (1, .66, .32)),
   const PhotoFilter('instant_cool', '拍立得冷閃', instantCoolGrade,
-    grain: .48, vignette: .22, soften: .18, halation: .10,
+    grain: .32, vignette: .22, soften: .18, halation: .10,
     halationColor: (1, .42, .24)),
 ];
 
