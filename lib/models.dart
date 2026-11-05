@@ -17,7 +17,7 @@ const sampleDuo = AssetImage('assets/samples/duo.jpg');
 
 enum CellShape { square, rounded, cloud, wavy }
 
-enum FramePattern { none, dots, paws, confetti, gingham, stripes }
+enum FramePattern { none, dots, paws, confetti, gingham, stripes, hearts, stars, flowers, checker, waves }
 
 /// What sits in the strip's bottom margin.
 enum FooterStyle {
@@ -371,7 +371,10 @@ class CustomTemplate {
       cell: darkTop ? Color.lerp(frame, Colors.white, .15)! : Colors.white,
       captionColor: darkBottom ? Colors.white : ink,
       pattern: pattern,
-      patternColor: darkTop ? Colors.white.withValues(alpha: .35) : Color.lerp(frame, Colors.white, .6)!,
+      // A frame almost white (cream) can't take a whiter pattern: a darker tint.
+      patternColor: darkTop ? Colors.white.withValues(alpha: .35)
+          : frame.computeLuminance() > .8 ? Color.lerp(frame, const Color(0xFFD9BFA8), .55)!
+          : Color.lerp(frame, Colors.white, .6)!,
       cellShape: cellShape, footer: footer, outline: !darkTop,
       decos: [
         for (final s in stickers)

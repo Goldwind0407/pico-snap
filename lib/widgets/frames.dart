@@ -362,6 +362,8 @@ class _FramePatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = color;
+    // Patterns drawn past the edge (a grid's last row) stay on the strip.
+    canvas.clipRect(Offset.zero & size);
     switch (pattern) {
       case FramePattern.none:
         return;
@@ -385,22 +387,31 @@ class _FramePatternPainter extends CustomPainter {
           }
         }
       case FramePattern.confetti:
-        // Fixed seed so the confetti doesn't jump around between builds.
+        // Its own bright colours (the pattern colour is often a pale tint of
+        // the frame, which wouldn't show), dense enough that the narrow
+        // margins between the photos still get plenty. Fixed seed so it
+        // doesn't jump around between builds.
         final rnd = Random(7);
-        final colors = [color, const Color(0xFFF7D77C), const Color(0xFF8EC5E8), const Color(0xFFB9C9AE)];
-        for (var i = 0; i < 70; i++) {
+        const colors = [Color(0xFFF2867B), Color(0xFFF5C84C), Color(0xFF6FB6E3), Color(0xFF7CC9A0), Color(0xFFA88BDD), Colors.white];
+        final n = (size.width * size.height / 150).round();
+        for (var i = 0; i < n; i++) {
           final p = Offset(rnd.nextDouble() * size.width, rnd.nextDouble() * size.height);
           final c = Paint()
-            ..color = colors[i % colors.length]
-            ..strokeWidth = 1.8
-            ..strokeCap = StrokeCap.round
-            ..style = PaintingStyle.stroke;
-          if (i.isEven) {
-            final a = rnd.nextDouble() * pi;
-            canvas.drawArc(Rect.fromCircle(center: p, radius: 3.5), a, 2.2, false, c);
-          } else {
-            canvas.drawCircle(p, 1.6, c..style = PaintingStyle.fill);
+            ..color = colors[rnd.nextInt(colors.length)]
+            ..strokeWidth = 2.2
+            ..strokeCap = StrokeCap.round;
+          canvas.save();
+          canvas.translate(p.dx, p.dy);
+          canvas.rotate(rnd.nextDouble() * pi);
+          switch (i % 3) {
+            case 0:
+              canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: 7, height: 3), const Radius.circular(1)), c);
+            case 1:
+              canvas.drawCircle(Offset.zero, 2.2, c);
+            default:
+              canvas.drawArc(Rect.fromCircle(center: Offset.zero, radius: 4.2), 0, 2.4, false, c..style = PaintingStyle.stroke);
           }
+          canvas.restore();
         }
       case FramePattern.gingham:
         GinghamPainter(Colors.transparent).paint(canvas, size);
@@ -408,7 +419,75 @@ class _FramePatternPainter extends CustomPainter {
         for (var x = 0.0; x < size.width; x += 16) {
           canvas.drawRect(Rect.fromLTWH(x, 0, 8, size.height), paint);
         }
+      case FramePattern.hearts:
+        _grid(canvas, size, 24, (row, col) {
+          canvas.rotate((row + col).isEven ? -.25 : .25);
+          canvas.drawPath(_heart(6.5), paint);
+        });
+      case FramePattern.stars:
+        _grid(canvas, size, 24, (row, col) {
+          canvas.rotate((row * 3 + col) % 5 * .25);
+          canvas.drawPath(_star(7), paint);
+        });
+      case FramePattern.flowers:
+        final middle = Paint()..color = const Color(0xFFF5C84C);
+        _grid(canvas, size, 24, (row, col) {
+          canvas.rotate((row + col) % 3 * .4);
+          for (var k = 0; k < 5; k++) {
+            canvas.drawCircle(Offset.fromDirection(k * 2 * pi / 5, 4), 3.1, paint);
+          }
+          canvas.drawCircle(Offset.zero, 2.4, middle);
+        });
+      case FramePattern.checker:
+        const step = 14.0;
+        for (var y = 0.0, row = 0; y < size.height; y += step, row++) {
+          for (var x = row.isEven ? 0.0 : step; x < size.width; x += step * 2) {
+            canvas.drawRect(Rect.fromLTWH(x, y, step, step), paint);
+          }
+        }
+      case FramePattern.waves:
+        final line = Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3
+          ..strokeCap = StrokeCap.round;
+        for (var y = 8.0; y < size.height + 8; y += 14) {
+          final path = Path()..moveTo(0, y);
+          for (var x = 0.0; x < size.width; x += 16) {
+            path.quadraticBezierTo(x + 4, y - 4, x + 8, y);
+            path.quadraticBezierTo(x + 12, y + 4, x + 16, y);
+          }
+          canvas.drawPath(path, line);
+        }
     }
+  }
+
+  /// [draw] at every point of a staggered grid [step] apart, the canvas
+  /// moved there (and restored after).
+  static void _grid(Canvas canvas, Size size, double step, void Function(int row, int col) draw) {
+    for (var y = step / 2, row = 0; y < size.height + step; y += step, row++) {
+      for (var x = row.isEven ? step / 2 : step, col = 0; x < size.width + step; x += step, col++) {
+        canvas.save();
+        canvas.translate(x, y);
+        draw(row, col);
+        canvas.restore();
+      }
+    }
+  }
+
+  static Path _heart(double r) => Path()
+    ..moveTo(0, r * .9)
+    ..cubicTo(-r * 1.6, -r * .2, -r * .7, -r * 1.3, 0, -r * .45)
+    ..cubicTo(r * .7, -r * 1.3, r * 1.6, -r * .2, 0, r * .9)
+    ..close();
+
+  static Path _star(double r) {
+    final path = Path();
+    for (var k = 0; k < 10; k++) {
+      final p = Offset.fromDirection(-pi / 2 + k * pi / 5, k.isEven ? r : r * .45);
+      k == 0 ? path.moveTo(p.dx, p.dy) : path.lineTo(p.dx, p.dy);
+    }
+    return path..close();
   }
 
   @override

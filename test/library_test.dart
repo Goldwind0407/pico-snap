@@ -108,6 +108,19 @@ void main() {
     expect(visual(c), findsNothing);
   });
 
+  testWidgets('設計模板：每種圖案都列出來、都畫得出來，換了就存進模板', (t) async {
+    await phone(t, const TemplateMakerScreen());
+    await t.tap(find.text('圖案'));
+    await t.pumpAndSettle();
+    for (final label in ['無', '點點', '貓掌', '碎紙花', '條紋', '格紋', '愛心', '星星', '小花', '棋盤格', '波浪']) {
+      await t.tap(find.text(label));
+      await t.pumpAndSettle();
+      expect(t.takeException(), isNull, reason: label);
+    }
+    expect(t.widget<PhotoStrip>(find.byType(PhotoStrip)).template.pattern, FramePattern.waves);
+    expect(_listed(), FramePattern.values.length, reason: '每一種都可以選');
+  });
+
   testWidgets('設計模板：選項會存進模板，模板頁可以刪除', (t) async {
     final sticker = MyLibrary.addSticker(_tinyPng);
     // 從「我的素材」的模板頁進去，儲存後回到那一頁
@@ -217,3 +230,5 @@ void main() {
     expect(old.template.decos.single.size, closeTo(40, .01));
   });
 }
+
+int _listed() => find.descendant(of: find.byType(Wrap), matching: find.byType(GestureDetector)).evaluate().length;

@@ -16,7 +16,9 @@ const _palette = [
 
 const _patterns = [
   (FramePattern.none, '無'), (FramePattern.dots, '點點'), (FramePattern.paws, '貓掌'),
-  (FramePattern.confetti, '碎紙花'), (FramePattern.stripes, '條紋'),
+  (FramePattern.confetti, '碎紙花'), (FramePattern.stripes, '條紋'), (FramePattern.gingham, '格紋'),
+  (FramePattern.hearts, '愛心'), (FramePattern.stars, '星星'), (FramePattern.flowers, '小花'),
+  (FramePattern.checker, '棋盤格'), (FramePattern.waves, '波浪'),
 ];
 
 const _cells = [(CellShape.square, '方形'), (CellShape.rounded, '圓角'), (CellShape.cloud, '雲朵'), (CellShape.wavy, '波浪邊')];
