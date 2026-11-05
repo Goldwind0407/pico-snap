@@ -285,6 +285,26 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     _closePhoto();
   });
 
+  /// 拍立得拼貼: the prints with photos move up in order and the count
+  /// shrinks to them; the blank ones wait beyond it, as when the count is
+  /// turned down.
+  void _dropBlank() => setState(() {
+    _remember();
+    final filled = [for (var i = 0; i < _count; i++) if (_photos[i] != null) i];
+    final order = [...filled, for (var i = 0; i < _cells; i++) if (!filled.contains(i)) i];
+    List<T> moved<T>(List<T> list) => [for (final i in order) list[i]];
+    _photos.setAll(0, moved(_photos));
+    _photoBytes.setAll(0, moved(_photoBytes));
+    _fits.setAll(0, moved(_fits));
+    _aspects.setAll(0, moved(_aspects));
+    _filters.setAll(0, moved(_filters));
+    _films.setRange(0, _cells, moved(_films));
+    _polaroidCaptions.setRange(0, _cells, moved(_polaroidCaptions));
+    _handwriting = moved([for (var i = 0; i < _cells; i++) i < _handwriting.length ? _handwriting[i] : const <Stroke>[]]);
+    _count = filled.length;
+    _selectedCell = min(_selectedCell, _count - 1);
+  });
+
   /// Leave the photo tool for the tool it was opened from.
   void _closePhoto() {
     if (_tool == _Tool.photo) _tool = _backTool ?? _tools.first;
@@ -392,6 +412,21 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     if (_saving) return;
     if (_photos.every((p) => p == null) && _subject == null) {
       return showMessage(context, '先放一張照片再儲存喔');
+    }
+    // A collage with prints still blank: take them away, keep them, or go fill them.
+    final blank = widget.mode == EditorMode.polaroid ? [for (var i = 0; i < _count; i++) if (_photos[i] == null) i] : const <int>[];
+    if (blank.isNotEmpty) {
+      final choice = await showGlassDialog<String>(context, (context) => GlassDialog(
+        title: '還有 ${blank.length} 張沒放照片',
+        message: '空白的拍立得會照樣存進作品裡。要拿掉，變成 ${_count - blank.length} 張嗎？',
+        actions: [
+          GlassAction('去放照片', () => Navigator.pop(context)),
+          GlassAction('留著空白', () => Navigator.pop(context, 'keep')),
+          GlassAction('拿掉空白的', () => Navigator.pop(context, 'trim')),
+        ],
+      ));
+      if (!mounted || choice == null) return;
+      if (choice == 'trim') _dropBlank();
     }
     final canVideo = _recorder.frameCount >= 3;
     final go = await showModalBottomSheet<bool>(

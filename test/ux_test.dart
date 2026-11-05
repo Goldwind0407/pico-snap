@@ -93,6 +93,29 @@ void main() {
     expect(prints(FilmStock.black), findsNWidgets(4));
   });
 
+  testWidgets('拍立得拼貼：還有空白的拍立得時，完成會問；可以拿掉空白的，照片往前補', (t) async {
+    final photo = (await t.runAsync(_photo))!;
+    // Photos in prints 1 and 2 of 4.
+    await _phone(t, EditorScreen(key: UniqueKey(), mode: EditorMode.polaroid, photos: [photo, photo]));
+    Finder prints() => find.byWidgetPredicate((w) => w is InstantPrint && w.caption.isNotEmpty);
+    expect(prints(), findsNWidgets(4));
+    await t.tap(find.text('完成'));
+    await t.pumpAndSettle();
+    expect(find.text('還有 2 張沒放照片'), findsOneWidget);
+    // 去放照片: back to editing, nothing changed.
+    await t.tap(find.text('去放照片'));
+    await t.pumpAndSettle();
+    expect(prints(), findsNWidgets(4));
+    expect(find.text('同時做「製作過程」縮時影片'), findsNothing);
+    await t.tap(find.text('完成'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('拿掉空白的'));
+    await t.pumpAndSettle();
+    expect(prints(), findsNWidgets(2));
+    expect(find.byWidgetPredicate((w) => w is InstantPrint && w.caption.isNotEmpty && w.image != null), findsNWidgets(2));
+    expect(find.text('同時做「製作過程」縮時影片'), findsOneWidget, reason: '接著照常完成');
+  });
+
   testWidgets('拍立得拼貼：張數 1～6、三種排法，每種比例都放得下', (t) async {
     await _phone(t, const EditorScreen(mode: EditorMode.polaroid));
     for (final n in ['1', '2', '3', '4', '5', '6']) {

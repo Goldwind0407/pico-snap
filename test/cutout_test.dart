@@ -155,6 +155,9 @@ void main() {
     Future<void> finish({required bool album}) async {
       await tester.tap(find.text('完成'));
       await tester.pumpAndSettle();
+      // Three prints are still blank: keep them.
+      await tester.tap(find.text('留著空白'));
+      await tester.pumpAndSettle();
       expect(find.text('同時做「製作過程」縮時影片'), findsOneWidget);
       final box = tester.widget<Checkbox>(find.descendant(of: find.ancestor(of: find.text('也存到手機相簿'), matching: find.byType(Row)).first, matching: find.byType(Checkbox)));
       if (box.value != album) await tester.tap(find.text('也存到手機相簿'));
@@ -182,6 +185,8 @@ void main() {
     expect(find.text('完成'), findsOneWidget, reason: '按鈕恢復原狀');
     // 「也存到手機相簿」會記住：關回去，不影響其他測試
     await tester.tap(find.text('完成'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('留著空白'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('也存到手機相簿'));
     await tester.pump();
