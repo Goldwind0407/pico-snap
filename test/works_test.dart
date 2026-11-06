@@ -82,7 +82,7 @@ void main() {
     expect(find.byType(WorkTile), findsNWidgets(2));
     expect(find.text('2 件'), findsOneWidget);
 
-    await t.tap(find.text('貼紙'));
+    await t.tap(find.text('照片貼紙'));
     await t.pumpAndSettle();
     expect(find.byType(WorkTile), findsOneWidget);
 

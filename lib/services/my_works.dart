@@ -14,7 +14,7 @@ import 'file_store.dart';
 enum WorkKind {
   fourCut('四格拍貼'),
   collage('拍立得拼貼'),
-  sticker('貼紙'),
+  sticker('照片貼紙'),
   instant('拍立得');
 
   final String label;

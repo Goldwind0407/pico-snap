@@ -708,7 +708,9 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     }
     // Moving stickers: the video is them moving, not the making of.
     final motion = widget.mode == EditorMode.sticker && _moving;
-    final canVideo = motion || _recorder.frameCount >= 3;
+    // Even a quick piece (photos in, a template) makes a video: a short
+    // one holds each frame longer.
+    final canVideo = motion || _recorder.frameCount >= 1;
     final go = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: Colors.white,

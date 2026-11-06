@@ -58,7 +58,7 @@ const _w = FilmStock.white, _b = FilmStock.black;
 final collageTemplates = [
   CollageTemplate(
     name: '彩虹天空', backdrop: 'rainbow_sky',
-    places: [_at(.34, .3, .46, -.08), _at(.68, .5, .46, .06), _at(.38, .72, .46, -.04)],
+    places: [_at(.32, .25, .44, -.08), _at(.68, .5, .44, .06), _at(.33, .765, .44, -.04)],
     films: [_w, _w, _w], captions: ['sunny day', '彩虹出現了', 'with you ♡'],
     stickers: [_deco('deco:tag:3', .74, .2, 1.1, .15), _deco('deco:note:0', .78, .84, .9, .1)],
     texture: PageTexture.warm, strength: .35,
