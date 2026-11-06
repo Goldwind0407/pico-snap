@@ -3,7 +3,6 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'dart:ui' as ui;
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
@@ -12,10 +11,13 @@ import 'package:image_picker/image_picker.dart';
 
 import 'collage_templates.dart';
 import 'cutout/cutout_page.dart';
+import 'cutout/photo_sticker.dart';
+import 'cutout/sticker_shape.dart';
 import 'filters.dart';
 import 'editor_document.dart';
 import 'gallery_screen.dart';
 import 'services/editor_drafts.dart';
+import 'services/my_library.dart';
 import 'models.dart';
 import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
@@ -36,11 +38,12 @@ enum _Tool {
   template(CupertinoIcons.square_split_1x2, '模板'),
   layout(CupertinoIcons.square_grid_2x2, '版面'),
   backdrop(CupertinoIcons.square_stack_3d_down_right, '背景'),
-  pattern(CupertinoIcons.circle_grid_3x3, '底紋'),
   sticker(CupertinoIcons.smiley, '貼紙'),
   text(CupertinoIcons.textformat, '文字'),
   brush(CupertinoIcons.paintbrush, '畫筆'),
   cutout(CupertinoIcons.scissors, '去背'),
+  /// 照片貼紙: the border, finish and motion of the cut-out stickers.
+  effect(CupertinoIcons.sparkles, '效果'),
   film(CupertinoIcons.film, '底片'),
   filter(CupertinoIcons.color_filter, '濾鏡'),
   /// Adjusting the selected photo; opened by tapping a photo, not a tab.
@@ -128,7 +131,14 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   /// Filter per photo (photos only; frames and stickers aren't filtered).
   late final List<PhotoFilter> _filters = [for (var i = 0; i < _cells; i++) i < widget.filters.length ? widget.filters[i] : photoFilters.first];
   /// Sticker mode: the cut-out subject (PNG with a white die-cut border).
+  /// Pieces from before 照片貼紙 only; it becomes a photo sticker.
   Uint8List? _subject;
+  /// 照片貼紙: the stickers cut out of photos, by sticker id; a cutting line
+  /// around each; no background.
+  Map<String, PhotoSticker> _cutouts = const {};
+  bool _cutLines = false, _clearPage = false;
+  /// Cutting photos out right now: what to say meanwhile.
+  String? _cutting;
   /// While saving: hide hints, selection outlines and sticker handles.
   bool _capturing = false, _saving = false;
   /// What the piece looked like when opened or last saved.
@@ -141,6 +151,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   Object _contentKey() => Object.hashAll([
     Object.hashAll(_photoBytes), Object.hashAll(_fits.map((f) => Object.hash(f.scale, f.align))), Object.hashAll(_films), Object.hashAll([for (final f in _filters) f.id]),
     _template, _format, _pattern, _backdrop, _count, _arrangement, _backdropPattern, Object.hashAll(_places), _backdropBytes, _backdropBlur, _backdropScene, _texture, _textureStrength, _stripCaption, Object.hashAll(_polaroidCaptions), _bubble, _subject,
+    Object.hashAll(_cutouts.entries.map((e) => Object.hash(e.key, e.value))), _cutLines, _clearPage,
     Object.hashAll(_stickers.map((s) => Object.hash(s.sticker, s.center, s.scale, s.rotation, s.flipped))), Object.hashAll(_strokes.map((s) => Object.hash(s.color, s.width, s.style, Object.hashAll(s.points)))), _strokes.isEmpty ? 0 : _strokes.last.points.length,
   ]);
 
@@ -155,7 +166,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   late int _template = widget.template;
   late String _category = allStripTemplates[widget.template].category;
   String? _stripCaption;
-  String _bubble = 'DREAM';
+  late String _bubble = widget.mode == EditorMode.sticker ? '' : 'DREAM';
   int _pattern = 0, _backdrop = 1, _format = 3, _selectedCell = 0;
   List<StickerData> _stickers = [];
   /// Brush lines, drawn over everything.
@@ -187,7 +198,8 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     handwriting: _handwriting, templateKey: EditorDocument.keyForTemplate(_template),
     format: _format, pattern: _pattern, backdrop: _backdrop, bubble: _bubble,
     stripCaption: _stripCaption, subject: _subject, count: _count, arrangement: _arrangement, backdropPattern: _backdropPattern, places: _places,
-    backdropPhoto: _backdropBytes, backdropBlur: _backdropBlur, backdropScene: _backdropScene, texture: _texture, textureStrength: _textureStrength);
+    backdropPhoto: _backdropBytes, backdropBlur: _backdropBlur, backdropScene: _backdropScene, texture: _texture, textureStrength: _textureStrength,
+    cutouts: _cutouts, cutLines: _cutLines, clearPage: _clearPage);
 
   void _restore(EditorDocument d) {
     _photoBytes.setAll(0, d.photos);
@@ -208,6 +220,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     _backdropBlur = d.backdropBlur; _backdropScene = d.backdropScene; _texture = d.texture; _textureStrength = d.textureStrength;
     if (widget.mode == EditorMode.polaroid) _selectedCell = min(_selectedCell, _count - 1);
     _bubble = d.bubble; _stripCaption = d.stripCaption; _subject = d.subject;
+    _cutouts = Map.of(d.cutouts); _cutLines = d.cutLines; _clearPage = d.clearPage;
     _selectedSticker = null; _textCtrl.text = _text;
     for (var i = 0; i < _cells; i++) { _aspects[i] = null; _measure(i); }
     _inkTick.value++;
@@ -234,13 +247,13 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   List<_Tool> get _tools => switch (widget.mode) {
     EditorMode.fourCut => const [_Tool.template, _Tool.sticker, _Tool.text, _Tool.brush, _Tool.filter],
     EditorMode.polaroid => const [_Tool.template, _Tool.layout, _Tool.backdrop, _Tool.film, _Tool.sticker, _Tool.text, _Tool.brush, _Tool.filter],
-    EditorMode.sticker => const [_Tool.sticker, _Tool.pattern, _Tool.text, _Tool.brush, _Tool.cutout],
+    EditorMode.sticker => const [_Tool.cutout, _Tool.effect, _Tool.backdrop, _Tool.sticker, _Tool.text, _Tool.brush],
   };
 
   String get _title => switch (widget.mode) {
     EditorMode.fourCut => '四格拍貼',
     EditorMode.polaroid => '拍立得拼貼',
-    EditorMode.sticker => '貼紙裝飾',
+    EditorMode.sticker => '照片貼紙',
   };
 
   double get _aspect => switch (widget.mode) {
@@ -268,6 +281,11 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // A new photo-sticker page starts pink gingham, like sticker paper.
+    if (widget.mode == EditorMode.sticker) {
+      _backdropPattern = BackdropPattern.gingham;
+      _backdrop = backdrops.indexWhere((b) => b.$1 == 'Pink');
+    }
     for (var i = 0; i < widget.photos.length && i < _cells; i++) {
       _photoBytes[i] = widget.photos[i];
       _photos[i] = photoImage(widget.photos[i]);
@@ -277,11 +295,32 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       _polaroidCaptions[i] = widget.captions[i];
     }
     if (widget.draft case final draft?) _restore(draft);
+    if (widget.mode == EditorMode.sticker) _upgradeStickerPiece();
     _savedKey = widget.draft == null || widget.saved ? _contentKey() : null;
+  }
+
+  /// A sticker piece from before 照片貼紙: its cut-out (or photo) becomes a
+  /// photo sticker, its speech bubble words.
+  void _upgradeStickerPiece() {
+    final old = _subject ?? _photoBytes[0];
+    if (_cutouts.isEmpty && old != null) {
+      final id = PhotoStickers.newId();
+      // A cut-out from then has its white border already.
+      _cutouts = {id: PhotoSticker(cut: old, source: _photoBytes[0], edge: _subject != null ? StickerEdge.none : StickerEdge.thick)};
+      _stickers = [StickerData(sticker: id, center: const Offset(.5, .54), scale: 3.6), ..._stickers];
+    }
+    _subject = null;
+    _photoBytes[0] = null;
+    _photos[0] = null;
+    if (_bubble.isNotEmpty) {
+      _stickers = [..._stickers, StickerData(sticker: TypedWords(_bubble).id, center: const Offset(.72, .12), scale: 1.6, rotation: .06)];
+      _bubble = '';
+    }
   }
 
   @override
   void dispose() {
+    if (widget.mode == EditorMode.sticker) PhotoStickers.sync(const {}, cutLines: false);
     WidgetsBinding.instance.removeObserver(this);
     _draftTimer?.cancel();
     unawaited(_writeDraft().whenComplete(() => EditorDrafts.release(_draftId)));
@@ -438,17 +477,157 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     _measure(i);
   }
 
-  /// Sticker mode: cut the subject out of the photo.
-  Future<void> _cutSubject() async {
-    final bytes = _photoBytes[0];
-    if (bytes == null) return _pickPhoto(0);
-    final png = await CutoutPage.open(context, bytes, recorder: _recorder);
-    if (png != null && mounted) {
-      setState(() {
-        _remember();
-        _subject = png;
-      });
+  /// 照片貼紙: pick photos; everyone in them is cut out by itself and put
+  /// on the page as a sticker.
+  Future<void> _addCutPhotos() async {
+    if (_cutting != null) return;
+    final files = await _picker.pickMultiImage(imageQuality: 95, limit: 6);
+    if (files.isEmpty || !mounted) return;
+    setState(() => _cutting = '去背中…');
+    final made = <(Uint8List, Uint8List)>[];
+    try {
+      final photos = await Future.wait([for (final f in files) f.readAsBytes()]);
+      for (final (k, photo) in photos.indexed) {
+        if (!mounted) return;
+        if (photos.length > 1) setState(() => _cutting = '去背中… ${k + 1}/${photos.length}');
+        for (final cut in await autoCutouts(photo)) {
+          made.add((cut, photo));
+        }
+      }
+    } catch (e) {
+      debugPrint('[STICKER] 去背失敗: $e');
     }
+    if (!mounted) return;
+    if (made.isEmpty) {
+      setState(() => _cutting = null);
+      return showMessage(context, '這次沒有剪出來，換一張照片試試', error: true);
+    }
+    setState(() {
+      _cutting = null;
+      _remember();
+      final n = made.length;
+      final cols = n == 1 ? 1 : n <= 4 ? 2 : 3;
+      final rows = (n / cols).ceil();
+      final scale = min(3.6, (1 / cols) * .95 / .2);
+      final cutouts = Map.of(_cutouts);
+      final added = <StickerData>[];
+      for (final (k, (cut, photo)) in made.indexed) {
+        final id = PhotoStickers.newId();
+        cutouts[id] = PhotoSticker(cut: cut, source: photo);
+        final col = k % cols, row = k ~/ cols;
+        added.add(StickerData(
+          sticker: id, scale: scale, rotation: n == 1 ? 0 : (k.isEven ? -.06 : .06),
+          center: Offset((col + .5) / cols, .08 + .84 * (row + .5) / rows),
+        ));
+      }
+      _cutouts = cutouts;
+      _stickers = [..._stickers, ...added];
+      _selectedSticker = null;
+      if (_tool == _Tool.cutout) _tool = _Tool.effect;
+    });
+  }
+
+  /// The photo sticker selected, if one is.
+  String? get _selectedCut {
+    final i = _selectedSticker;
+    if (i == null || i >= _stickers.length) return null;
+    final id = _stickers[i].sticker;
+    return _cutouts.containsKey(id) ? id : null;
+  }
+
+  /// Fix the selected sticker's edge by hand, on the photo it came from.
+  Future<void> _fixEdge() async {
+    final id = _selectedCut;
+    final source = id == null ? null : _cutouts[id]?.source;
+    if (id == null || source == null) return showMessage(context, '先點一張剪好的貼紙');
+    final png = await CutoutPage.open(context, source, recorder: _recorder, raw: true);
+    if (png == null || !mounted || !_cutouts.containsKey(id)) return;
+    setState(() {
+      _remember();
+      _cutouts = {..._cutouts, id: _cutouts[id]!.copyWith(cut: png)};
+    });
+  }
+
+  /// Change the selected photo sticker's look, or every one's.
+  void _styleCuts(PhotoSticker Function(PhotoSticker) change) => setState(() {
+    _remember();
+    final only = _selectedCut;
+    _cutouts = {
+      for (final MapEntry(key: id, value: c) in _cutouts.entries) id: only == null || only == id ? change(c) : c,
+    };
+  });
+
+  /// A sticker sheet to print: white paper, everything in rows with room to
+  /// cut around, cutting lines on.
+  void _arrangeSheet() => setState(() {
+    _remember();
+    _clearPage = false;
+    _backdropPattern = BackdropPattern.plain;
+    _backdrop = 0;
+    _cutLines = true;
+    _selectedSticker = null;
+    final n = _stickers.length;
+    if (n == 0) return;
+    final cols = n == 1 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4;
+    final rows = (n / cols).ceil();
+    final cell = min(1 / cols, 1 / rows / _aspect);
+    final scale = cell * .84 / .2;
+    _stickers = [
+      for (final (k, st) in _stickers.indexed)
+        st.copyWith(center: Offset((k % cols + .5) / cols, (k ~/ cols + .5) / rows), scale: scale, rotation: 0),
+    ];
+  });
+
+  /// The selected sticker (or every one) into the sticker book's 我的;
+  /// what happened, to tell.
+  Future<String> _keepCuts({String? only}) async {
+    final ids = only != null ? [only] : [for (final s in _stickers) if (_cutouts.containsKey(s.sticker)) s.sticker];
+    var kept = 0;
+    for (final id in ids.toSet()) {
+      final png = await PhotoStickers.png(id);
+      if (png == null) continue;
+      MyLibrary.addSticker(png);
+      kept++;
+    }
+    return kept == 0 ? '沒有可以收的貼紙' : '$kept 張收進貼紙本的「我的」了 ♡';
+  }
+
+  /// The selected sticker (or every one) to the album as a picture with a
+  /// transparent background, for chat apps; what happened, and whether it
+  /// went wrong.
+  Future<(String, bool)> _exportCuts({String? only}) async {
+    final ids = only != null ? [only] : [for (final s in _stickers) if (_cutouts.containsKey(s.sticker)) s.sticker];
+    String? error;
+    var saved = 0;
+    for (final id in ids.toSet()) {
+      final png = await PhotoStickers.png(id);
+      if (png == null) continue;
+      error = await PhotoSaveService.saveBytes(png);
+      if (error != null) break;
+      saved++;
+    }
+    return (error ?? (saved == 0 ? '沒有可以存的貼紙' : '$saved 張透明貼圖存到相簿了'), error != null);
+  }
+
+  /// Some photo sticker moves: 完成 can make a video of them.
+  bool get _moving => _stickers.any((s) => (_cutouts[s.sticker]?.motion ?? StickerMotion.none) != StickerMotion.none);
+
+  /// The page with its stickers moving, two seconds looped: a video file
+  /// and the recorder holding it (to dispose once it is copied).
+  Future<(String?, TimelapseRecorder)> _motionVideo() async {
+    final rec = TimelapseRecorder(subtitle: 'my photo stickers ♡');
+    const frames = 20;
+    for (var k = 0; k < frames; k++) {
+      PhotoStickers.clock.value = k / frames;
+      await WidgetsBinding.instance.endOfFrame;
+      final shot = await _snapshot();
+      if (shot != null) await rec.add(shot);
+    }
+    rec.loop(3);
+    PhotoStickers.clock.value = 0;
+    await WidgetsBinding.instance.endOfFrame;
+    final still = await _snapshot();
+    return (still == null ? null : await rec.render(still), rec);
   }
 
   /// One timelapse frame: the canvas as it looks now (handles and all).
@@ -472,10 +651,13 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     }
   }
 
+  /// Nothing to show yet: photos (or photo stickers) come first.
+  bool get _blank => widget.mode == EditorMode.sticker ? _cutouts.isEmpty && _stickers.isEmpty : _photos.every((p) => p == null);
+
   /// Ask whether to save the timelapse too, then save.
   Future<void> _askSave() async {
     if (_saving) return;
-    if (_photos.every((p) => p == null) && _subject == null) {
+    if (_blank) {
       return showMessage(context, '先放一張照片再儲存喔');
     }
     // A collage with prints still blank: take them away, keep them, or go fill them.
@@ -493,7 +675,9 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       if (!mounted || choice == null) return;
       if (choice == 'trim') _dropBlank();
     }
-    final canVideo = _recorder.frameCount >= 3;
+    // Moving stickers: the video is them moving, not the making of.
+    final motion = widget.mode == EditorMode.sticker && _moving;
+    final canVideo = motion || _recorder.frameCount >= 3;
     final go = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: Colors.white,
@@ -517,9 +701,9 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                 Icon(CupertinoIcons.film, color: canVideo ? coral : muted),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('同時做「製作過程」縮時影片', style: TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)),
+                  Text(motion ? '同時做「動態貼紙」影片' : '同時做「製作過程」縮時影片', style: const TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 2),
-                  Text(canVideo ? '你放照片、去背、貼貼紙的過程，約 ${_recorder.seconds} 秒，適合發 Reels、TikTok' : '多編輯一下就能做成影片',
+                  Text(motion ? '會動的貼紙錄成約 7 秒的影片，適合發限動、Reels' : canVideo ? '你放照片、去背、貼貼紙的過程，約 ${_recorder.seconds} 秒，適合發 Reels、TikTok' : '多編輯一下就能做成影片',
                     style: const TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
                 ])),
                 Checkbox(value: canVideo && _withVideo, activeColor: coral, onChanged: canVideo ? (v) => setSheet(() => _withVideo = v ?? false) : null),
@@ -555,22 +739,26 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
         ]),
       ))),
     );
-    if (go == true && mounted) await _save(video: canVideo && _withVideo, album: _toAlbum);
+    if (go == true && mounted) await _save(video: canVideo && _withVideo, album: _toAlbum, motion: motion);
   }
 
   /// Into the gallery, and the phone's album too if [album].
-  Future<void> _save({bool video = false, bool album = false}) async {
+  Future<void> _save({bool video = false, bool album = false, bool motion = false}) async {
     if (_saving) return;
     setState(() {
       _saving = true;
       _capturing = true;
       _selectedSticker = null;
     });
+    // Photo stickers still and drawn in their latest look.
+    PhotoStickers.clock.value = 0;
+    await PhotoStickers.settle();
     // Let the frame without hints and handles paint before capturing it.
     await WidgetsBinding.instance.endOfFrame;
     final piece = _document();
     MyWorks.lastAdded = null;
-    var error = await PhotoSaveService.saveBoundary(_shotKey, album: album, keep: switch (widget.mode) {
+    final clear = widget.mode == EditorMode.sticker && _clearPage;
+    var error = await PhotoSaveService.saveBoundary(_shotKey, album: album, background: clear ? const Color(0x00000000) : const Color(0xFFFFFFFF), keep: switch (widget.mode) {
       EditorMode.fourCut => WorkKind.fourCut,
       EditorMode.polaroid => WorkKind.collage,
       EditorMode.sticker => WorkKind.sticker,
@@ -579,7 +767,17 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     // The gallery keeps the piece, to open it again.
     final kept = error == null ? MyWorks.lastAdded : null;
     if (kept != null) await MyWorks.keepPiece(kept, piece);
-    if (error == null && video) {
+    if (error == null && video && motion) {
+      final (path, rec) = await _motionVideo();
+      if (path == null) {
+        error = '圖片已收好，但動態影片做不出來';
+      } else {
+        if (kept != null) await MyWorks.keepVideo(kept, path);
+        if (album) error = await PhotoSaveService.saveVideo(path);
+      }
+      rec.dispose();
+      if (mounted) setState(() => _capturing = false);
+    } else if (error == null && video) {
       // The clean finished piece ends the video.
       final finished = await _snapshot();
       if (mounted) setState(() => _capturing = false);
@@ -591,6 +789,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
         if (album) error = await PhotoSaveService.saveVideo(path);
       }
     }
+    PhotoStickers.clock.value = null;
     if (error == null) {
       _exported = true;
       _draftTimer?.cancel();
@@ -625,6 +824,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   /// After 完成: the piece as it went into the gallery, and what next.
   Future<void> _showDone(Work work, {required bool album}) async {
     var inAlbum = album, busy = false;
+    String? exported, keptCuts;
     final next = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.white,
@@ -673,6 +873,38 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
               ),
             )),
           ]),
+          if (widget.mode == EditorMode.sticker && _cutouts.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(child: OutlinedButton.icon(
+                onPressed: exported != null ? null : () async {
+                  final (said, failed) = await _exportCuts();
+                  if (!context.mounted) return;
+                  if (failed) return showMessage(context, said, error: true);
+                  setSheet(() => exported = said);
+                },
+                icon: Icon(exported != null ? CupertinoIcons.checkmark_alt : CupertinoIcons.chat_bubble_2, size: 18),
+                label: FittedBox(child: Text(exported ?? '貼紙存成透明貼圖', style: const TextStyle(fontWeight: FontWeight.w800))),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: ink, side: const BorderSide(color: line, width: 1.3), padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              )),
+              const SizedBox(width: 10),
+              Expanded(child: OutlinedButton.icon(
+                onPressed: keptCuts != null ? null : () async {
+                  final said = await _keepCuts();
+                  if (context.mounted) setSheet(() => keptCuts = said);
+                },
+                icon: Icon(keptCuts != null ? CupertinoIcons.checkmark_alt : CupertinoIcons.book, size: 18),
+                label: FittedBox(child: Text(keptCuts != null ? '已收進我的貼紙' : '收進我的貼紙', style: const TextStyle(fontWeight: FontWeight.w800))),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: ink, side: const BorderSide(color: line, width: 1.3), padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              )),
+            ]),
+          ],
           const SizedBox(height: 4),
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             TextButton(onPressed: () => Navigator.pop(context), style: TextButton.styleFrom(foregroundColor: muted),
@@ -717,7 +949,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   bool get _showCaption => !_capturing && _tool == _Tool.text && widget.mode == EditorMode.polaroid && !_wordSticker;
 
   /// The template prints its own words: typed text goes on as a sticker.
-  bool get _printedText => widget.mode == EditorMode.fourCut && allStripTemplates[_template].art != null;
+  bool get _printedText => widget.mode == EditorMode.sticker || (widget.mode == EditorMode.fourCut && allStripTemplates[_template].art != null);
 
   void _addText(String text) {
     text = text.trim();
@@ -812,6 +1044,12 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
+    if (widget.mode == EditorMode.sticker) {
+      final cutouts = _cutouts, lines = _cutLines;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) PhotoStickers.sync(cutouts, cutLines: lines);
+      });
+    }
     // Record the piece for the timelapse when it changed, not on every
     // rebuild (picking a tool, selecting a sticker).
     final key = _contentKey();
@@ -876,18 +1114,29 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
         // A blank collage or sticker piece leaves room under it for the
         // 選照片 button (it would hide a photo); the four-cut strip's bottom
         // is only its caption, and the strip is narrow enough already.
-        Positioned.fill(child: Padding(padding: EdgeInsets.fromLTRB(28, 12, 28, widget.mode != EditorMode.fourCut && !_capturing && _photos.every((p) => p == null) ? 84 : 16), child: _canvas())),
+        Positioned.fill(child: Padding(padding: EdgeInsets.fromLTRB(28, 12, 28, widget.mode != EditorMode.fourCut && !_capturing && _blank ? 84 : 16), child: _canvas())),
         // A blank piece: photos first, then decorating.
-        if (!_capturing && _photos.every((p) => p == null))
+        if (!_capturing && _blank && _cutting == null)
           Positioned(left: 0, right: 0, bottom: 28, child: Center(child: FilledButton.icon(
-            onPressed: _pickMany,
+            onPressed: widget.mode == EditorMode.sticker ? _addCutPhotos : _pickMany,
             icon: const Icon(CupertinoIcons.photo_on_rectangle, size: 20),
-            label: Text(widget.mode == EditorMode.polaroid ? '選照片（1～6 張）' : _slots > 1 ? '選照片（一次可以選 $_slots 張）' : '先選一張照片', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+            label: Text(widget.mode == EditorMode.sticker ? '選照片，自動剪成貼紙' : widget.mode == EditorMode.polaroid ? '選照片（1～6 張）' : _slots > 1 ? '選照片（一次可以選 $_slots 張）' : '先選一張照片', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
             style: FilledButton.styleFrom(
               backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
               shape: const StadiumBorder(), elevation: 3, shadowColor: ink.withValues(alpha: .3),
             ),
           ))),
+        if (_cutting case final message?)
+          Positioned.fill(child: ColoredBox(color: cream.withValues(alpha: .55), child: Center(child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: line),
+              boxShadow: [BoxShadow(color: ink.withValues(alpha: .1), blurRadius: 12, offset: const Offset(0, 4))]),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2.4, color: coral)),
+              const SizedBox(width: 12),
+              Text(message, style: const TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)),
+            ]),
+          )))),
       ]);
 
   Widget _topBar() => Padding(
@@ -933,7 +1182,10 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
             }),
             onDelete: () => setState(() {
               _remember();
-              _stickers.removeAt(i);
+              final gone = _stickers.removeAt(i).sticker;
+              if (_cutouts.containsKey(gone) && !_stickers.any((s) => s.sticker == gone)) {
+                _cutouts = {..._cutouts}..remove(gone);
+              }
               _selectedSticker = null;
             }),
           ),
@@ -1023,39 +1275,11 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     );
   }
 
-  Widget _stickerArtwork() => CustomPaint(
-    painter: GinghamPainter(ginghamPatterns[_pattern].base, ginghamPatterns[_pattern].right),
-    child: Stack(children: [
-      if (_subject != null)
-        // The cut-out subject, with a soft shadow under its white border.
-        Positioned.fill(child: FractionallySizedBox(widthFactor: .88, heightFactor: .84, alignment: const Alignment(0, .3), child: GestureDetector(
-          onTap: () => setState(() => _tool = _Tool.cutout),
-          child: Stack(fit: StackFit.expand, children: [
-            Transform.translate(offset: const Offset(0, 4), child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: ColorFiltered(colorFilter: const ColorFilter.mode(Color(0x40000000), BlendMode.srcIn), child: Image.memory(_subject!, fit: BoxFit.contain, gaplessPlayback: true)),
-            )),
-            Image.memory(_subject!, fit: BoxFit.contain, gaplessPlayback: true),
-          ]),
-        )))
-      else ...[
-        // White die-cut border behind the photo.
-        Positioned.fill(child: FractionallySizedBox(widthFactor: .84, heightFactor: .78, child: PhysicalShape(
-          clipper: const BlobClipper(phase: 1.3), color: Colors.white, elevation: 5, shadowColor: ink.withValues(alpha: .5),
-          child: const SizedBox.expand(),
-        ))),
-        Positioned.fill(child: FractionallySizedBox(widthFactor: .76, heightFactor: .70, child: ClipPath(
-          clipper: const BlobClipper(phase: 1.3),
-          child: PhotoSlot(
-            image: _photos[0], color: const Color(0xFFFFF6F2), outlineWidth: 0, placeholder: _capturing ? null : const AddPhotoHint(scale: 1.3), onTap: () => _tapCell(0),
-            fit: _fits[0], aspect: _aspects[0], onFit: _adjusting == 0 ? (f) => _setFit(0, f) : null,
-          ),
-        ))),
-      ],
-      if (_bubble.isNotEmpty)
-        Positioned(right: 14, top: 14, child: Transform.rotate(angle: .06, child: SpeechBubble(_bubble))),
-    ]),
-  );
+  /// 照片貼紙's page: the background, or (clear) a checkerboard on screen
+  /// and nothing in the saved picture.
+  Widget _stickerArtwork() => _clearPage
+    ? (_capturing ? const SizedBox.expand() : const CustomPaint(painter: _ClearPainter(), child: SizedBox.expand()))
+    : Backdrop(color: backdrops[_backdrop].$2, pattern: _backdropPattern, photo: _backdropPhoto, blur: _backdropBlur, child: const SizedBox.expand());
 
   /// The tools: under the piece, or beside it ([side]) on a wide screen,
   /// where each tool gets the full height.
@@ -1077,7 +1301,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       SizedBox(
         height: _tool == _Tool.sticker ? max(168.0, MediaQuery.sizeOf(context).height * (widget.mode == EditorMode.fourCut ? .3 : .36))
             // The collage's tools are all one height: the page doesn't jump between them.
-            : widget.mode == EditorMode.polaroid ? 216
+            : widget.mode != EditorMode.fourCut ? 216
             : _tool == _Tool.text ? (_printedText ? 168 : 206) : 168,
         child: _toolView(),
       ),
@@ -1101,9 +1325,9 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     _Tool.template => widget.mode == EditorMode.polaroid ? _collageTemplateTool() : _templateTool(),
     _Tool.layout => _layoutTool(),
     _Tool.backdrop => _backdropTool(),
-    _Tool.pattern => _patternTool(),
     _Tool.sticker => _stickerTool(),
-    _Tool.cutout => _cutoutTool(),
+    _Tool.cutout => _cutTool(),
+    _Tool.effect => _effectTool(),
     _Tool.photo => _photoTool(),
     _Tool.film => _filmTool(),
     _Tool.filter => _filterTool(),
@@ -1234,6 +1458,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   ImageProvider? get _backdropPhoto {
     if (_backdropImage case final image?) return image;
     if (sceneBackdrop(_backdropScene) case final scene?) return AssetImage(scene.asset);
+    if (widget.mode == EditorMode.sticker) return _firstSource;
     return _photos.take(_count).nonNulls.firstOrNull;
   }
 
@@ -1248,6 +1473,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       _backdropImage = photoImage(bytes);
       _backdropScene = null;
       _backdropPattern = BackdropPattern.photo;
+      _clearPage = false;
     });
   }
 
@@ -1258,15 +1484,33 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       SizedBox(height: 112, child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 4),
-        itemCount: BackdropPattern.values.length + sceneBackdrops.length,
+        itemCount: BackdropPattern.values.length + sceneBackdrops.length + (widget.mode == EditorMode.sticker ? 1 : 0),
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (_, i) {
+          if (widget.mode == EditorMode.sticker) {
+            if (i == 0) {
+              return GestureDetector(
+                onTap: () => setState(() { _remember(); _clearPage = true; }),
+                child: Column(children: [
+                  Container(
+                    width: 60, height: 66, padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: _clearPage ? coral : line, width: _clearPage ? 2.5 : 1.3)),
+                    child: ClipRRect(borderRadius: BorderRadius.circular(11), child: const CustomPaint(painter: _ClearPainter(cell: 7), child: SizedBox.expand())),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('透明', style: TextStyle(fontSize: 11, color: _clearPage ? ink : muted, fontWeight: _clearPage ? FontWeight.w900 : FontWeight.w700)),
+                ]),
+              );
+            }
+            i--;
+          }
           if (i >= BackdropPattern.values.length) {
             final scene = sceneBackdrops[i - BackdropPattern.values.length];
-            final selected = _backdropPattern == BackdropPattern.photo && _backdropScene == scene.id && _backdropBytes == null;
+            final selected = !_clearPage && _backdropPattern == BackdropPattern.photo && _backdropScene == scene.id && _backdropBytes == null;
             return GestureDetector(
               onTap: () => setState(() {
                 _remember();
+                _clearPage = false;
                 _backdropPattern = BackdropPattern.photo;
                 _backdropScene = scene.id;
                 _backdropBytes = null; _backdropImage = null;
@@ -1285,10 +1529,11 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
           }
           final p = BackdropPattern.values[i];
           // 照片 is the user's own photo; a scene shows as its own item.
-          final selected = _backdropPattern == p && (p != BackdropPattern.photo || _backdropScene == null || _backdropBytes != null);
+          final selected = !_clearPage && _backdropPattern == p && (p != BackdropPattern.photo || _backdropScene == null || _backdropBytes != null);
           return GestureDetector(
             onTap: () => setState(() {
               _remember();
+              _clearPage = false;
               _backdropPattern = p;
               if (p == BackdropPattern.photo) _backdropScene = null;
             }),
@@ -1310,7 +1555,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
           );
         },
       )),
-      if (_backdropPattern == BackdropPattern.photo)
+      if (_backdropPattern == BackdropPattern.photo && !_clearPage)
         Padding(
           padding: const EdgeInsets.fromLTRB(18, 6, 18, 0),
           child: Row(children: [
@@ -1329,14 +1574,14 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
           ]),
         ),
       // The colour tints a blurred photo; a sharp one is shown as it is.
-      if (_backdropPattern != BackdropPattern.photo || _backdropBlur)
+      if (!_clearPage && (_backdropPattern != BackdropPattern.photo || _backdropBlur))
       Expanded(child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
         itemCount: backdrops.length,
         separatorBuilder: (_, __) => const SizedBox(width: 4),
         itemBuilder: (_, i) => GestureDetector(
-          onTap: () => setState(() { _remember(); _backdrop = i; }),
+          onTap: () => setState(() { _remember(); _backdrop = i; _clearPage = false; }),
           child: Container(
             width: 40, height: 40, padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: _backdrop == i ? outline.withValues(alpha: .6) : Colors.transparent, width: 2)),
@@ -1394,32 +1639,6 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       )),
     ]);
   }
-
-  Widget _patternTool() => ListView.separated(
-    scrollDirection: Axis.horizontal,
-    padding: const EdgeInsets.fromLTRB(22, 30, 22, 10),
-    itemCount: ginghamPatterns.length,
-    separatorBuilder: (_, __) => const SizedBox(width: 18),
-    itemBuilder: (_, i) {
-      final p = ginghamPatterns[i];
-      final selected = _pattern == i;
-      return GestureDetector(
-        onTap: () => setState(() { _remember(); _pattern = i; }),
-        child: Column(children: [
-          Container(
-            width: 56, height: 56,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: selected ? coral : outline.withValues(alpha: .4), width: selected ? 3 : 1.2),
-            ),
-            child: ClipRRect(borderRadius: BorderRadius.circular(13), child: CustomPaint(painter: GinghamPainter(p.base, p.right))),
-          ),
-          const SizedBox(height: 8),
-          Text(p.name, style: hand(18, color: selected ? ink : muted)),
-        ]),
-      );
-    },
-  );
 
   Widget _stickerTool() => StickerBookView(onPick: _addSticker, used: {for (final s in _stickers) s.sticker});
 
@@ -1596,45 +1815,149 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     );
   }
 
-  Widget _cutoutTool() {
-    final hasPhoto = _photoBytes[0] != null;
+  /// The photo the first photo sticker was cut from, as a background.
+  ImageProvider? get _firstSource {
+    final bytes = _cutouts.values.map((c) => c.source).nonNulls.firstOrNull;
+    if (bytes == null) return null;
+    if (!identical(bytes, _firstSourceBytes)) {
+      _firstSourceBytes = bytes;
+      _firstSourceImage = photoImage(bytes);
+    }
+    return _firstSourceImage;
+  }
+  Uint8List? _firstSourceBytes;
+  ImageProvider? _firstSourceImage;
+
+  /// 照片貼紙's 去背: more photos, fixing an edge, a sheet to print.
+  Widget _cutTool() {
+    final selected = _selectedCut;
+    final canFix = selected != null && _cutouts[selected]?.source != null;
+    ButtonStyle outlined() => OutlinedButton.styleFrom(
+      foregroundColor: ink, side: const BorderSide(color: line, width: 1.3), padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('去背', style: TextStyle(fontSize: 17, color: ink, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 4),
-        Text(
-          hasPhoto
-            ? '先用手機內建 AI 去背，認不出來會改用手動去背；也可以自己換方法、用筆刷修邊。'
-            : '先放一張照片，再把人或東西去背，做成貼紙。',
-          style: TextStyle(fontSize: 12, height: 1.4, color: muted.withValues(alpha: .95), fontWeight: FontWeight.w600),
-        ),
-        const Spacer(),
         Row(children: [
           Expanded(child: FilledButton.icon(
-            onPressed: _cutSubject,
-            icon: Icon(hasPhoto ? CupertinoIcons.scissors : CupertinoIcons.photo, size: 18),
-            label: Text(!hasPhoto ? '選照片' : _subject == null ? '開始去背' : '重新去背', style: const TextStyle(fontWeight: FontWeight.w800)),
+            onPressed: _cutting == null ? _addCutPhotos : null,
+            icon: const Icon(CupertinoIcons.photo_on_rectangle, size: 18),
+            label: const FittedBox(child: Text('加照片，自動去背', style: TextStyle(fontWeight: FontWeight.w800))),
             style: FilledButton.styleFrom(
-              backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 13),
+              backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
           )),
-          if (_subject != null) ...[
-            const SizedBox(width: 10),
-            Expanded(child: OutlinedButton.icon(
-              onPressed: () => setState(() { _remember(); _subject = null; }),
-              icon: const Icon(CupertinoIcons.photo, size: 18),
-              label: const Text('還原照片', style: TextStyle(fontWeight: FontWeight.w800)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: ink, side: const BorderSide(color: line, width: 1.3), padding: const EdgeInsets.symmetric(vertical: 13),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-            )),
-          ],
+          const SizedBox(width: 10),
+          Expanded(child: OutlinedButton.icon(
+            onPressed: canFix ? _fixEdge : null,
+            icon: const Icon(CupertinoIcons.scissors, size: 18),
+            label: const FittedBox(child: Text('修這張的邊', style: TextStyle(fontWeight: FontWeight.w800))),
+            style: outlined(),
+          )),
         ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: OutlinedButton.icon(
+            onPressed: _stickers.isEmpty ? null : _arrangeSheet,
+            icon: const Icon(CupertinoIcons.square_grid_2x2, size: 18),
+            label: const FittedBox(child: Text('排成貼紙單', style: TextStyle(fontWeight: FontWeight.w800))),
+            style: outlined(),
+          )),
+          const SizedBox(width: 10),
+          Expanded(child: GestureDetector(
+            onTap: () => setState(() { _remember(); _cutLines = !_cutLines; }),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 2, 2, 2),
+              decoration: BoxDecoration(color: _cutLines ? blush : cream, borderRadius: BorderRadius.circular(14), border: Border.all(color: _cutLines ? blushLine : line, width: 1.3)),
+              child: Row(children: [
+                const Expanded(child: FittedBox(alignment: Alignment.centerLeft, fit: BoxFit.scaleDown, child: Text('裁切線', style: TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)))),
+                Switch(value: _cutLines, activeTrackColor: coral, onChanged: (v) => setState(() { _remember(); _cutLines = v; })),
+              ]),
+            ),
+          )),
+        ]),
+        const Spacer(),
+        Text(
+          selected != null ? '點「修這張的邊」可以擦掉多的、補回少的。'
+            : _cutouts.isEmpty ? '選好照片，裡面的人、寵物、東西會自動剪下來，一個一個變成貼紙。'
+            : '點一張貼紙可以修邊；排成貼紙單加上裁切線，印出來就能剪。',
+          style: TextStyle(fontSize: 12, height: 1.4, color: muted.withValues(alpha: .95), fontWeight: FontWeight.w600),
+        ),
       ]),
     );
+  }
+
+  /// 照片貼紙's 效果: border, finish and motion of the selected sticker (or
+  /// every one), and taking it out of the piece.
+  Widget _effectTool() {
+    final only = _selectedCut;
+    final current = only != null ? _cutouts[only] : _stickers.map((s) => _cutouts[s.sticker]).nonNulls.firstOrNull;
+    if (current == null) {
+      return const Center(child: Padding(
+        padding: EdgeInsets.all(24),
+        child: Text('先在「去背」選照片，剪好的貼紙可以在這裡換白邊、材質，還能讓它動起來。', textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, height: 1.5, color: muted, fontWeight: FontWeight.w700)),
+      ));
+    }
+    Widget row(String label, List<Widget> items) => SizedBox(height: 40, child: ListView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: [
+        SizedBox(width: 38, child: Center(child: Text(label, style: const TextStyle(fontSize: 13, color: ink, fontWeight: FontWeight.w800)))),
+        const SizedBox(width: 6),
+        for (final w in items) Padding(padding: const EdgeInsets.only(right: 6), child: Center(child: w)),
+      ],
+    ));
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
+        child: Row(children: [
+          Expanded(child: Text(only != null ? '這張貼紙（點空白處改全部）' : '全部的貼紙（點一張只改那張）', maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w800))),
+          if (only != null) ...[
+            _MiniAction(icon: CupertinoIcons.book, label: '收進我的', onTap: () async {
+              final said = await _keepCuts(only: only);
+              if (mounted) showMessage(context, said);
+            }),
+            _MiniAction(icon: CupertinoIcons.chat_bubble_2, label: '存貼圖', onTap: () async {
+              final (said, failed) = await _exportCuts(only: only);
+              if (mounted) showMessage(context, said, error: failed);
+            }),
+          ],
+        ]),
+      ),
+      row('白邊', [
+        for (final e in StickerEdge.values)
+          _Chip(label: e.label, selected: current.edge == e, onTap: () => _styleCuts((c) => c.copyWith(edge: e))),
+        const SizedBox(width: 4),
+        for (final (i, color) in stickerEdgeColors.indexed)
+          GestureDetector(
+            onTap: () => _styleCuts((c) => c.copyWith(color: i, edge: c.edge == StickerEdge.none ? StickerEdge.thick : c.edge)),
+            child: Container(
+              width: 30, height: 30, padding: const EdgeInsets.all(2.5),
+              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: current.color == i && current.edge != StickerEdge.none ? coral : Colors.transparent, width: 2)),
+              child: Container(decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: Border.all(color: line, width: 1.2))),
+            ),
+          ),
+      ]),
+      row('材質', [
+        for (final f in StickerFinish.values)
+          _Chip(label: f.label, icon: f.icon, selected: current.finish == f, onTap: () => _styleCuts((c) => c.copyWith(finish: f))),
+      ]),
+      row('動態', [
+        for (final m in StickerMotion.values)
+          _Chip(label: m.label, icon: m.icon, selected: current.motion == m, onTap: () => _styleCuts((c) => c.copyWith(motion: m))),
+      ]),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
+        child: Text(
+          current.finish != StickerFinish.matte ? '傾斜手機，光會在貼紙上移動' : current.motion != StickerMotion.none ? '按「完成」可以做成會動的影片' : '亮片、雷射、寶石、膨膨會跟著手機傾斜反光',
+          style: TextStyle(fontSize: 11, color: muted.withValues(alpha: .9), fontWeight: FontWeight.w600),
+        ),
+      ),
+    ]);
   }
 
   Widget _brushTool() {
@@ -1947,6 +2270,68 @@ class _ToolTab extends StatelessWidget {
       )),
     );
   }
+}
+
+/// A choice in the 效果 tool.
+class _Chip extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final bool selected;
+  final VoidCallback onTap;
+  const _Chip({required this.label, required this.selected, required this.onTap, this.icon});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      decoration: BoxDecoration(
+        color: selected ? blush : cream, borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: selected ? blushLine : line, width: 1.2),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        if (icon != null) ...[Icon(icon, size: 14, color: selected ? ink : muted), const SizedBox(width: 4)],
+        Text(label, style: TextStyle(fontSize: 12.5, color: selected ? ink : muted, fontWeight: selected ? FontWeight.w900 : FontWeight.w700)),
+      ]),
+    ),
+  );
+}
+
+class _MiniAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _MiniAction({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => TextButton.icon(
+    onPressed: onTap,
+    icon: Icon(icon, size: 15),
+    label: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+    style: TextButton.styleFrom(foregroundColor: coral, visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 6)),
+  );
+}
+
+/// A transparent page on screen: a light checkerboard.
+class _ClearPainter extends CustomPainter {
+  final double cell;
+  const _ClearPainter({this.cell = 14});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.clipRect(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, Paint()..color = Colors.white);
+    final grey = Paint()..color = const Color(0xFFEDE8E3);
+    for (var y = 0; y * cell < size.height; y++) {
+      for (var x = y.isEven ? 0 : 1; x * cell < size.width; x += 2) {
+        canvas.drawRect(Rect.fromLTWH(x * cell, y * cell, cell, cell), grey);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ClearPainter old) => old.cell != cell;
 }
 
 /// A collage template in little: its background and where its prints lie.

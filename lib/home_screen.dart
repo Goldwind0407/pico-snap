@@ -49,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
             (0, CupertinoIcons.square_split_1x2, blush, '四格拍貼', '像拍貼機，倒數連拍 4 張'),
             (1, CupertinoIcons.camera, lilac, '拍立得', '拍一張，看它慢慢顯影'),
             (2, CupertinoIcons.square_grid_2x2, sky, '拍立得拼貼', '從相簿選照片，排成一頁'),
-            (3, CupertinoIcons.smiley, butter, '貼紙裝飾', '一張照片，貼滿貼紙'),
+            (3, CupertinoIcons.smiley, butter, '照片貼紙', '把照片裡的人剪成貼紙'),
           ]) Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Material(
@@ -176,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
             art: const _CollageArt(), onTap: () => _open(context, EditorMode.polaroid),
           ),
           _ModeCard(
-            label: '貼紙裝飾', sub: 'Sticker', color: butter, border: butterLine,
+            label: '照片貼紙', sub: 'Sticker', color: butter, border: butterLine,
             art: const _StickerArt(), onTap: () => _open(context, EditorMode.sticker),
           ),
         ];

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import 'cutout/photo_sticker.dart';
 import 'models.dart';
 import 'widgets/backdrop.dart';
 import 'widgets/collage_layout.dart';
@@ -42,6 +43,11 @@ class EditorDocument {
   /// 拍立得拼貼: the look over the whole page.
   final PageTexture texture;
   final double textureStrength;
+  /// 照片貼紙: the stickers cut out of photos, by their sticker id.
+  final Map<String, PhotoSticker> cutouts;
+  /// 照片貼紙: a cutting line around each (a sticker sheet to print), and
+  /// no background (a transparent picture).
+  final bool cutLines, clearPage;
 
   /// Photo windows a piece of [mode] keeps: a collage holds up to six prints.
   static int cellsOf(EditorMode mode) => switch (mode) {
@@ -82,7 +88,10 @@ class EditorDocument {
       this.backdropBlur = true,
       this.backdropScene,
       this.texture = PageTexture.none,
-      this.textureStrength = .7})
+      this.textureStrength = .7,
+      Map<String, PhotoSticker> cutouts = const {},
+      this.cutLines = false,
+      this.clearPage = false})
       : photos = List.unmodifiable(_pad(photos, cellsOf(mode), (_) => null)),
         fits = List.unmodifiable(_pad(fits, cellsOf(mode), (_) => const PhotoFit())),
         films = List.unmodifiable(_pad(films, max(4, cellsOf(mode)), (_) => FilmStock.white)),
@@ -90,6 +99,7 @@ class EditorDocument {
         captions = List.unmodifiable(_pad(captions, max(4, cellsOf(mode)), (i) => collageCaptions[i])),
         places = List.unmodifiable(_pad(places, mode == EditorMode.polaroid ? cellsOf(mode) : 0, (_) => null)),
         stickers = List.unmodifiable(stickers),
+        cutouts = Map.unmodifiable(cutouts),
         strokes = copyStrokes(strokes),
         handwriting = [for (final lines in handwriting) copyStrokes(lines)];
 
@@ -144,7 +154,7 @@ class EditorDocument {
       };
 
   /// Binary assets live alongside this JSON, and are only written once.
-  Map<String, Object?> toJson(List<String?> photoFiles, String? subjectFile, {String? backdropFile}) =>
+  Map<String, Object?> toJson(List<String?> photoFiles, String? subjectFile, {String? backdropFile, Map<String, (String, String?)> cutoutFiles = const {}}) =>
       {
         'version': 1,
         'mode': mode.name,
@@ -169,6 +179,13 @@ class EditorDocument {
         'backdropScene': backdropScene,
         'texture': texture.name,
         'textureStrength': textureStrength,
+        'cutouts': {
+          for (final MapEntry(key: id, value: s) in cutouts.entries)
+            if (cutoutFiles[id] case (final cut, final source))
+              id: {...s.styleJson(), 'cut': cut, 'source': source},
+        },
+        'cutLines': cutLines,
+        'clearPage': clearPage,
         'bubble': bubble,
         'stripCaption': stripCaption,
         'stickers': [
@@ -189,7 +206,7 @@ class EditorDocument {
       };
 
   factory EditorDocument.fromJson(
-      Map<String, dynamic> json, List<Uint8List?> photos, Uint8List? subject, {Uint8List? backdropPhoto}) {
+      Map<String, dynamic> json, List<Uint8List?> photos, Uint8List? subject, {Uint8List? backdropPhoto, Map<String, PhotoSticker> cutouts = const {}}) {
     if (json['version'] != 1) {
       throw const FormatException('Unsupported draft version');
     }
@@ -243,6 +260,9 @@ class EditorDocument {
       backdropScene: json['backdropScene'] as String?,
       texture: PageTexture.values.asNameMap()[json['texture']] ?? PageTexture.none,
       textureStrength: ((json['textureStrength'] as num?) ?? .7).toDouble().clamp(0, 1),
+      cutouts: cutouts,
+      cutLines: json['cutLines'] as bool? ?? false,
+      clearPage: json['clearPage'] as bool? ?? false,
       places: [
         for (final p in (json['places'] as List?) ?? const [])
           p == null ? null : (center: Offset((p[0] as num).toDouble(), (p[1] as num).toDouble()), width: (p[2] as num).toDouble(), angle: (p[3] as num).toDouble())

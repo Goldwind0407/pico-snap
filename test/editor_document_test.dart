@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pico_snap/cutout/photo_sticker.dart';
+import 'package:pico_snap/cutout/sticker_shape.dart';
 import 'package:pico_snap/editor_document.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/models.dart';
@@ -83,6 +85,41 @@ void main() {
       await EditorDrafts.remove(id);
       expect(EditorDrafts.entries, isEmpty);
       expect(await dir.list().isEmpty, isTrue);
+    } finally {
+      EditorDrafts.reset();
+      await dir.delete(recursive: true);
+    }
+  });
+
+  test('a photo-sticker draft keeps each cut-out, its look and the photo it came from', () async {
+    final dir = await Directory.systemTemp.createTemp('pico_draft_test_');
+    try {
+      await EditorDrafts.load(directory: dir);
+      final id = EditorDrafts.newId();
+      final photo = Uint8List.fromList([1, 2, 3]);
+      final cutA = Uint8List.fromList([4, 5]), cutB = Uint8List.fromList([6, 7]);
+      final d = EditorDocument(
+        mode: EditorMode.sticker, photos: const [], fits: const [], films: const [], filters: const [], captions: const [],
+        stickers: const [StickerData(sticker: 'cut:a', center: Offset(.3, .4)), StickerData(sticker: 'cut:b', center: Offset(.6, .7))],
+        strokes: const [], handwriting: const [], templateKey: EditorDocument.keyForTemplate(0),
+        format: 0, pattern: 0, backdrop: 1, bubble: '',
+        cutouts: {
+          'cut:a': PhotoSticker(cut: cutA, source: photo, edge: StickerEdge.thin, color: 2, finish: StickerFinish.holo, motion: StickerMotion.wiggle),
+          'cut:b': PhotoSticker(cut: cutB, source: photo),
+        },
+        cutLines: true, clearPage: true,
+      );
+      expect(await EditorDrafts.save(id, d), isTrue);
+      final names = [for (final f in dir.listSync(recursive: true)) f.path].where((p) => p.endsWith('.bin'));
+      expect(names, hasLength(3), reason: '兩張貼紙共用同一張照片，只存一次');
+      final back = await EditorDrafts.read(id);
+      final a = back.cutouts['cut:a']!;
+      expect(a.cut, cutA);
+      expect(a.source, photo);
+      expect((a.edge, a.color, a.finish, a.motion), (StickerEdge.thin, 2, StickerFinish.holo, StickerMotion.wiggle));
+      expect(back.cutouts['cut:b']!.cut, cutB);
+      expect(back.cutLines, isTrue);
+      expect(back.clearPage, isTrue);
     } finally {
       EditorDrafts.reset();
       await dir.delete(recursive: true);

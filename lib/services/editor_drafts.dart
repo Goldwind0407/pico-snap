@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../cutout/photo_sticker.dart';
 import '../editor_document.dart';
 import '../models.dart';
 import 'file_store.dart';
@@ -19,7 +20,7 @@ class EditorDraft {
   String get label => switch (mode) {
         EditorMode.fourCut => '四格拍貼',
         EditorMode.polaroid => '拍立得拼貼',
-        EditorMode.sticker => '貼紙裝飾',
+        EditorMode.sticker => '照片貼紙',
       };
 }
 
@@ -135,7 +136,11 @@ abstract final class EditorDrafts {
     for (final bytes in document.photos) {
       photos.add(await asset(bytes));
     }
-    final json = document.toJson(photos, await asset(document.subject), backdropFile: await asset(document.backdropPhoto));
+    final cutoutFiles = <String, (String, String?)>{
+      for (final MapEntry(key: id, value: s) in document.cutouts.entries)
+        id: ((await asset(s.cut))!, await asset(s.source)),
+    };
+    final json = document.toJson(photos, await asset(document.subject), backdropFile: await asset(document.backdropPhoto), cutoutFiles: cutoutFiles);
     final now = DateTime.now();
     json['updated'] = now.millisecondsSinceEpoch;
     final encoded = await compute(jsonEncode, json);
@@ -168,7 +173,14 @@ abstract final class EditorDrafts {
     for (final file in json['photos'] as List) {
       photos.add(await asset(file));
     }
-    return EditorDocument.fromJson(json, photos, await asset(json['subject']), backdropPhoto: await asset(json['backdropPhoto']));
+    final cutouts = <String, PhotoSticker>{};
+    for (final MapEntry(key: id, value: raw) in ((json['cutouts'] as Map?) ?? const {}).entries) {
+      final style = (raw as Map).cast<String, Object?>();
+      final cut = await asset(style['cut']);
+      if (cut == null || !isPhotoSticker(id as String)) continue;
+      cutouts[id] = PhotoSticker.fromJson(style, cut, await asset(style['source']));
+    }
+    return EditorDocument.fromJson(json, photos, await asset(json['subject']), backdropPhoto: await asset(json['backdropPhoto']), cutouts: cutouts);
   }
 
   static Future<void> remove(String id) => _writer.run(() async {

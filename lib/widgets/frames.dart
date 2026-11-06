@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
+import '../cutout/photo_sticker.dart';
 import '../filters.dart';
 import '../models.dart';
 import '../theme.dart';
@@ -757,6 +758,7 @@ class StickerVisual extends StatelessWidget {
     }
     if (TypedWords.parse(sticker) case final words?) return SizedBox.square(dimension: size, child: FittedBox(child: TextSticker(words)));
     if (parseDeco(sticker) case (final kind, final color)) return DecoSticker(kind, color, size: size);
+    if (isPhotoSticker(sticker)) return PhotoStickerView(sticker, size: size);
     if (sticker.startsWith('my:')) {
       final custom = customStickers[sticker];
       final path = customStickerPaths[sticker];

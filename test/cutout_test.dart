@@ -5,6 +5,8 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/cutout/cutout_page.dart';
+import 'package:pico_snap/cutout/photo_sticker.dart';
+import 'package:pico_snap/cutout/sticker_shape.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/models.dart';
 import 'package:pico_snap/services/my_works.dart';
@@ -61,6 +63,33 @@ void main() {
       expect([at(edge, c, 0), at(edge, c, 3)], [255, 255], reason: '白色描邊');
       expect(at(0, 0, 3), 0, reason: '角落在描邊外，透明');
     });
+
+    test('照片貼紙：彩色白邊、裁切線、膨膨', () {
+      final pink = bakeStickerStyled((rgba: rgba, mask: mask, w: w, h: h, border: .022, finish: StickerFinish.matte, edge: 0xFFFFC6D9, cutLine: false));
+      final c = pink.w ~/ 2, edge = (pink.w - 20) ~/ 2 - 2;
+      int at(({Uint8List rgba, int w, int h}) o, int x, int y, int ch) => o.rgba[(y * o.w + x) * 4 + ch];
+      expect([at(pink, edge, c, 0), at(pink, edge, c, 1), at(pink, edge, c, 2)], [0xFF, 0xC6, 0xD9], reason: '粉紅邊');
+      final lined = bakeStickerStyled((rgba: rgba, mask: mask, w: w, h: h, border: .022, finish: StickerFinish.matte, edge: 0xFFFFFFFF, cutLine: true));
+      expect(lined.w, greaterThan(out.w), reason: '裁切線在白邊外面');
+      final m = lined.h ~/ 2;
+      final line = [for (var x = 0; x < lined.w; x++) if (at(lined, x, m, 3) > 200 && at(lined, x, m, 0) < 200) x];
+      expect(line, isNotEmpty, reason: '灰色的線');
+      expect(line.first, lessThan(lined.w ~/ 2 - 10 - 4), reason: '在白邊外');
+      final puffy = bakeStickerStyled((rgba: rgba, mask: mask, w: w, h: h, border: .022, finish: StickerFinish.puffy, edge: 0xFFFFFFFF, cutLine: false));
+      final pc = puffy.w ~/ 2, rim = (puffy.w - 20) ~/ 2;
+      expect(at(puffy, rim, pc, 2), lessThan(at(puffy, pc, pc, 2)), reason: '邊緣比中間暗，看起來鼓起來');
+    });
+  });
+
+  test('照片貼紙的動態：每種都繞一圈回到原位', () {
+    for (final m in StickerMotion.values) {
+      final a = motionAt(m, 0), b = motionAt(m, 1);
+      expect(b.shift.dx, closeTo(a.shift.dx, 1e-6), reason: m.label);
+      expect(b.shift.dy, closeTo(a.shift.dy, 1e-6), reason: m.label);
+      expect(b.grow, closeTo(a.grow, 1e-6), reason: m.label);
+      expect((b.turn - a.turn) % (2 * 3.141592653589793), anyOf(closeTo(0, 1e-6), closeTo(2 * 3.141592653589793, 1e-6)), reason: m.label);
+    }
+    expect(motionAt(StickerMotion.bounce, .25).shift.dy, lessThan(0), reason: '彈跳會往上');
   });
 
   testWidgets('去背頁：AI 不能用時自動改用手動去背，完成後回傳貼紙 PNG', (tester) async {

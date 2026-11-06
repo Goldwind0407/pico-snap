@@ -119,7 +119,10 @@ enum StickerFinish {
   matte('霧面', CupertinoIcons.square),
   glitter('亮片', CupertinoIcons.sparkles),
   holo('雷射', CupertinoIcons.rays),
-  gem('寶石', CupertinoIcons.suit_diamond);
+  gem('寶石', CupertinoIcons.suit_diamond),
+  /// Puffed up like a soft 3D sticker: darker where it curves away, a soft
+  /// highlight on the top.
+  puffy('膨膨', CupertinoIcons.cloud);
 
   final String label;
   final IconData icon;
@@ -178,6 +181,13 @@ double _hash(int x, int y) {
       final glint = (1 - ((fy - .86) / .05).abs()).clamp(0.0, 1.0) * (1 - rim) * .5;
       final gloss = math.max(band * band * .55, glint);
       double c(double v) => mix(((l + (v - l) * 1.4) * shade).clamp(0.0, 1.0), 1, gloss);
+      return (c(r), c(g), c(b));
+    case StickerFinish.puffy:
+      final rim = (inside / (side * .12)).clamp(0.0, 1.0);
+      final shade = .7 + .3 * math.sqrt(rim);
+      final fx = x / w - .36, fy = y / h - .28;
+      final light = math.exp(-(fx * fx + fy * fy) / .05) * .3 * rim;
+      double c(double v) => mix(((l + (v - l) * 1.12) * shade).clamp(0.0, 1.0), 1, light);
       return (c(r), c(g), c(b));
   }
 }

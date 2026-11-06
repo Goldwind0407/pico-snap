@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/booth_screen.dart';
+import 'package:pico_snap/cutout/photo_sticker.dart';
+import 'package:pico_snap/cutout/sticker_shape.dart';
+import 'package:pico_snap/editor_document.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/filters.dart' show PhotoCapture;
 import 'package:pico_snap/home_screen.dart';
@@ -376,7 +379,7 @@ void main() {
     t.view.physicalSize = const Size(820, 900);
     await t.pumpWidget(const MaterialApp(home: HomeScreen()));
     await t.pumpAndSettle();
-    final four = t.getRect(find.text('四格拍貼').first), sticker = t.getRect(find.text('貼紙裝飾').first);
+    final four = t.getRect(find.text('四格拍貼').first), sticker = t.getRect(find.text('照片貼紙').first);
     expect(sticker.top, closeTo(four.top, 1), reason: '四張卡片同一排');
   });
 
@@ -397,10 +400,10 @@ void main() {
     await t.tap(find.byIcon(CupertinoIcons.camera_fill));
     await t.pumpAndSettle();
     final sheet = find.byType(BottomSheet);
-    for (final mode in ['四格拍貼', '拍立得', '拍立得拼貼', '貼紙裝飾']) {
+    for (final mode in ['四格拍貼', '拍立得', '拍立得拼貼', '照片貼紙']) {
       expect(find.descendant(of: sheet, matching: find.text(mode)), findsOneWidget);
     }
-    await t.tap(find.descendant(of: sheet, matching: find.text('貼紙裝飾')));
+    await t.tap(find.descendant(of: sheet, matching: find.text('照片貼紙')));
     await t.pumpAndSettle();
     expect(t.widget<EditorScreen>(find.byType(EditorScreen)).mode, EditorMode.sticker);
     t.state<NavigatorState>(find.byType(Navigator)).pop();
@@ -440,7 +443,7 @@ void main() {
     final nav = t.state<NavigatorState>(find.byType(Navigator));
 
     // 只是點工具、沒有改東西：直接離開
-    await t.tap(find.text('底紋'));
+    await t.tap(find.text('背景'));
     await t.pumpAndSettle();
     nav.maybePop();
     await t.pumpAndSettle();
@@ -448,18 +451,70 @@ void main() {
 
     await t.tap(find.text('open'));
     await t.pumpAndSettle();
-    await t.tap(find.text('底紋'));
+    await t.tap(find.text('背景'));
     await t.pumpAndSettle();
-    await t.tap(find.text(ginghamPatterns[2].name));
+    await t.tap(find.text(BackdropPattern.dots.label));
     await t.pumpAndSettle();
     nav.maybePop();
     await t.pumpAndSettle();
     expect(find.text('還沒儲存的作品會不見喔。'), findsOneWidget);
   });
 
+  testWidgets('照片貼紙：效果改全部或選中的那張、可以復原；排成貼紙單有裁切線', (t) async {
+    PhotoStickers.sensor = const Stream.empty();
+    addTearDown(() => PhotoStickers.sensor = null);
+    final photo = (await t.runAsync(_photo))!;
+    final d = EditorDocument(
+      mode: EditorMode.sticker, photos: const [], fits: const [], films: const [], filters: const [], captions: const [],
+      stickers: const [StickerData(sticker: 'cut:a', center: Offset(.3, .3), scale: 1.5, rotation: .2), StickerData(sticker: 'cut:b', center: Offset(.7, .7), scale: 1.5)],
+      strokes: const [], handwriting: const [], templateKey: EditorDocument.keyForTemplate(0), format: 0, pattern: 0, backdrop: 1, bubble: '',
+      cutouts: {'cut:a': PhotoSticker(cut: photo, source: photo), 'cut:b': PhotoSticker(cut: photo, source: photo)},
+    );
+    await _phone(t, EditorScreen(mode: EditorMode.sticker, draft: d));
+    expect(find.text('選照片，自動剪成貼紙'), findsNothing);
+    await t.tap(find.text('效果'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('雷射'));
+    await t.pumpAndSettle();
+    expect(PhotoStickers.items.values.map((s) => s.finish), everyElement(StickerFinish.holo), reason: '沒選就改全部');
+    await t.tap(find.byType(StickerItem).first);
+    await t.pump(const Duration(seconds: 1));
+    expect(find.text('這張貼紙（點空白處改全部）'), findsOneWidget);
+    await t.tap(find.text('彈跳'));
+    await t.pump(const Duration(milliseconds: 100));
+    expect(PhotoStickers.items['cut:a']!.motion, StickerMotion.bounce);
+    expect(PhotoStickers.items['cut:b']!.motion, StickerMotion.none, reason: '只改選中的那張');
+    await t.tap(find.byIcon(CupertinoIcons.arrow_uturn_left));
+    await t.pumpAndSettle();
+    expect(PhotoStickers.items['cut:a']!.motion, StickerMotion.none);
+
+    await t.tap(find.text('去背'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('排成貼紙單'));
+    await t.pumpAndSettle();
+    final placed = [for (final s in t.widgetList<StickerItem>(find.byType(StickerItem))) s.data];
+    expect(placed.map((s) => s.rotation), everyElement(0.0));
+    expect(placed[0].center.dy, placed[1].center.dy, reason: '兩張排成一排');
+    expect(PhotoStickers.cutLines, isTrue);
+  });
+
+  testWidgets('照片貼紙：以前的貼紙作品打開時，照片變成貼紙、對話泡泡變成文字', (t) async {
+    final photo = (await t.runAsync(_photo))!;
+    final d = EditorDocument(
+      mode: EditorMode.sticker, photos: [photo], fits: const [], films: const [], filters: const [], captions: const [],
+      stickers: const [], strokes: const [], handwriting: const [], templateKey: EditorDocument.keyForTemplate(0),
+      format: 0, pattern: 0, backdrop: 1, bubble: 'hello',
+    );
+    await _phone(t, EditorScreen(mode: EditorMode.sticker, draft: d));
+    final ids = [for (final s in t.widgetList<StickerItem>(find.byType(StickerItem))) s.data.sticker];
+    expect(ids.where(isPhotoSticker), hasLength(1));
+    expect(ids.where((id) => TypedWords.parse(id)?.text == 'hello'), hasLength(1));
+    expect(PhotoStickers.items.values.single.cut, photo);
+  });
+
   testWidgets('空白作品先引導選照片；有照片之後就不再擋著', (t) async {
     await _phone(t, const EditorScreen(mode: EditorMode.sticker));
-    expect(find.text('先選一張照片'), findsOneWidget);
+    expect(find.text('選照片，自動剪成貼紙'), findsOneWidget);
     await _phone(t, EditorScreen(key: UniqueKey(), mode: EditorMode.fourCut, template: 0));
     expect(find.text('選照片（一次可以選 4 張）'), findsOneWidget);
     final photo = (await t.runAsync(_photo))!;

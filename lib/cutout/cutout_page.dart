@@ -42,10 +42,13 @@ class CutoutPage extends StatefulWidget {
   final Uint8List photo;
   /// 有的話，去背的過程也錄進縮時影片。
   final TimelapseRecorder? recorder;
-  const CutoutPage({super.key, required this.photo, this.recorder});
+  /// Only the cut-out subject, no border or finish (照片貼紙 adds those
+  /// itself): no 外框 step.
+  final bool raw;
+  const CutoutPage({super.key, required this.photo, this.recorder, this.raw = false});
 
-  static Future<Uint8List?> open(BuildContext context, Uint8List photo, {TimelapseRecorder? recorder}) =>
-      Navigator.push<Uint8List>(context, MaterialPageRoute(builder: (_) => CutoutPage(photo: photo, recorder: recorder)));
+  static Future<Uint8List?> open(BuildContext context, Uint8List photo, {TimelapseRecorder? recorder, bool raw = false}) =>
+      Navigator.push<Uint8List>(context, MaterialPageRoute(builder: (_) => CutoutPage(photo: photo, recorder: recorder, raw: raw)));
 
   @override
   State<CutoutPage> createState() => _CutoutPageState();
@@ -631,6 +634,10 @@ class _CutoutPageState extends State<CutoutPage> {
   }
 
   Future<({Uint8List rgba, int w, int h})?> _bake(ui.Image photo, Uint8List rgba, int w, int h, Uint8List mask) async {
+    if (widget.raw) {
+      if (!mask.any((v) => v > 127)) return null;
+      return compute(bakeStickerWith, (rgba: rgba, mask: mask, w: w, h: h, border: 0.0, finish: StickerFinish.matte));
+    }
     if (_shape == StickerShape.contour) {
       if (!mask.any((v) => v > 127)) return null;
       return compute(bakeStickerWith, (rgba: rgba, mask: mask, w: w, h: h, border: _borders[_border].$2, finish: _finish));
@@ -907,11 +914,11 @@ class _CutoutPageState extends State<CutoutPage> {
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(color: cream, borderRadius: BorderRadius.circular(16), border: Border.all(color: line)),
         child: Row(children: [
-          for (final (m, icon, label) in const [
+          for (final (m, icon, label) in [
             (_Mode.select, CupertinoIcons.hand_point_right, '選主體'),
             (_Mode.erase, CupertinoIcons.delete_left, '擦掉'),
             (_Mode.restore, CupertinoIcons.paintbrush, '補回'),
-            (_Mode.shape, CupertinoIcons.square_on_circle, '外框'),
+            if (!widget.raw) (_Mode.shape, CupertinoIcons.square_on_circle, '外框'),
           ])
             Expanded(child: GestureDetector(
               onTap: () => _setMode(m),
@@ -1225,9 +1232,19 @@ Future<ui.Image> _imageFromRgba(Uint8List rgba, int w, int h) {
 
 /// [bakeSticker] with the white border [border] × the photo's long side
 /// (0 = no border), the picture printed with [finish].
-({Uint8List rgba, int w, int h}) bakeStickerWith(({Uint8List rgba, Uint8List mask, int w, int h, double border, StickerFinish finish}) a) {
+({Uint8List rgba, int w, int h}) bakeStickerWith(({Uint8List rgba, Uint8List mask, int w, int h, double border, StickerFinish finish}) a) =>
+    bakeStickerStyled((rgba: a.rgba, mask: a.mask, w: a.w, h: a.h, border: a.border, finish: a.finish, edge: 0xFFFFFFFF, cutLine: false));
+
+/// [bakeStickerWith] with the border in [edge] (ARGB) rather than white,
+/// and with [cutLine] a thin grey line around it, where to cut a printed
+/// sticker sheet.
+({Uint8List rgba, int w, int h}) bakeStickerStyled(({Uint8List rgba, Uint8List mask, int w, int h, double border, StickerFinish finish, int edge, bool cutLine}) a) {
   final w = a.w, h = a.h, n = w * h;
   final r = a.border <= 0 ? 0 : math.max(4, (math.max(w, h) * a.border).round());
+  final line = a.cutLine ? math.max(2.0, math.max(w, h) * .004) : 0.0;
+  final reach = r + line.ceil();
+  final edge = [(a.edge >> 16) & 255, (a.edge >> 8) & 255, a.edge & 255];
+  const cut = [158, 148, 140];
   // 到主體的距離（3-4 倒角距離，除以 3 約等於像素）
   const inf = 1 << 28;
   final d = Int32List(n);
@@ -1266,7 +1283,7 @@ Future<ui.Image> _imageFromRgba(Uint8List rgba, int w, int h) {
   var x0 = w, y0 = h, x1 = -1, y1 = -1;
   for (var y = 0; y < h; y++) {
     for (var x = 0; x < w; x++) {
-      if (d[y * w + x] <= (r + 1) * 3) {
+      if (d[y * w + x] <= (reach + 1) * 3) {
         x0 = math.min(x0, x);
         x1 = math.max(x1, x);
         y0 = math.min(y0, y);
@@ -1276,7 +1293,7 @@ Future<ui.Image> _imageFromRgba(Uint8List rgba, int w, int h) {
   }
   final cw = x1 - x0 + 1, ch = y1 - y0 + 1;
   // The gem finish shades by how far inside the picture a pixel is.
-  final inside = a.finish == StickerFinish.gem ? _insideDistance(a.mask, w, h) : null;
+  final inside = a.finish == StickerFinish.gem || a.finish == StickerFinish.puffy ? _insideDistance(a.mask, w, h) : null;
   final out = Uint8List(cw * ch * 4);
   for (var y = 0; y < ch; y++) {
     for (var x = 0; x < cw; x++) {
@@ -1284,14 +1301,17 @@ Future<ui.Image> _imageFromRgba(Uint8List rgba, int w, int h) {
       final m = a.mask[i] / 255;
       final dist = d[i] / 3;
       final o = (r + .5 - dist).clamp(0.0, 1.0); // 白邊覆蓋率
-      final alpha = m + (1 - m) * o;
+      // The cut line: just outside the border, over whatever it touches.
+      final lo = line <= 0 ? 0.0 : ((r + line + .5 - dist).clamp(0.0, 1.0) * (dist - r + .5).clamp(0.0, 1.0));
+      final alpha = (m + (1 - m) * o) * (1 - lo) + lo;
       final j = (y * cw + x) * 4;
       final (fr, fg, fb) = m == 0
         ? (0.0, 0.0, 0.0)
         : applyFinish(a.finish, a.rgba[i * 4] / 255, a.rgba[i * 4 + 1] / 255, a.rgba[i * 4 + 2] / 255, x, y, cw, ch, inside == null ? 0 : inside[i] / 3);
       final art = [fr, fg, fb];
       for (var c = 0; c < 3; c++) {
-        out[j + c] = (art[c] * 255 * m + 255 * (1 - m) * o).round().clamp(0, 255);
+        final under = art[c] * 255 * m + edge[c] * (1 - m) * o;
+        out[j + c] = (under * (1 - lo) + cut[c] * lo).round().clamp(0, 255);
       }
       out[j + 3] = (alpha * 255).round().clamp(0, 255);
     }
