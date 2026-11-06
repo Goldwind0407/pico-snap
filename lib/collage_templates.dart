@@ -25,6 +25,7 @@ const sceneBackdrops = [
   SceneBackdrop('wildflowers', '野花'),
   SceneBackdrop('window_light', '窗邊'),
   SceneBackdrop('town_street', '小鎮街道'),
+  SceneBackdrop('seaside_street', '海邊街道'),
 ];
 
 SceneBackdrop? sceneBackdrop(String? id) => sceneBackdrops.where((s) => s.id == id).firstOrNull;
@@ -103,5 +104,12 @@ final collageTemplates = [
     films: [_w, _w, _w], captions: ['旅行日記', '散步中', 'see you'],
     stickers: [_deco('deco:tag:3', .74, .3, 1.1, .12), _deco('deco:stripeTape:3', .6, .93, 1.2, -.08)],
     texture: PageTexture.grain, strength: .4,
+  ),
+  CollageTemplate(
+    name: '海邊街道', backdrop: 'seaside_street',
+    places: [_at(.3, .25, .44, -.06), _at(.7, .42, .44, .05), _at(.34, .745, .44, -.03)],
+    films: [_w, _w, _w], captions: ['海邊散步', 'summer road', 'see the sea ♡'],
+    stickers: [_deco('deco:tag:3', .8, .1, 1, .12), _deco('deco:stripeTape:3', .72, .95, 1.2, -.06)],
+    texture: PageTexture.warm, strength: .3,
   ),
 ];
