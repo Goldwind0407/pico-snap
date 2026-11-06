@@ -653,7 +653,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     )),
   ]);
 
-  /// 基本 / 三麗鷗 / 寶可夢 / 聯名: which films the row below shows.
+  /// 基本 / 三麗鷗 / 寶可夢 / 中職 / 動漫: which films the row below shows.
   Widget _seriesTabs() => SizedBox(height: 34, child: ListView.separated(
     scrollDirection: Axis.horizontal,
     padding: const EdgeInsets.symmetric(horizontal: 16),

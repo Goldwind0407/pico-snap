@@ -26,11 +26,23 @@ enum FilmStock {
   pokemonGs('心金魂銀', '寶可夢', 'assets/instant/pokemon_gs.png', Rect.fromLTWH(.10667, .11667, .78778, .5975), ink, Colors.white, Color(0xFF1E1E20)),
   pokemonFrlg('火紅葉綠', '寶可夢', 'assets/instant/pokemon_frlg.png', Rect.fromLTWH(.10667, .125, .78667, .55667), ink, Colors.white, Color(0xFF1E1E20)),
   pokemonRs('紅寶藍寶', '寶可夢', 'assets/instant/pokemon_rs.png', Rect.fromLTWH(.12222, .13417, .75667, .55667), ink, Colors.white, Color(0xFF1E1E20)),
-  keroroFrame('Keroro 框', '聯名', 'assets/instant/frame_keroro.png', Rect.fromLTWH(.11333, .085, .77111, .69917), ink, Colors.white, ink),
-  rakutenFrame('樂天桃猿框', '聯名', 'assets/instant/frame_rakuten.png', Rect.fromLTWH(.10778, .09333, .78444, .67083), ink, Colors.white, Color(0xFF9E1B32));
+  pokemonDp('鑽石珍珠', '寶可夢', 'assets/instant/pokemon_dp.png', Rect.fromLTWH(.10208, .11233, .79248, .6117), ink, Colors.white, Color(0xFF1E1E20)),
+  pokemonBw2('黑2白2', '寶可夢', 'assets/instant/pokemon_bw2.png', Rect.fromLTWH(.10817, .11491, .77408, .60245), ink, Colors.white, Color(0xFF1E1E20)),
+  pokemonXy('XY', '寶可夢', 'assets/instant/pokemon_xy.png', Rect.fromLTWH(.09551, .10656, .79632, .61389), ink, Colors.white, Color(0xFF1E1E20)),
+  pokemonUsum('究極日月', '寶可夢', 'assets/instant/pokemon_usum.png', Rect.fromLTWH(.09971, .13467, .77959, .56887), ink, Colors.white, Color(0xFF1E1E20)),
+  pokemonSwsh('劍盾', '寶可夢', 'assets/instant/pokemon_swsh.png', Rect.fromLTWH(.09452, .12192, .77867, .5923), ink, Colors.white, Color(0xFF1E1E20)),
+  cpblBrothers('中信兄弟', '中職', 'assets/instant/cpbl_brothers.png', Rect.fromLTWH(.09047, .07581, .81809, .65199), ink, Colors.white, Color(0xFF1E1E20)),
+  cpblLions('統一獅', '中職', 'assets/instant/cpbl_lions.png', Rect.fromLTWH(.09135, .07648, .81731, .67605), ink, Colors.white, Color(0xFF1E1E20)),
+  rakutenFrame('樂天桃猿', '中職', 'assets/instant/cpbl_monkeys.png', Rect.fromLTWH(.0888, .07381, .82239, .6288), ink, Colors.white, Color(0xFF9E1B32)),
+  cpblGuardians('富邦悍將', '中職', 'assets/instant/cpbl_guardians.png', Rect.fromLTWH(.09143, .07581, .81617, .64838), ink, Colors.white, Color(0xFF1E1E20)),
+  cpblDragons('味全龍', '中職', 'assets/instant/cpbl_dragons.png', Rect.fromLTWH(.09318, .07925, .81268, .63617), ink, Colors.white, Color(0xFF1E1E20)),
+  cpblHawks('台鋼雄鷹', '中職', 'assets/instant/cpbl_hawks.png', Rect.fromLTWH(.09423, .07931, .8125, .64888), ink, Colors.white, Color(0xFF1E1E20)),
+  keroroFrame('Keroro', '動漫', 'assets/instant/frame_keroro.png', Rect.fromLTWH(.11333, .085, .77111, .69917), ink, Colors.white, ink),
+  animeConan('名偵探柯南', '動漫', 'assets/instant/anime_conan.png', Rect.fromLTWH(.09908, .06742, .80127, .72818), ink, Colors.white, Color(0xFF1E1E20)),
+  animeShinchan('蠟筆小新', '動漫', 'assets/instant/anime_shinchan.png', Rect.fromLTWH(.10642, .07728, .78322, .71242), ink, Colors.white, Color(0xFF1E1E20));
 
   /// The film picker's tabs, in order.
-  static const series = ['基本', '三麗鷗', '寶可夢', '聯名'];
+  static const series = ['基本', '三麗鷗', '寶可夢', '中職', '動漫'];
 
   final String label, group, asset;
   /// The photo window, as fractions of the print.
