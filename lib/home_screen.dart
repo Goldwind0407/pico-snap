@@ -12,6 +12,7 @@ import 'polaroid_camera_screen.dart';
 import 'models.dart';
 import 'theme.dart';
 import 'widgets/frames.dart';
+import 'widgets/studio_chrome.dart';
 
 /// Whether the drafts list on the home screen is open.
 final _draftsOpen = ValueNotifier(false);
@@ -38,9 +39,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _choose(BuildContext context) async {
     final pick = await showModalBottomSheet<int>(
       context: context,
+      isScrollControlled: true,
+      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
       backgroundColor: cream,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-      builder: (context) => SafeArea(child: Padding(
+      builder: (context) => SafeArea(child: SingleChildScrollView(child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('選一種玩法', style: TextStyle(fontSize: 20, color: ink, fontWeight: FontWeight.w900)),
@@ -73,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ]),
-      )),
+      ))),
     );
     if (!context.mounted) return;
     switch (pick) {
@@ -107,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   );
 
-  Widget _home(BuildContext context) => SafeArea(bottom: false, child: ListView(padding: const EdgeInsets.fromLTRB(0, 10, 0, 120), children: [
+  Widget _home(BuildContext context) => SafeArea(bottom: false, child: ListView(padding: const EdgeInsets.fromLTRB(0, 14, 0, 120), children: [
       _pad(const _Header()),
       ValueListenableBuilder<int>(valueListenable: EditorDrafts.changes, builder: (context, _, child) {
         if (EditorDrafts.entries.isEmpty) return const SizedBox.shrink();
@@ -154,9 +157,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ])));
       }),
-      const SizedBox(height: 22),
+      const SizedBox(height: 24),
       _pad(_HeroCard(onStart: () => _choose(context))),
-      const SizedBox(height: 30),
+      const SizedBox(height: 32),
       _pad(const _SectionTitle(title: '選一種玩法', note: 'Create')),
       const SizedBox(height: 14),
       // Two by two (four in a row on a wide screen); each row's cards share
@@ -203,13 +206,17 @@ class _Header extends StatelessWidget {
   const _Header();
 
   @override
-  Widget build(BuildContext context) => const SizedBox(height: 44, child: Center(child: Text.rich(
-    TextSpan(children: [
-      TextSpan(text: '快趣', style: TextStyle(color: coral)),
-      TextSpan(text: '拍', style: TextStyle(color: ink)),
-    ]),
-    style: TextStyle(fontSize: 26, letterSpacing: 3, fontWeight: FontWeight.w900),
-  )));
+  Widget build(BuildContext context) => Row(children: [
+    Container(width: 42, height: 42,
+      decoration: studioSurface(radius: 14),
+      child: const Icon(CupertinoIcons.camera, color: actionCoral, size: 23)),
+    const SizedBox(width: 12),
+    const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('快趣拍', style: TextStyle(fontSize: 23, letterSpacing: 1, color: ink, fontWeight: FontWeight.w800)),
+      Text('YOUR LITTLE PHOTO STUDIO', style: TextStyle(fontSize: 8, letterSpacing: 1.5, color: muted, fontWeight: FontWeight.w700)),
+    ])),
+    const Icon(CupertinoIcons.sparkles, size: 22, color: actionCoral),
+  ]);
 }
 
 class _HeroCard extends StatelessWidget {
@@ -218,48 +225,36 @@ class _HeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    height: 236,
-    decoration: BoxDecoration(
-      color: paperCard, borderRadius: BorderRadius.circular(26),
-      border: Border.all(color: line),
-      boxShadow: [BoxShadow(color: ink.withValues(alpha: .06), blurRadius: 16, offset: const Offset(0, 6))],
-    ),
-    child: LayoutBuilder(builder: (context, c) {
-      final w = c.maxWidth;
-      final textLeft = w * .47;
-      return Stack(clipBehavior: Clip.none, children: [
-        const Positioned(left: -18, top: -6, child: WashiTape(width: 80, height: 22, angle: -.5)),
-        const Positioned(right: -20, top: -4, child: WashiTape(width: 84, height: 22, angle: .55, colors: [Color(0xFFB9C9AE), Color(0xFFF4D98B)])),
-        Positioned(left: 74, top: 46, child: Transform.rotate(angle: .12, child: const SizedBox(width: 82, child: FittedBox(child: PolaroidCard(
-          image: sampleDuo, caption: '', color: blush,
-        ))))),
-        Positioned(left: 22, top: 22, child: Transform.rotate(angle: -.18, child: SizedBox(
-          width: 62, height: 192,
-          child: FittedBox(child: PhotoStrip(
-            template: drawnTemplates.firstWhere((t) => t.name == 'Coral'), photos: samplePhotos,
-            captionWidget: const Icon(CupertinoIcons.camera, color: Colors.white, size: 30),
-          )),
-        ))),
-        const Positioned(left: 50, top: 20, child: Sparkle(size: 15)),
-        const Positioned(left: 98, top: 30, child: DoodleHeart(size: 15)),
-        const Positioned(left: 30, bottom: 18, child: Sparkle(size: 20)),
-        const Positioned(left: 136, bottom: 30, child: Sparkle(size: 17, fill: Color(0xFFF7D77C))),
-        const Positioned(left: 150, bottom: 52, child: DoodleHeart(size: 12)),
-        Positioned(right: 24, top: 30, child: Transform.rotate(angle: .1, child: Text('make today a ↘', style: hand(17)))),
-        Positioned(left: textLeft, right: 18, top: 72, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Make today a\nlittle more lovely.', style: TextStyle(fontSize: 19, height: 1.25, color: ink, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 16),
-          SizedBox(width: double.infinity, height: 44, child: FilledButton(
-            onPressed: onStart,
-            style: FilledButton.styleFrom(
-              backgroundColor: coral, foregroundColor: Colors.white, elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-            child: const Text('開始製作', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
-          )),
+    decoration: studioSurface(radius: 28, color: paperCard),
+    padding: const EdgeInsets.all(22),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('LITTLE MOMENTS, MADE YOURS', style: TextStyle(fontSize: 9, letterSpacing: 1.4, color: muted, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 18),
+      Row(children: [
+        const Expanded(flex: 5, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('讓日常，\n值得收藏。', style: TextStyle(fontSize: 24, height: 1.5, color: ink, fontWeight: FontWeight.w800)),
+          SizedBox(height: 10),
+          Text('拍一張、貼一點，\n收藏你的日常小事。', style: TextStyle(fontSize: 12, height: 1.7, color: muted)),
         ])),
-      ]);
-    }),
+        const SizedBox(width: 12),
+        Expanded(flex: 4, child: SizedBox(height: 158, child: FittedBox(child: SizedBox(width: 128, height: 158, child: Stack(clipBehavior: Clip.none, children: [
+          Positioned(right: 2, top: 28, child: Transform.rotate(angle: .13, child: const SizedBox(width: 82,
+            child: FittedBox(child: PolaroidCard(image: sampleDuo, caption: '', color: Colors.white))))),
+          Positioned(left: 6, top: 2, child: Transform.rotate(angle: -.12, child: SizedBox(width: 46, height: 148,
+            child: FittedBox(child: PhotoStrip(template: drawnTemplates.firstWhere((t) => t.name == 'Coral'), photos: samplePhotos))))),
+          const Positioned(right: 18, top: 20, child: WashiTape(width: 40, height: 13, angle: .12)),
+          const Positioned(right: 2, bottom: 4, child: Sparkle(size: 14, fill: Color(0xFFE3C887))),
+        ]))))),
+      ]),
+      const SizedBox(height: 22),
+      SizedBox(width: double.infinity, child: FilledButton.icon(
+        onPressed: onStart,
+        style: FilledButton.styleFrom(backgroundColor: actionCoral, foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+        icon: const Icon(CupertinoIcons.plus, size: 17),
+        label: const Text('開始製作', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+      )),
+    ]),
   );
 }
 
@@ -269,9 +264,9 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-    Text(title, style: const TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w800)),
+    Text(title, style: const TextStyle(fontSize: 19, color: ink, fontWeight: FontWeight.w800)),
     const SizedBox(width: 8),
-    Flexible(child: Text(note, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: muted, fontWeight: FontWeight.w700))),
+    Flexible(child: Text(note, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, letterSpacing: .6, color: muted, fontWeight: FontWeight.w500))),
   ]);
 }
 
@@ -283,19 +278,20 @@ class _ModeCard extends StatelessWidget {
   const _ModeCard({required this.label, required this.sub, required this.color, required this.border, required this.art, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  Widget build(BuildContext context) => StudioPress(
     onTap: onTap,
     child: Container(
       constraints: const BoxConstraints(minHeight: 140),
-      padding: const EdgeInsets.fromLTRB(6, 10, 6, 10),
-      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(18), border: Border.all(color: border, width: 1.6)),
+      padding: const EdgeInsets.fromLTRB(10, 14, 10, 14),
+      decoration: studioSurface(radius: 22, color: Color.lerp(color, Colors.white, .58)!),
       // The drawing keeps its size; with large text the card grows instead.
       child: Column(children: [
         SizedBox(height: 78, child: Center(child: FittedBox(child: art))),
         const Spacer(),
         const SizedBox(height: 6),
         Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: ink, fontWeight: FontWeight.w800)),
-        Text(sub, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: muted, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 3),
+        Text(sub, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, letterSpacing: .5, color: muted, fontWeight: FontWeight.w500)),
       ]),
     ),
   );
@@ -389,7 +385,7 @@ class _StyleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = stripTemplates[index];
-    return GestureDetector(
+    return StudioPress(
       onTap: onTap,
       child: Container(
         width: 150,
@@ -425,7 +421,8 @@ class _BottomBar extends StatelessWidget {
     child: Stack(clipBehavior: Clip.none, children: [
       Positioned(left: 0, right: 0, bottom: 0, top: 20, child: Container(
         decoration: BoxDecoration(
-          color: cream,
+          color: Colors.white,
+          border: const Border(top: BorderSide(color: line)),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           boxShadow: [BoxShadow(color: ink.withValues(alpha: .08), blurRadius: 18, offset: const Offset(0, -4))],
         ),
@@ -437,18 +434,18 @@ class _BottomBar extends StatelessWidget {
           Expanded(child: _NavItem(icon: tab == 1 ? CupertinoIcons.bookmark_fill : CupertinoIcons.bookmark, label: '素材', selected: tab == 1, onTap: () => onTab(1))),
         ])),
       )),
-      Positioned(top: 0, left: 0, right: 0, child: Center(child: GestureDetector(
+      Positioned(top: 0, left: 0, right: 0, child: Center(child: Semantics(label: '開始製作', button: true, child: StudioPress(
         onTap: onCamera,
         child: Container(
           width: 64, height: 64,
           decoration: BoxDecoration(
-            color: coral, shape: BoxShape.circle,
+            color: actionCoral, shape: BoxShape.circle,
             border: Border.all(color: cream, width: 4),
-            boxShadow: [BoxShadow(color: coral.withValues(alpha: .4), blurRadius: 14, offset: const Offset(0, 6))],
+            boxShadow: [BoxShadow(color: actionCoral.withValues(alpha: .22), blurRadius: 16, offset: const Offset(0, 6))],
           ),
           child: const Icon(CupertinoIcons.camera_fill, color: Colors.white, size: 28),
         ),
-      ))),
+      )))),
     ]),
   );
 }
@@ -461,11 +458,15 @@ class _NavItem extends StatelessWidget {
   const _NavItem({required this.icon, required this.label, this.selected = false, this.onTap});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  Widget build(BuildContext context) => StudioPress(
     onTap: onTap,
-    behavior: HitTestBehavior.opaque,
+    selected: selected,
     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Icon(icon, size: 26, color: selected ? ink : muted),
+      AnimatedContainer(
+        duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+        decoration: BoxDecoration(color: selected ? paperCard : Colors.transparent, borderRadius: BorderRadius.circular(12)),
+        child: Icon(icon, size: 22, color: selected ? actionCoral : muted)),
       const SizedBox(height: 4),
       Text(label, style: TextStyle(fontSize: 11, color: selected ? ink : muted, fontWeight: selected ? FontWeight.w800 : FontWeight.w600)),
     ]),

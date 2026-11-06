@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'models.dart';
 import 'services/my_library.dart';
 import 'theme.dart';
+import 'widgets/studio_chrome.dart';
 import 'widgets/frames.dart';
 import 'widgets/sticker_book_view.dart';
 import 'widgets/sticker_item.dart';
@@ -127,7 +128,7 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
             Expanded(child: Text(_editing ? '修改模板' : '設計模板', style: const TextStyle(fontSize: 20, color: ink, fontWeight: FontWeight.w900))),
             FilledButton(
               onPressed: _save,
-              style: FilledButton.styleFrom(backgroundColor: coral, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              style: FilledButton.styleFrom(backgroundColor: actionCoral, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
               child: const Text('儲存', style: TextStyle(fontWeight: FontWeight.w800)),
             ),
           ]),
@@ -179,7 +180,8 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      boxShadow: [BoxShadow(color: ink.withValues(alpha: .07), blurRadius: 20, offset: const Offset(0, -4))],
+      border: Border.all(color: line),
+      boxShadow: [BoxShadow(color: ink.withValues(alpha: .04), blurRadius: 24, offset: const Offset(0, -4))],
     ),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
       // The sticker book wants room to show part of a sheet.
@@ -194,22 +196,22 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
       Container(
         decoration: BoxDecoration(
           color: cream,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          boxShadow: [BoxShadow(color: ink.withValues(alpha: .06), blurRadius: 14, offset: const Offset(0, -3))],
+          border: const Border(top: BorderSide(color: line)),
         ),
         child: SafeArea(top: false, child: Padding(
           padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
           child: Row(children: [
             for (final t in _Tab.values)
-              Expanded(child: GestureDetector(
+              Expanded(child: StudioPress(
                 onTap: () => setState(() => _tab = t),
-                behavior: HitTestBehavior.opaque,
+                selected: _tab == t, radius: 14,
                 child: Center(child: AnimatedContainer(
                   duration: const Duration(milliseconds: 160),
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  decoration: BoxDecoration(color: _tab == t ? blush : Colors.transparent, borderRadius: BorderRadius.circular(14)),
+                  decoration: BoxDecoration(color: _tab == t ? Colors.white : Colors.transparent, borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _tab == t ? line : Colors.transparent)),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(t.icon, size: 22, color: _tab == t ? ink : muted),
+                    Icon(t.icon, size: 22, color: _tab == t ? actionCoral : muted),
                     const SizedBox(height: 2),
                     Text(t.label, style: TextStyle(fontSize: 11, color: _tab == t ? ink : muted, fontWeight: _tab == t ? FontWeight.w800 : FontWeight.w600)),
                   ]),

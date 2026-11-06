@@ -8,6 +8,7 @@ import 'models.dart';
 import 'services/my_library.dart';
 import 'template_maker_screen.dart';
 import 'theme.dart';
+import 'widgets/studio_chrome.dart';
 import 'widgets/frames.dart';
 import 'widgets/my_sheet_view.dart';
 
@@ -160,19 +161,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: cream,
     body: SafeArea(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      StudioHeader(title: '我的素材', eyebrow: 'THE MATERIAL LIBRARY', subtitle: '喜歡的貼紙與模板，慢慢收集成自己的風格。',
+        onBack: widget.embedded ? null : () => Navigator.pop(context)),
       Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
-        child: Row(children: [
-          if (widget.embedded) const SizedBox(width: 12, height: 48)
-          else IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(CupertinoIcons.back, color: ink, size: 26)),
-          const Text('我的素材', style: TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900)),
-        ]),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
         child: Container(
           padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: line)),
+          decoration: BoxDecoration(color: paperCard, borderRadius: BorderRadius.circular(16)),
           child: Row(children: [
             for (final (i, label) in const [(0, '貼紙'), (1, '模板')])
               Expanded(child: GestureDetector(
@@ -180,7 +175,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 160),
                   padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(color: _tab == i ? blush : Colors.transparent, borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(color: _tab == i ? Colors.white : Colors.transparent, borderRadius: BorderRadius.circular(12),
+                    boxShadow: _tab == i ? const [BoxShadow(color: Color(0x0D3E322E), blurRadius: 6, offset: Offset(0, 2))] : null),
                   child: Text(label, textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 15, color: ink, fontWeight: _tab == i ? FontWeight.w900 : FontWeight.w600)),
                 ),
@@ -307,17 +303,17 @@ class _AddTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: blush, borderRadius: BorderRadius.circular(18),
+    color: Colors.white, borderRadius: BorderRadius.circular(18),
     child: InkWell(
       onTap: onTap, borderRadius: BorderRadius.circular(18),
       child: Container(
         height: height,
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: blushLine, width: 1.4)),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: line)),
         child: height != null
           ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(icon, color: coral, size: 24),
+              Icon(icon, color: actionCoral, size: 21),
               const SizedBox(width: 8),
-              Text(label, style: const TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)),
+              Flexible(child: Text(label, style: const TextStyle(fontSize: 13, color: ink, fontWeight: FontWeight.w700))),
             ])
           : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               Icon(icon, color: coral, size: 30),
@@ -375,7 +371,7 @@ class _EmptyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.fromLTRB(20, 26, 20, 22),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: line)),
+    decoration: studioSurface(),
     child: Column(children: [
       SizedBox(height: 110, child: art),
       const SizedBox(height: 14),
@@ -385,7 +381,7 @@ class _EmptyCard extends StatelessWidget {
       const SizedBox(height: 16),
       FilledButton(
         onPressed: onTap,
-        style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: const StadiumBorder()),
+        style: FilledButton.styleFrom(backgroundColor: actionCoral, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
         child: Text(action, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
       ),
     ]),

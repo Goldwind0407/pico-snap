@@ -12,6 +12,7 @@ import 'services/editor_drafts.dart';
 import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
 import 'theme.dart';
+import 'widgets/studio_chrome.dart';
 
 const _weekdays = ['一', '二', '三', '四', '五', '六', '日'];
 
@@ -44,16 +45,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
         final kind = kinds.contains(_kind) ? _kind : null;
         final shown = [for (final w in MyWorks.works) if (kind == null || w.kind == kind) w];
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
-            child: Row(children: [
-              if (widget.embedded) const SizedBox(width: 12, height: 48)
-              else IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(CupertinoIcons.back, color: ink, size: 26)),
-              const Expanded(child: Text('作品集', style: TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
-              if (MyWorks.works.isNotEmpty)
-                Text('${MyWorks.works.length} 件', style: const TextStyle(fontSize: 13, color: muted, fontWeight: FontWeight.w700)),
-            ]),
-          ),
+          StudioHeader(title: '作品集', eyebrow: 'YOUR MOMENTS, COLLECTED', subtitle: '把日常裡的小喜歡，留在這裡。',
+            onBack: widget.embedded ? null : () => Navigator.pop(context),
+            trailing: MyWorks.works.isEmpty ? null : Text('${MyWorks.works.length} 件', style: const TextStyle(fontSize: 13, color: muted))),
           if (kinds.length > 1)
             SizedBox(height: 50, child: ListView(
               scrollDirection: Axis.horizontal,
@@ -82,17 +76,19 @@ class _Empty extends StatelessWidget {
   const _Empty();
 
   @override
-  Widget build(BuildContext context) => const Center(child: Padding(
-    padding: EdgeInsets.fromLTRB(40, 0, 40, 80),
-    child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Icon(CupertinoIcons.photo_on_rectangle, size: 54, color: blushLine),
-      SizedBox(height: 14),
-      Text('還沒有作品', style: TextStyle(fontSize: 17, color: ink, fontWeight: FontWeight.w900)),
-      SizedBox(height: 6),
-      Text('拍好、做好的作品存到相簿時，\n會自動收一份在這裡 ♡', textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 13, height: 1.5, color: muted, fontWeight: FontWeight.w600)),
+  Widget build(BuildContext context) => Center(child: Padding(
+    padding: const EdgeInsets.fromLTRB(28, 0, 28, 100),
+    child: Container(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 34), decoration: studioSurface(),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Container(width: 80, height: 80, decoration: BoxDecoration(color: paperCard, borderRadius: BorderRadius.circular(24)),
+        child: const Icon(CupertinoIcons.photo_on_rectangle, size: 36, color: actionCoral)),
+      const SizedBox(height: 22),
+      const Text('還沒有作品', style: TextStyle(fontSize: 18, color: ink, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 8),
+      const Text('拍好、做好的作品存到相簿時，\n會自動收一份在這裡 ♡', textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 13, height: 1.7, color: muted, fontWeight: FontWeight.w500)),
     ]),
-  ));
+  )));
 }
 
 class _Chip extends StatelessWidget {

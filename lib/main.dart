@@ -29,12 +29,7 @@ class PicoSnapApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     title: '快趣拍',
     debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      useMaterial3: true,
-      scaffoldBackgroundColor: cream,
-      colorScheme: ColorScheme.fromSeed(seedColor: coral),
-      fontFamily: 'Nunito',
-    ),
+    theme: buildAppTheme(),
     home: ready == null ? const HomeScreen() : FutureBuilder<void>(
       future: ready,
       builder: (context, snapshot) => snapshot.connectionState == ConnectionState.done

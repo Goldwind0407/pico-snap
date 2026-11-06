@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'gallery_screen.dart';
 import 'services/my_works.dart';
 import 'theme.dart';
+import 'widgets/studio_chrome.dart';
 
 /// 「日記」：月曆上看每天做了哪些作品，每天可以寫一句話。
 class DiaryScreen extends StatefulWidget {
@@ -62,7 +63,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
           SizedBox(width: double.infinity, child: FilledButton(
             onPressed: () => Navigator.pop(context, ctrl.text),
             style: FilledButton.styleFrom(
-              backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 14),
+              backgroundColor: actionCoral, padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
             child: const Text('寫好了', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
@@ -89,16 +90,15 @@ class _DiaryScreenState extends State<DiaryScreen> {
           byDay.putIfAbsent(MyWorks.dayKey(w.created), () => []).add(w);
         }
         return ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 130), children: [
-          Row(children: [
-            const SizedBox(height: 48),
-            const Expanded(child: Text('日記', style: TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
-            if (MyWorks.dayKey(_day) != MyWorks.dayKey(_today()) || _month != DateTime(_day.year, _day.month))
-              TextButton(
+          StudioHeader(padding: const EdgeInsets.fromLTRB(0, 12, 0, 18),
+            title: '日記', eyebrow: 'A LITTLE NOTE FOR TODAY', subtitle: '一張照片，一句心情。',
+            trailing: MyWorks.dayKey(_day) != MyWorks.dayKey(_today()) || _month != DateTime(_day.year, _day.month)
+              ? TextButton(
                 onPressed: _goToday,
                 style: TextButton.styleFrom(foregroundColor: coral),
                 child: const Text('回到今天', style: TextStyle(fontWeight: FontWeight.w800)),
-              ),
-          ]),
+              ) : null,
+          ),
           const SizedBox(height: 8),
           _MonthCard(
             month: _month, selected: _day, today: _today(), byDay: byDay,

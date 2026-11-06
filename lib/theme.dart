@@ -2,13 +2,14 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
-const cream = Color(0xFFFFFAF4);
-const paperCard = Color(0xFFF8F2EA);
-const ink = Color(0xFF4A3632);
+const cream = Color(0xFFFBF8F3);
+const paperCard = Color(0xFFF2ECE4);
+const ink = Color(0xFF3E322E);
 const outline = Color(0xFF5E4843);
-const muted = Color(0xFFAA9891);
+const muted = Color(0xFF806E65);
 const coral = Color(0xFFF47C6E);
-const line = Color(0xFFEDE2D7);
+const actionCoral = Color(0xFFB45446);
+const line = Color(0xFFE8DFD5);
 
 const blush = Color(0xFFFFDCD8);
 const blushLine = Color(0xFFF0AAA3);
@@ -18,6 +19,65 @@ const butter = Color(0xFFFFF0C2);
 const butterLine = Color(0xFFE9D28C);
 const sage = Color(0xFFC6D4BB);
 const sky = Color(0xFFC8DDEA);
+const appFontFallback = ['PingFang TC', 'Microsoft JhengHei', 'Noto Sans TC'];
+
+/// Shared UI surfaces and type. Photo artwork keeps its own frame styling.
+ThemeData buildAppTheme() {
+  final scheme = ColorScheme.fromSeed(seedColor: actionCoral).copyWith(
+    primary: actionCoral, onPrimary: Colors.white,
+    secondary: const Color(0xFF60715D), surface: cream, onSurface: ink,
+    onSurfaceVariant: muted, outline: muted, outlineVariant: line,
+    surfaceContainerHighest: paperCard,
+  );
+  final base = ThemeData(useMaterial3: true, colorScheme: scheme, fontFamily: 'Nunito',
+    fontFamilyFallback: appFontFallback);
+  final buttonShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(16));
+  return base.copyWith(
+    scaffoldBackgroundColor: cream,
+    textTheme: base.textTheme.apply(bodyColor: ink, displayColor: ink).copyWith(
+      headlineSmall: base.textTheme.headlineSmall?.copyWith(fontSize: 25, height: 1.25, fontWeight: FontWeight.w800, color: ink),
+      titleLarge: base.textTheme.titleLarge?.copyWith(fontSize: 21, height: 1.3, fontWeight: FontWeight.w800, color: ink),
+      bodyMedium: base.textTheme.bodyMedium?.copyWith(height: 1.4, color: ink),
+    ),
+    appBarTheme: const AppBarTheme(backgroundColor: cream, foregroundColor: ink,
+      elevation: 0, scrolledUnderElevation: 0, centerTitle: false),
+    filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(
+      backgroundColor: actionCoral, foregroundColor: Colors.white, elevation: 0,
+      minimumSize: const Size(48, 48), padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      textStyle: const TextStyle(fontFamily: 'Nunito', fontFamilyFallback: appFontFallback, fontSize: 14, fontWeight: FontWeight.w800), shape: buttonShape)),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(
+      foregroundColor: ink, minimumSize: const Size(44, 44), side: const BorderSide(color: line), shape: buttonShape)),
+    textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: actionCoral,
+      textStyle: const TextStyle(fontFamily: 'Nunito', fontFamilyFallback: appFontFallback, fontWeight: FontWeight.w800), shape: buttonShape)),
+    iconButtonTheme: IconButtonThemeData(style: IconButton.styleFrom(foregroundColor: ink,
+      minimumSize: const Size(44, 44), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)))),
+    bottomSheetTheme: const BottomSheetThemeData(backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent, modalBarrierColor: Color(0x663E322E),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      clipBehavior: Clip.antiAlias),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true, fillColor: Colors.white, hintStyle: const TextStyle(color: muted, fontWeight: FontWeight.w500),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: line)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: line)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: actionCoral, width: 1.5))),
+    dividerTheme: const DividerThemeData(color: line, thickness: 1, space: 24),
+    progressIndicatorTheme: const ProgressIndicatorThemeData(color: actionCoral, linearTrackColor: paperCard),
+    sliderTheme: base.sliderTheme.copyWith(activeTrackColor: actionCoral, thumbColor: actionCoral,
+      inactiveTrackColor: line, overlayColor: coral.withValues(alpha: .12), trackHeight: 3),
+    chipTheme: base.chipTheme.copyWith(backgroundColor: Colors.white, selectedColor: blush,
+      side: const BorderSide(color: line), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+    snackBarTheme: SnackBarThemeData(behavior: SnackBarBehavior.floating, backgroundColor: ink,
+      elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+    tooltipTheme: TooltipThemeData(decoration: BoxDecoration(color: ink, borderRadius: BorderRadius.circular(10)),
+      textStyle: const TextStyle(color: Colors.white, fontSize: 12)),
+  );
+}
+
+BoxDecoration studioSurface({double radius = 24, Color color = Colors.white}) => BoxDecoration(
+  color: color, borderRadius: BorderRadius.circular(radius), border: Border.all(color: line),
+  boxShadow: const [BoxShadow(color: Color(0x073E322E), blurRadius: 22, offset: Offset(0, 8))],
+);
 
 /// Handwritten accent text.
 /// Handwriting: Caveat, and 辰宇落雁體 for Chinese.

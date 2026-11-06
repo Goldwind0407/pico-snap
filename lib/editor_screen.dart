@@ -33,6 +33,7 @@ import 'widgets/page_texture.dart';
 import 'widgets/print_item.dart';
 import 'widgets/sticker_book_view.dart';
 import 'widgets/sticker_item.dart';
+import 'widgets/studio_chrome.dart';
 
 enum _Tool {
   template(CupertinoIcons.square_split_1x2, '模板'),
@@ -792,7 +793,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
           SizedBox(width: double.infinity, child: FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 14),
+              backgroundColor: actionCoral, padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
             child: const Text('完成', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
@@ -929,7 +930,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
               icon: const Icon(CupertinoIcons.photo_on_rectangle, size: 18),
               label: const Text('看作品、分享', style: TextStyle(fontWeight: FontWeight.w800)),
               style: FilledButton.styleFrom(
-                backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 13),
+                backgroundColor: actionCoral, padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
             )),
@@ -1189,7 +1190,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
             icon: const Icon(CupertinoIcons.photo_on_rectangle, size: 20),
             label: Text(widget.mode == EditorMode.sticker ? '選照片，自動剪成貼紙' : widget.mode == EditorMode.polaroid ? '選照片（1～6 張）' : _slots > 1 ? '選照片（一次可以選 $_slots 張）' : '先選一張照片', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
             style: FilledButton.styleFrom(
-              backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+              backgroundColor: actionCoral, padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
               shape: const StadiumBorder(), elevation: 3, shadowColor: ink.withValues(alpha: .3),
             ),
           ))),
@@ -1210,7 +1211,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
     child: Row(children: [
       IconButton(onPressed: () => Navigator.maybePop(context), icon: const Icon(CupertinoIcons.back, color: ink, size: 26)),
-      Expanded(child: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 20, color: ink, fontWeight: FontWeight.w900))),
+      Expanded(child: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 19, color: ink, fontWeight: FontWeight.w800))),
       _IconButton(icon: CupertinoIcons.arrow_uturn_left, tooltip: '復原', onTap: _history.isEmpty ? null : _undo),
       _IconButton(icon: CupertinoIcons.arrow_uturn_right, tooltip: '重做', onTap: _redoHistory.isEmpty ? null : _redo),
       if (widget.mode != EditorMode.sticker) _IconButton(icon: CupertinoIcons.photo_on_rectangle, tooltip: '從相簿選照片', onTap: _pickMany),
@@ -1355,7 +1356,8 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      boxShadow: [BoxShadow(color: ink.withValues(alpha: .07), blurRadius: 20, offset: Offset(0, side ? 4 : -4))],
+      border: const Border(top: BorderSide(color: line)),
+      boxShadow: [BoxShadow(color: ink.withValues(alpha: .04), blurRadius: 24, offset: Offset(0, side ? 4 : -4))],
     ),
     child: Column(mainAxisSize: side ? MainAxisSize.max : MainAxisSize.min, children: [
       if (!side) ...[
@@ -1375,8 +1377,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       Container(
         decoration: BoxDecoration(
           color: cream,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          boxShadow: [BoxShadow(color: ink.withValues(alpha: .06), blurRadius: 14, offset: const Offset(0, -3))],
+          border: const Border(top: BorderSide(color: line)),
         ),
         child: SafeArea(top: false, child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
@@ -1912,7 +1913,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
             icon: const Icon(CupertinoIcons.photo_on_rectangle, size: 18),
             label: const FittedBox(child: Text('加照片，自動去背', style: TextStyle(fontWeight: FontWeight.w800))),
             style: FilledButton.styleFrom(
-              backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+              backgroundColor: actionCoral, padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
           )),
@@ -2180,7 +2181,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
         const SizedBox(width: 8),
         FilledButton(
           onPressed: () => _addText(_textCtrl.text),
-          style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+          style: FilledButton.styleFrom(backgroundColor: actionCoral, padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
           child: const Text('加上去', style: TextStyle(fontWeight: FontWeight.w800)),
         ),
       ]),
@@ -2321,14 +2322,15 @@ class _ToolTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? ink : muted;
-    return GestureDetector(
+    final color = selected ? actionCoral : muted;
+    return StudioPress(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
+      selected: selected, radius: 14,
       child: Center(child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 12, vertical: 6),
-        decoration: BoxDecoration(color: selected ? blush : Colors.transparent, borderRadius: BorderRadius.circular(14)),
+        decoration: BoxDecoration(color: selected ? Colors.white : Colors.transparent, borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: selected ? line : Colors.transparent)),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Icon(tool.icon, size: 24, color: color),
           const SizedBox(height: 3),
@@ -2479,7 +2481,7 @@ class _TopButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: filled ? coral : Colors.white,
+    color: filled ? actionCoral : Colors.white,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: filled ? BorderSide.none : const BorderSide(color: line, width: 1.3)),
     child: InkWell(
       onTap: onTap, borderRadius: BorderRadius.circular(12),

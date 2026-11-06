@@ -638,7 +638,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         _Stage.pick => '選底片',
         _Stage.aiming => _film.label,
         _ => '拍立得',
-      }, style: const TextStyle(fontSize: 22, color: ink, fontWeight: FontWeight.w900))),
+      }, style: const TextStyle(fontSize: 21, color: ink, fontWeight: FontWeight.w800))),
       if (_canFlip && _stage == _Stage.aiming)
         IconButton(tooltip: '切換鏡頭', onPressed: _flipCamera, icon: const Icon(CupertinoIcons.camera_rotate), color: ink),
       if (_stage == _Stage.pick || _stage == _Stage.aiming)
@@ -665,7 +665,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         onPressed: _start,
         icon: const Icon(CupertinoIcons.camera_fill),
         label: const Text('開始拍照', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-        style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+        style: FilledButton.styleFrom(backgroundColor: actionCoral, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
       )),
     )),
   ]);
@@ -866,7 +866,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
       child: SizedBox(width: double.infinity, child: FilledButton(
         onPressed: _stopDecorating,
-        style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 12)),
+        style: FilledButton.styleFrom(backgroundColor: actionCoral, padding: const EdgeInsets.symmetric(vertical: 12)),
         child: const Text('選好了', style: TextStyle(fontWeight: FontWeight.w800)),
       )),
     ),
@@ -954,7 +954,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
             icon: const Icon(CupertinoIcons.checkmark_circle_fill, size: 18),
             label: Text(_saving ? '儲存中…' : '完成！', style: const TextStyle(fontWeight: FontWeight.w900)),
             style: FilledButton.styleFrom(
-              backgroundColor: coral, disabledBackgroundColor: coral.withValues(alpha: .6), disabledForegroundColor: Colors.white,
+              backgroundColor: actionCoral, disabledBackgroundColor: coral.withValues(alpha: .6), disabledForegroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
           )),
@@ -1001,7 +1001,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
           const SizedBox(width: 4),
           FilledButton(
             onPressed: _stopDecorating,
-            style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12)),
+            style: FilledButton.styleFrom(backgroundColor: actionCoral, padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12)),
             child: const Text('寫好了', style: TextStyle(fontWeight: FontWeight.w800)),
           ),
         ]),
@@ -1016,7 +1016,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
       child: SizedBox(width: double.infinity, child: FilledButton(
         onPressed: _stopDecorating,
-        style: FilledButton.styleFrom(backgroundColor: coral, padding: const EdgeInsets.symmetric(vertical: 12)),
+        style: FilledButton.styleFrom(backgroundColor: actionCoral, padding: const EdgeInsets.symmetric(vertical: 12)),
         child: const Text('貼好了', style: TextStyle(fontWeight: FontWeight.w800)),
       )),
     ),

@@ -5,6 +5,7 @@ import 'package:pico_snap/booth_screen.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/home_screen.dart';
 import 'package:pico_snap/models.dart';
+import 'package:pico_snap/theme.dart';
 import 'package:pico_snap/sticker_book.dart';
 import 'package:pico_snap/widgets/doodle.dart';
 import 'package:pico_snap/widgets/sticker_book_view.dart';
@@ -15,9 +16,24 @@ void main() {
   Future<void> pump(WidgetTester t, Size s, Widget w) async {
     t.view.physicalSize = s;
     t.view.devicePixelRatio = 1;
-    await t.pumpWidget(MaterialApp(home: w));
+    await t.pumpWidget(MaterialApp(theme: buildAppTheme(), home: w));
     await t.pumpAndSettle();
   }
+
+  testWidgets('home keeps its creation action usable on a narrow screen with large text', (t) async {
+    t.view.physicalSize = const Size(320, 740);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(MaterialApp(theme: buildAppTheme(),
+      builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(1.5)), child: child!),
+      home: const HomeScreen()));
+    await t.pumpAndSettle();
+    await t.ensureVisible(find.text('開始製作'));
+    await t.tap(find.text('開始製作'));
+    await t.pumpAndSettle();
+    expect(find.text('像拍貼機，倒數連拍 4 張'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
 
   for (final s in sizes) {
     testWidgets('home $s', (t) async {

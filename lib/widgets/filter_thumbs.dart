@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../filters.dart';
 import '../lut_files.dart';
 import '../theme.dart';
+import 'studio_chrome.dart';
 
 /// Every filter as a small preview of [image], so you see the look before
 /// picking it.
@@ -24,18 +25,22 @@ class FilterThumbs extends StatelessWidget {
     itemBuilder: (_, i) {
       final f = photoFilters[i];
       final on = f.id == selected;
-      return GestureDetector(
+      return StudioPress(
         onTap: () => onPick(f),
-        child: Column(children: [
-          Container(
+        selected: on, radius: 14,
+        child: SizedBox(width: 68, child: Column(children: [
+          AnimatedContainer(
+            duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 180),
             width: 64, height: 64,
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: on ? coral : Colors.transparent, width: 2.5)),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: on ? actionCoral : line, width: on ? 2 : 1)),
             padding: const EdgeInsets.all(2),
             child: ClipRRect(borderRadius: BorderRadius.circular(9), child: FilterEffects(filter: f, child: Image(image: filtered(image, f, maxSide: 180), fit: BoxFit.cover, width: 60, height: 60, gaplessPlayback: true))),
           ),
           const SizedBox(height: 4),
-          Text(f.name, style: TextStyle(fontSize: 11, color: on ? ink : muted, fontWeight: on ? FontWeight.w900 : FontWeight.w600)),
-        ]),
+          Text(f.name, maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, color: on ? actionCoral : muted, fontWeight: on ? FontWeight.w800 : FontWeight.w500)),
+        ])),
       );
     },
   ));
