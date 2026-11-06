@@ -17,6 +17,7 @@ import 'filters.dart';
 import 'editor_document.dart';
 import 'gallery_screen.dart';
 import 'services/editor_drafts.dart';
+import 'services/app_sounds.dart';
 import 'services/my_library.dart';
 import 'models.dart';
 import 'services/my_works.dart';
@@ -399,6 +400,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   /// Takes print [i] off the page: the ones after it move up.
   void _deletePrint(int i) {
     if (_count <= 1) return showMessage(context, '至少要留一張拍立得');
+    AppSounds.shared.play(AppSound.trash);
     setState(() => _dropPrint(i));
   }
 
@@ -534,6 +536,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       setState(() => _cutting = null);
       return showMessage(context, '這次沒有剪出來，換一張照片試試', error: true);
     }
+    AppSounds.shared.play(AppSound.snip);
     setState(() {
       _cutting = null;
       _remember();
@@ -574,6 +577,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     if (id == null || source == null) return showMessage(context, '先點一張剪好的貼紙');
     final png = await CutoutPage.open(context, source, recorder: _recorder, raw: true);
     if (png == null || !mounted || !_cutouts.containsKey(id)) return;
+    AppSounds.shared.play(AppSound.snip);
     setState(() {
       _remember();
       _cutouts = {..._cutouts, id: _cutouts[id]!.copyWith(cut: png)};
@@ -592,6 +596,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   /// A sticker sheet to print: white paper, everything in rows with room to
   /// cut around, cutting lines on.
   void _arrangeSheet() => setState(() {
+    AppSounds.shared.play(AppSound.pop);
     _remember();
     _clearPage = false;
     _backdropPattern = BackdropPattern.plain;
@@ -863,6 +868,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       _capturing = false;
       if (error == null) _savedKey = _contentKey();
     });
+    if (error == null) AppSounds.shared.play(AppSound.complete);
     final work = kept == null ? null : MyWorks.works.where((w) => w.id == kept.id).firstOrNull;
     // Done: show the piece and where to go from here.
     if (error == null && work != null) return _showDone(work, album: album);
@@ -1031,6 +1037,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   });
 
   void _selectTool(_Tool tool) => setState(() {
+    if (tool != _tool) AppSounds.shared.play(AppSound.select);
     _tool = tool;
     _backTool = null;
     if (tool == _Tool.text) _textCtrl.text = _text;
@@ -1100,11 +1107,13 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
 
   void _undo() => setState(() {
     if (_history.isEmpty) return;
+    AppSounds.shared.play(AppSound.undo);
     _redoHistory.add(_document()); _restore(_history.removeLast()); _historyGroup = null;
   });
 
   void _redo() => setState(() {
     if (_redoHistory.isEmpty) return;
+    AppSounds.shared.play(AppSound.redo);
     _history.add(_document()); _restore(_redoHistory.removeLast()); _historyGroup = null;
   });
 
@@ -1249,6 +1258,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
               _stickers[i] = _stickers[i].copyWith(flipped: !_stickers[i].flipped);
             }),
             onDelete: () => setState(() {
+              AppSounds.shared.play(AppSound.trash);
               _remember();
               final gone = _stickers.removeAt(i).sticker;
               if (_cutouts.containsKey(gone) && !_stickers.any((s) => s.sticker == gone)) {
@@ -1406,6 +1416,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   /// Puts the collage into [t]: its page, prints, paper bits and look; the
   /// photos stay. null: back to a plain page.
   void _applyTemplate(CollageTemplate? t) => setState(() {
+    AppSounds.shared.play(AppSound.sparkle);
     _remember();
     _closePhoto();
     _selectedCell = 0;
@@ -1471,7 +1482,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (_, k) {
           final i = visible[k];
-          return _TemplateThumb(template: allStripTemplates[i], selected: _template == i, onTap: () => setState(() { _remember(); _template = i; }));
+          return _TemplateThumb(template: allStripTemplates[i], selected: _template == i, onTap: () => setState(() { if (_template != i) AppSounds.shared.play(AppSound.select); _remember(); _template = i; }));
         },
       )),
     ]);
@@ -1661,6 +1672,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   }
 
   void _setFilm(FilmStock f, {bool all = false}) => setState(() {
+    AppSounds.shared.play(AppSound.select);
     _remember();
     for (var i = 0; i < _films.length; i++) {
       if (all || i == _selectedCell) _films[i] = f;
@@ -2012,11 +2024,13 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       ]),
       row('材質', [
         for (final f in StickerFinish.values)
-          _Chip(label: f.label, icon: f.icon, selected: current.finish == f, onTap: () => _styleCuts((c) => c.copyWith(finish: f))),
+          _Chip(label: f.label, icon: f.icon, selected: current.finish == f, sound: f == StickerFinish.matte ? AppSound.select : AppSound.sparkle,
+            onTap: () => _styleCuts((c) => c.copyWith(finish: f))),
       ]),
       row('動態', [
         for (final m in StickerMotion.values)
-          _Chip(label: m.label, icon: m.icon, selected: current.motion == m, onTap: () => _styleCuts((c) => c.copyWith(motion: m))),
+          _Chip(label: m.label, icon: m.icon, selected: current.motion == m, sound: m == StickerMotion.none ? AppSound.select : AppSound.pop,
+            onTap: () => _styleCuts((c) => c.copyWith(motion: m))),
       ]),
       Padding(
         padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
@@ -2038,7 +2052,10 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
             Expanded(child: Padding(
               padding: EdgeInsets.only(right: s == PenStyle.values.last ? 0 : 6),
               child: GestureDetector(
-                onTap: () => setState(() => _setPen(s)),
+                onTap: () => setState(() {
+                  if (s != _pen) AppSounds.shared.play(AppSound.select);
+                  _setPen(s);
+                }),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 160),
                   padding: const EdgeInsets.symmetric(vertical: 7),
@@ -2067,7 +2084,10 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                 final c = penColors[i];
                 final on = c == _penColor;
                 return GestureDetector(
-                  onTap: () => setState(() => _penColor = c),
+                  onTap: () => setState(() {
+                    if (c != _penColor) AppSounds.shared.play(AppSound.select);
+                    _penColor = c;
+                  }),
                   child: Container(
                     width: 34, height: 34, padding: const EdgeInsets.all(3),
                     decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: on ? coral : Colors.transparent, width: 2.2)),
@@ -2081,7 +2101,10 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
           if (!erasing)
             for (var i = 0; i < penWidths.length; i++)
               GestureDetector(
-                onTap: () => setState(() => _penWidth = i),
+                onTap: () => setState(() {
+                  if (_penWidth != i) AppSounds.shared.play(AppSound.select);
+                  _penWidth = i;
+                }),
                 child: Container(
                   width: 40, height: 34, margin: const EdgeInsets.only(right: 6),
                   decoration: BoxDecoration(
@@ -2347,11 +2370,16 @@ class _Chip extends StatelessWidget {
   final IconData? icon;
   final bool selected;
   final VoidCallback onTap;
-  const _Chip({required this.label, required this.selected, required this.onTap, this.icon});
+  /// What it sounds like when tapped.
+  final AppSound sound;
+  const _Chip({required this.label, required this.selected, required this.onTap, this.icon, this.sound = AppSound.select});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
+    onTap: () {
+      AppSounds.shared.play(sound);
+      onTap();
+    },
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 140),
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),

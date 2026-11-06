@@ -7,6 +7,7 @@ import 'lut_files.dart';
 import 'services/my_library.dart';
 import 'services/my_works.dart';
 import 'services/editor_drafts.dart';
+import 'services/app_sounds.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -15,7 +16,7 @@ Future<void> main() async {
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks(['辰宇落雁體 ChenYuluoyan'], await rootBundle.loadString('assets/fonts/ChenYuluoyan-OFL.txt'));
   });
-  final ready = Future.wait([MyLibrary.load(), MyWorks.load(), EditorDrafts.load()]);
+  final ready = Future.wait([MyLibrary.load(), MyWorks.load(), EditorDrafts.load(), AppSounds.shared.initialize()]);
   runApp(PicoSnapApp(ready: ready));
   // Filters from lookup files join the list a moment later.
   LutFiles.load();

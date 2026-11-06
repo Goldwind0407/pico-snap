@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/app_sounds.dart';
 
 const stickerPeelDuration = Duration(milliseconds: 760);
 const stickerLandDuration = Duration(milliseconds: 620);
@@ -121,12 +122,14 @@ class _PeelableStickerState extends State<PeelableSticker> with SingleTickerProv
     if (_busy) return;
     _busy = true;
     HapticFeedback.selectionClick();
+    if (!MediaQuery.disableAnimationsOf(context)) AppSounds.shared.play(AppSound.peel);
     try {
       if (!MediaQuery.disableAnimationsOf(context)) await _lift.forward(from: 0).orCancel;
       if (mounted) widget.onPick();
     } on TickerCanceled {
       // Closing the picker cancels the pending selection.
     } finally {
+      AppSounds.shared.stop(AppSound.peel);
       if (mounted) _lift.reset();
       _busy = false;
     }

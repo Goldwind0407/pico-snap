@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'cutout/cutout_page.dart';
 import 'booth_screen.dart';
 import 'models.dart';
+import 'services/app_sounds.dart';
 import 'services/my_library.dart';
 import 'template_maker_screen.dart';
 import 'theme.dart';
@@ -171,7 +172,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
           child: Row(children: [
             for (final (i, label) in const [(0, '貼紙'), (1, '模板')])
               Expanded(child: GestureDetector(
-                onTap: () => setState(() => _tab = i),
+                onTap: () => setState(() {
+                  if (_tab != i) AppSounds.shared.play(AppSound.select);
+                  _tab = i;
+                }),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 160),
                   padding: const EdgeInsets.symmetric(vertical: 10),

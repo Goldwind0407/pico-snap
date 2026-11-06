@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import 'models.dart';
+import 'services/app_sounds.dart';
 import 'services/my_library.dart';
 import 'theme.dart';
 import 'widgets/studio_chrome.dart';
@@ -203,7 +204,10 @@ class _TemplateMakerScreenState extends State<TemplateMakerScreen> {
           child: Row(children: [
             for (final t in _Tab.values)
               Expanded(child: StudioPress(
-                onTap: () => setState(() => _tab = t),
+                onTap: () => setState(() {
+                  if (_tab != t) AppSounds.shared.play(AppSound.select);
+                  _tab = t;
+                }),
                 selected: _tab == t, radius: 14,
                 child: Center(child: AnimatedContainer(
                   duration: const Duration(milliseconds: 160),
@@ -388,7 +392,10 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
+    onTap: () {
+      if (!selected) AppSounds.shared.play(AppSound.select);
+      onTap();
+    },
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

@@ -11,6 +11,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../services/app_sounds.dart';
 import '../services/timelapse_recorder.dart';
 import '../theme.dart';
 import 'cutout.dart';
@@ -296,6 +297,7 @@ class _CutoutPageState extends State<CutoutPage> {
 
   void _undoStep() {
     if (_undo.isEmpty || _busy) return;
+    AppSounds.shared.play(AppSound.undo);
     _redo.add((_mask, _hints));
     final (m, h) = _undo.removeLast();
     _mask = m;
@@ -305,6 +307,7 @@ class _CutoutPageState extends State<CutoutPage> {
 
   void _redoStep() {
     if (_redo.isEmpty || _busy) return;
+    AppSounds.shared.play(AppSound.redo);
     _undo.add((_mask, _hints));
     final (m, h) = _redo.removeLast();
     _mask = m;
@@ -689,6 +692,7 @@ class _CutoutPageState extends State<CutoutPage> {
     img.dispose();
     if (!mounted) return;
     _edited = false;
+    if (png != null) AppSounds.shared.play(AppSound.snip);
     Navigator.pop(context, png?.buffer.asUint8List());
   }
 

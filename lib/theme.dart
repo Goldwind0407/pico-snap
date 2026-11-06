@@ -2,6 +2,8 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
+import 'services/app_sounds.dart';
+
 const cream = Color(0xFFFBF8F3);
 const paperCard = Color(0xFFF2ECE4);
 const ink = Color(0xFF3E322E);
@@ -85,25 +87,30 @@ TextStyle hand(double size, {Color color = ink}) =>
     TextStyle(fontFamily: 'Caveat', fontFamilyFallback: const ['ChenYuluoyan'], fontSize: size, color: color, fontWeight: FontWeight.w600, height: 1.1);
 
 /// Asks before deleting something; true when the user confirms.
-Future<bool> confirmDelete(BuildContext context, String title, String message, {String delete = '刪除'}) async =>
-    await showGlassDialog<bool>(context, (context) => GlassDialog(
-      title: title, message: message,
-      actions: [
-        GlassAction('取消', () => Navigator.pop(context, false)),
-        GlassAction(delete, () => Navigator.pop(context, true), danger: true),
-      ],
-    )) ==
-    true;
+Future<bool> confirmDelete(BuildContext context, String title, String message, {String delete = '刪除'}) async {
+  final yes = await showGlassDialog<bool>(context, (context) => GlassDialog(
+    title: title, message: message,
+    actions: [
+      GlassAction('取消', () => Navigator.pop(context, false)),
+      GlassAction(delete, () => Navigator.pop(context, true), danger: true),
+    ],
+  )) == true;
+  if (yes) AppSounds.shared.play(AppSound.trash);
+  return yes;
+}
 
 /// A short floating message at the bottom of the screen; [above] lifts it
 /// over controls it would otherwise cover.
-void showMessage(BuildContext context, String text, {bool error = false, double above = 0}) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-  content: Text(text),
-  behavior: SnackBarBehavior.floating,
-  margin: EdgeInsets.fromLTRB(16, 0, 16, 16 + above),
-  backgroundColor: error ? const Color(0xFFB4483C) : ink,
-  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-));
+void showMessage(BuildContext context, String text, {bool error = false, double above = 0}) {
+  if (error) AppSounds.shared.play(AppSound.oops);
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    content: Text(text),
+    behavior: SnackBarBehavior.floating,
+    margin: EdgeInsets.fromLTRB(16, 0, 16, 16 + above),
+    backgroundColor: error ? const Color(0xFFB4483C) : ink,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+  ));
+}
 
 /// Asks before leaving a page with unsaved work; true when the user leaves.
 Future<bool> confirmLeave(BuildContext context, String message, {String stay = '繼續編輯'}) async =>

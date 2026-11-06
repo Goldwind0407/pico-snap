@@ -18,6 +18,7 @@ import 'models.dart';
 import 'polaroid_camera_screen.dart' show mainCamera;
 import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
+import 'services/app_sounds.dart';
 import 'services/timelapse_recorder.dart';
 import 'theme.dart';
 import 'widgets/filter_thumbs.dart';
@@ -252,7 +253,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
       if (!_alive(session)) return;
       setState(() => _count = n);
       _pop.forward(from: 0);
-      SystemSound.play(SystemSoundType.click);
+      AppSounds.shared.play(n == 1 ? AppSound.ready : AppSound.tick);
       await Future<void>.delayed(const Duration(seconds: 1));
     }
     if (!_alive(session)) return;
@@ -304,6 +305,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
 
   Future<({Uint8List bytes, bool mirror})?> _take() async {
     HapticFeedback.heavyImpact();
+    AppSounds.shared.play(AppSound.shutter);
     _flash.forward(from: 0);
     final shoot = widget.shoot;
     if (shoot != null) {
@@ -517,6 +519,7 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
       }
     });
     // Saved is said under the strip; only trouble pops up.
+    if (error == null) AppSounds.shared.play(AppSound.complete);
     if (error != null) showMessage(context, error, error: true, above: 150);
   }
 
@@ -672,7 +675,10 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
         itemBuilder: (_, k) {
           final i = visible[k];
           return GestureDetector(
-            onTap: () => setState(() => _template = i),
+            onTap: () => setState(() {
+              if (_template != i) AppSounds.shared.play(AppSound.select);
+              _template = i;
+            }),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
               padding: const EdgeInsets.all(4),
@@ -969,7 +975,10 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
+    onTap: () {
+      if (!selected) AppSounds.shared.play(AppSound.select);
+      onTap();
+    },
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 160),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

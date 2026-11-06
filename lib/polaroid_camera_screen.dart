@@ -14,12 +14,14 @@ import 'filters.dart';
 import 'models.dart';
 import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
+import 'services/app_sounds.dart';
 import 'theme.dart';
 import 'widgets/doodle.dart';
 import 'widgets/filter_thumbs.dart';
 import 'widgets/instant_print.dart';
 import 'widgets/sticker_book_view.dart';
 import 'widgets/sticker_item.dart';
+import 'widgets/sound_settings.dart';
 
 /// Geometry of the camera photos (all the same model), as fractions of the
 /// photo's width (x, radius) and height (y), measured on the cream one.
@@ -191,6 +193,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     _inkTick.dispose();
     _cameraGen++;
     _motor?.cancel();
+    AppSounds.shared.stop(AppSound.feed);
     _camera?.dispose();
     _eject.dispose();
     _lift.dispose();
@@ -318,6 +321,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     final camera = _camera;
     if (camera == null || !camera.value.isInitialized || camera.value.isTakingPicture) return _fromGallery();
     HapticFeedback.heavyImpact();
+    AppSounds.shared.play(AppSound.shutter);
     _flash.forward(from: 0);
     try {
       final file = await camera.takePicture();
@@ -361,6 +365,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     });
     _develop.value = 0;
     _lift.value = 0;
+    AppSounds.shared.play(AppSound.feed);
     // The motor whirs while the film is moving.
     _motor?.cancel();
     _motor = Timer.periodic(const Duration(milliseconds: 120), (_) {
@@ -376,6 +381,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     } finally {
       _motor?.cancel();
       _motor = null;
+      AppSounds.shared.stop(AppSound.feed);
     }
     HapticFeedback.lightImpact(); // stops with a little clunk
     if (!mounted) return;
@@ -484,6 +490,9 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
               ]),
             ),
         ]),
+        const SizedBox(height: 14),
+        const Divider(),
+        const SoundSettingsTile(),
       ]),
     ))),
   );
@@ -503,6 +512,7 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       _saving = false;
       if (error == null) _current?.saved = true;
     });
+    if (error == null) AppSounds.shared.play(AppSound.complete);
     showMessage(context, error ?? '已存到相簿 ♡', error: error != null, above: _controlsHeight);
   }
 
@@ -679,7 +689,10 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
     itemBuilder: (_, i) {
       final g = FilmStock.series[i], on = g == _series;
       return GestureDetector(
-        onTap: () => setState(() => _series = g),
+        onTap: () => setState(() {
+          if (g != _series) AppSounds.shared.play(AppSound.select);
+          _series = g;
+        }),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           alignment: Alignment.center,
@@ -701,7 +714,10 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
       itemBuilder: (_, i) {
         final f = films[i], on = f == _film;
         return GestureDetector(
-          onTap: () => setState(() => _lastFilm = _film = f),
+          onTap: () => setState(() {
+            if (f != _film) AppSounds.shared.play(AppSound.select);
+            _lastFilm = _film = f;
+          }),
           child: SizedBox(width: 72, child: Column(children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 150),
@@ -972,7 +988,10 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           for (final c in _handColors)
             Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: GestureDetector(
-              onTap: () => setState(() => _pen = c),
+              onTap: () => setState(() {
+                if (_pen != c) AppSounds.shared.play(AppSound.select);
+                _pen = c;
+              }),
               child: Container(
                 width: 30, height: 30,
                 decoration: BoxDecoration(

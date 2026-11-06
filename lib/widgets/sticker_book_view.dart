@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../services/my_library.dart';
+import '../services/app_sounds.dart';
 import '../sticker_book.dart';
 import '../theme.dart';
 import 'deco_sticker.dart';
@@ -88,12 +89,14 @@ class _StickerBookViewState extends State<StickerBookView> with SingleTickerProv
       return;
     }
     setState(() => _lifting = (sheet, hit!));
+    AppSounds.shared.play(AppSound.peel);
     try {
       await _lift.forward(from: 0).orCancel;
       if (mounted) widget.onPick(hit.asset, scale);
     } on TickerCanceled {
       // The picker closed before the sticker was peeled off.
     } finally {
+      AppSounds.shared.stop(AppSound.peel);
       if (mounted) setState(() => _lifting = null);
     }
   }
@@ -160,7 +163,10 @@ class _StickerBookViewState extends State<StickerBookView> with SingleTickerProv
           : PageView.builder(
               controller: _pages,
               itemCount: labels.length,
-              onPageChanged: (i) => setState(() => _page = i),
+              onPageChanged: (i) => setState(() {
+                if (i != _page) AppSounds.shared.play(AppSound.flip);
+                _page = i;
+              }),
               itemBuilder: (_, i) => i < mine.length ? _mySheet(mine[i]) : i == mine.length ? _decorations() : _sheet(i - mine.length - 1),
             )),
       ]);

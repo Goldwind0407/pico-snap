@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models.dart';
+import '../services/app_sounds.dart';
 import '../theme.dart';
 import 'frames.dart';
 import 'sticker_motion.dart';
@@ -37,8 +38,9 @@ class StickerItem extends StatefulWidget {
 }
 
 class _StickerItemState extends State<StickerItem> with SingleTickerProviderStateMixin {
-  late final _landing = AnimationController(vsync: this, value: 1, duration: stickerLandDuration);
+  late final _landing = AnimationController(vsync: this, value: 1, duration: stickerLandDuration)..addStatusListener(_onLanded);
   bool _initialized = false;
+  bool _stampPending = false;
   late StickerData _start;
   Offset _startFocal = Offset.zero;
 
@@ -49,7 +51,14 @@ class _StickerItemState extends State<StickerItem> with SingleTickerProviderStat
     super.didChangeDependencies();
     if (!_initialized) {
       _initialized = true;
-      if (widget.animatePlacement && _canAnimate) _landing.forward(from: 0);
+      if (widget.animatePlacement && widget.animationsEnabled) {
+        if (_canAnimate) {
+          _stampPending = true;
+          _landing.forward(from: 0);
+        } else {
+          AppSounds.shared.play(AppSound.stamp);
+        }
+      }
     }
     if (!_canAnimate) _landing.value = 1;
   }
@@ -70,18 +79,35 @@ class _StickerItemState extends State<StickerItem> with SingleTickerProviderStat
     widget.onSelect();
     HapticFeedback.selectionClick();
     if (!_canAnimate) return;
+    AppSounds.shared.play(AppSound.peel);
     try {
       // Lift the corner before rolling it back down. Starting halfway through
       // a landing would flash an already-folded sticker on a simple tap.
       await _landing.animateBack(.3, duration: const Duration(milliseconds: 260)).orCancel;
-      if (mounted && _canAnimate) await _landing.forward().orCancel;
+      if (mounted && _canAnimate) {
+        _stampPending = true;
+        await _landing.forward().orCancel;
+      }
     } on TickerCanceled {
       // A new tap, drag or removal owns the motion now.
+    } finally {
+      AppSounds.shared.stop(AppSound.peel);
     }
   }
 
+  void _onLanded(AnimationStatus status) {
+    if (status != AnimationStatus.completed || !_stampPending) return;
+    _stampPending = false;
+    if (mounted && widget.animationsEnabled) AppSounds.shared.play(AppSound.stamp);
+  }
+
   void _land() {
-    if (_canAnimate) _landing.forward();
+    if (_canAnimate) {
+      _stampPending = true;
+      _landing.forward();
+    } else if (widget.animationsEnabled) {
+      AppSounds.shared.play(AppSound.stamp);
+    }
     HapticFeedback.lightImpact();
   }
 

@@ -8,6 +8,7 @@ import 'package:video_player/video_player.dart';
 
 import 'editor_screen.dart';
 import 'lut_files.dart';
+import 'services/app_sounds.dart';
 import 'services/editor_drafts.dart';
 import 'services/my_works.dart';
 import 'services/photo_save_service.dart';
@@ -99,7 +100,10 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
+    onTap: () {
+      if (!selected) AppSounds.shared.play(AppSound.select);
+      onTap();
+    },
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       alignment: Alignment.center,
@@ -176,6 +180,7 @@ class _WorkViewerState extends State<WorkViewer> {
   }
 
   Future<void> _share() async {
+    AppSounds.shared.play(AppSound.whoosh);
     setState(() => _busy = true);
     final work = _work;
     try {
@@ -329,6 +334,7 @@ class _VideoViewerState extends State<VideoViewer> {
   }
 
   Future<void> _share() async {
+    AppSounds.shared.play(AppSound.whoosh);
     try {
       await SharePlus.instance.share(ShareParams(files: [XFile(widget.file.path, mimeType: 'video/mp4')]));
     } catch (e) {

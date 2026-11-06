@@ -13,6 +13,8 @@ import 'models.dart';
 import 'theme.dart';
 import 'widgets/frames.dart';
 import 'widgets/studio_chrome.dart';
+import 'services/app_sounds.dart';
+import 'widgets/sound_settings.dart';
 
 /// Whether the drafts list on the home screen is open.
 final _draftsOpen = ValueNotifier(false);
@@ -28,11 +30,17 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 0 = 首頁, 1 = 素材, 2 = 日記, 3 = 作品集.
   int _tab = 0;
 
-  void _open(BuildContext context, EditorMode mode, [int template = 0]) => Navigator.push(
-    context, MaterialPageRoute(builder: (_) => mode == EditorMode.fourCut ? BoothScreen(template: template) : EditorScreen(mode: mode, template: template)),
-  );
+  void _open(BuildContext context, EditorMode mode, [int template = 0]) {
+    AppSounds.shared.play(AppSound.pop);
+    Navigator.push(
+      context, MaterialPageRoute(builder: (_) => mode == EditorMode.fourCut ? BoothScreen(template: template) : EditorScreen(mode: mode, template: template)),
+    );
+  }
 
-  void _camera(BuildContext context) => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolaroidCameraScreen()));
+  void _camera(BuildContext context) {
+    AppSounds.shared.play(AppSound.pop);
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const PolaroidCameraScreen()));
+  }
 
   /// The camera button and 開始製作 both ask which way to play, the same
   /// four as the cards.
@@ -105,7 +113,10 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: _BottomBar(
         tab: _tab,
         onCamera: () => _choose(context),
-        onTab: (t) => setState(() => _tab = t),
+        onTab: (t) {
+          if (t != _tab) AppSounds.shared.play(AppSound.select);
+          setState(() => _tab = t);
+        },
       ),
     ),
   );
@@ -215,7 +226,7 @@ class _Header extends StatelessWidget {
       Text('快趣拍', style: TextStyle(fontSize: 23, letterSpacing: 1, color: ink, fontWeight: FontWeight.w800)),
       Text('YOUR LITTLE PHOTO STUDIO', style: TextStyle(fontSize: 8, letterSpacing: 1.5, color: muted, fontWeight: FontWeight.w700)),
     ])),
-    const Icon(CupertinoIcons.sparkles, size: 22, color: actionCoral),
+    const SoundToggleButton(),
   ]);
 }
 

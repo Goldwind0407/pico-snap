@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../filters.dart';
 import '../lut_files.dart';
+import '../services/app_sounds.dart';
 import '../theme.dart';
 import 'studio_chrome.dart';
 
@@ -26,7 +27,10 @@ class FilterThumbs extends StatelessWidget {
       final f = photoFilters[i];
       final on = f.id == selected;
       return StudioPress(
-        onTap: () => onPick(f),
+        onTap: () {
+          if (!on) AppSounds.shared.play(AppSound.select);
+          onPick(f);
+        },
         selected: on, radius: 14,
         child: SizedBox(width: 68, child: Column(children: [
           AnimatedContainer(

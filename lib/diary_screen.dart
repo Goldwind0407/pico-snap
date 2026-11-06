@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 
 import 'gallery_screen.dart';
+import 'services/app_sounds.dart';
 import 'services/my_works.dart';
 import 'theme.dart';
 import 'widgets/studio_chrome.dart';
@@ -23,7 +24,10 @@ class _DiaryScreenState extends State<DiaryScreen> {
   late DateTime _day = _today();
   late DateTime _month = DateTime(_day.year, _day.month);
 
-  void _shiftMonth(int by) => setState(() => _month = DateTime(_month.year, _month.month + by));
+  void _shiftMonth(int by) {
+    AppSounds.shared.play(AppSound.flip);
+    setState(() => _month = DateTime(_month.year, _month.month + by));
+  }
 
   void _goToday() => setState(() {
     _day = _today();
