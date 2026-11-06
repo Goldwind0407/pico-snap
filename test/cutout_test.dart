@@ -140,7 +140,7 @@ void main() {
     await tester.tap(find.text('完成'));
     await tester.pump();
     expect(find.text('先放一張照片再儲存喔'), findsOneWidget);
-    expect(find.text('同時做「製作過程」縮時影片'), findsNothing);
+    expect(find.text('同時做「製作過程」影片'), findsNothing);
   });
 
   testWidgets('編輯過還沒存：按返回會先問；沒編輯就直接離開', (tester) async {
@@ -187,7 +187,7 @@ void main() {
       // Three prints are still blank: keep them.
       await tester.tap(find.text('留著空白'));
       await tester.pumpAndSettle();
-      expect(find.text('同時做「製作過程」縮時影片'), findsOneWidget);
+      expect(find.text('同時做「製作過程」影片'), findsOneWidget);
       final box = tester.widget<Checkbox>(find.descendant(of: find.ancestor(of: find.text('也存到手機相簿'), matching: find.byType(Row)).first, matching: find.byType(Checkbox)));
       if (box.value != album) await tester.tap(find.text('也存到手機相簿'));
       await tester.pump();

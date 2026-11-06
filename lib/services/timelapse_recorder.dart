@@ -21,6 +21,9 @@ class TimelapseRecorder {
   TimelapseRecorder({Directory? dir, this.maxFrames = 360, this.subtitle = 'the making of ♡'}) : _baseDir = dir;
 
   static const width = 720, height = 1280, fps = 12, holdSeconds = 2, minProcessSeconds = 4;
+  /// 完整版（照實際速度）：停下來想事情最多停這麼久，整段最長這麼長
+  /// （超過就整段平均加速）。
+  static const realPause = Duration(milliseconds: 1500), realLongest = Duration(minutes: 3);
   static const _maxRepeat = 6;
   static const _channel = MethodChannel('picosnap/video');
 
@@ -31,6 +34,8 @@ class TimelapseRecorder {
   Directory? _dir;
   bool _noDir = false;
   final _frames = <String>[];
+  /// When each frame was taken, for the real-speed video.
+  final _times = <DateTime>[];
   var _interval = const Duration(milliseconds: 250);
   var _last = DateTime(0);
   Timer? _timer;
@@ -50,8 +55,26 @@ class TimelapseRecorder {
   /// 每一格過程要重複幾次。
   int get _repeat => _frames.isEmpty ? 1 : min(_maxRepeat, max(1, (minProcessSeconds * fps / _frames.length).ceil()));
 
-  /// 現在做成影片大約幾秒。
+  /// 現在做成影片大約幾秒；[real] 是照實際速度的完整版。
   int get seconds => (_frames.length * _repeat / fps).ceil() + holdSeconds;
+
+  int get realSeconds => (_realRepeats(DateTime.now()).fold(0, (a, b) => a + b) / fps).ceil() + holdSeconds;
+
+  /// 完整版每一格要停幾格：到下一格之前實際過了多久（太久的停頓縮短），
+  /// 整段太長就平均加速。
+  List<int> _realRepeats(DateTime end) {
+    final out = <int>[];
+    for (var i = 0; i < _frames.length; i++) {
+      final next = i + 1 < _times.length ? _times[i + 1] : end;
+      var gap = next.difference(_times[i]);
+      if (gap > realPause) gap = realPause;
+      out.add(max(1, (gap.inMilliseconds * fps / 1000).round()));
+    }
+    final total = out.fold(0, (a, b) => a + b), longest = realLongest.inSeconds * fps;
+    if (total <= longest) return out;
+    final k = longest / total;
+    return [for (final n in out) max(1, (n * k).round())];
+  }
 
   /// 畫面變了：等一下用 [source] 截一張。
   void request(Future<ui.Image?> Function() source) {
@@ -116,6 +139,7 @@ class TimelapseRecorder {
     final path = await _write(art, 'f${(_seq++).toString().padLeft(5, '0')}');
     if (path == null) return;
     _frames.add(path);
+    _times.add(DateTime.now());
     // Not while the encoder is reading the frames; the next one thins.
     if (_frames.length >= maxFrames && !_encodingNow) _thin();
   }
@@ -123,18 +147,20 @@ class TimelapseRecorder {
   /// Plays everything so far [times] times over, without making the
   /// frames again (the booth's live video loops its moments).
   void loop(int times) {
-    final once = List.of(_frames);
+    final once = List.of(_frames), at = List.of(_times);
     for (var i = 1; i < times; i++) {
       _frames.addAll(once);
+      _times.addAll(at);
     }
   }
 
   /// 隔一張丟一張，之後截得慢一倍。
   void _thin() {
-    final keep = <String>[];
+    final keep = <String>[], keepTimes = <DateTime>[];
     for (var i = 0; i < _frames.length; i++) {
       if (i.isEven) {
         keep.add(_frames[i]);
+        keepTimes.add(_times[i]);
       } else {
         File(_frames[i]).delete().ignore();
       }
@@ -142,31 +168,39 @@ class TimelapseRecorder {
     _frames
       ..clear()
       ..addAll(keep);
+    _times
+      ..clear()
+      ..addAll(keepTimes);
     _interval *= 2;
   }
 
   /// 做成 MP4：錄到的過程，最後是 [finished]（乾淨的成品）停兩秒。
+  /// [real] 照實際編輯的速度（完整版），否則是縮時。
   /// 回傳影片路徑；做不出來回傳 null。
-  Future<String?> render(ui.Image finished) async {
+  Future<String?> render(ui.Image finished, {bool real = false}) async {
+    final end = DateTime.now();
     _finishing = true;
     _timer?.cancel();
     _pending = null;
     try {
       // A shot already being taken goes in before the finished picture.
       await _shot;
-      return await _encode(finished);
+      return await _encode(finished, real ? _realRepeats(end) : null);
     } finally {
       // Editing on after saving keeps recording, for the next save.
       _finishing = false;
     }
   }
 
-  Future<String?> _encode(ui.Image finished) async {
+  Future<String?> _encode(ui.Image finished, List<int>? repeats) async {
     final last = await _write(finished, 'final_${_seq++}');
     if (last == null) return null;
     final out = '${_dir!.path}/pico_snap_${DateTime.now().millisecondsSinceEpoch}.mp4';
     final job = _channel.invokeMethod<String>('encode', {
-      'frames': [for (final f in _frames) for (var i = 0; i < _repeat; i++) f, for (var i = 0; i < fps * holdSeconds; i++) last],
+      'frames': [
+        for (final (k, f) in _frames.indexed) for (var i = 0; i < (repeats == null ? _repeat : repeats[min(k, repeats.length - 1)]); i++) f,
+        for (var i = 0; i < fps * holdSeconds; i++) last,
+      ],
       'out': out, 'fps': fps, 'width': width, 'height': height,
     });
     _encoding = job.then((_) {}, onError: (_) {});

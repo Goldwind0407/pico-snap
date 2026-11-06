@@ -162,6 +162,8 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   bool _withVideo = true;
   /// 完成 also saves to the phone's album: off unless asked, remembered.
   static bool _toAlbum = false;
+  /// The making-of video at real speed rather than sped up; remembered.
+  static bool _realVideo = false;
   final _polaroidCaptions = List.of(EditorDocument.collageCaptions);
   late int _template = widget.template;
   late String _category = allStripTemplates[widget.template].category;
@@ -730,15 +732,43 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                 Icon(CupertinoIcons.film, color: canVideo ? coral : muted),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(motion ? '同時做「動態貼紙」影片' : '同時做「製作過程」縮時影片', style: const TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)),
+                  Text(motion ? '同時做「動態貼紙」影片' : '同時做「製作過程」影片', style: const TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 2),
-                  Text(motion ? '會動的貼紙錄成約 7 秒的影片，適合發限動、Reels' : canVideo ? '你放照片、去背、貼貼紙的過程，約 ${_recorder.seconds} 秒，適合發 Reels、TikTok' : '多編輯一下就能做成影片',
+                  Text(motion ? '會動的貼紙錄成約 7 秒的影片，適合發限動、Reels' : canVideo ? '你放照片、去背、貼貼紙的過程，適合發 Reels、TikTok' : '多編輯一下就能做成影片',
                     style: const TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
                 ])),
                 Checkbox(value: canVideo && _withVideo, activeColor: coral, onChanged: canVideo ? (v) => setSheet(() => _withVideo = v ?? false) : null),
               ]),
             ),
           ),
+          // Sped up, or as it happened (long pauses shortened).
+          if (canVideo && _withVideo && !motion) ...[
+            const SizedBox(height: 8),
+            Row(children: [
+              for (final (real, label, note) in [
+                (false, '縮時', '約 ${_recorder.seconds} 秒，快速看完'),
+                (true, '完整', '約 ${_recorder.realSeconds} 秒，照實際速度'),
+              ]) Expanded(child: Padding(
+                padding: EdgeInsets.only(right: real ? 0 : 8),
+                child: GestureDetector(
+                  onTap: () => setSheet(() => _realVideo = real),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: _realVideo == real ? Colors.white : cream, borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _realVideo == real ? coral : line, width: _realVideo == real ? 2 : 1.2),
+                    ),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(label, style: TextStyle(fontSize: 14, color: ink, fontWeight: _realVideo == real ? FontWeight.w900 : FontWeight.w700)),
+                      const SizedBox(height: 1),
+                      Text(note, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
+                ),
+              )),
+            ]),
+          ],
           const SizedBox(height: 10),
           GestureDetector(
             onTap: () => setSheet(() => _toAlbum = !_toAlbum),
@@ -810,7 +840,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
       // The clean finished piece ends the video.
       final finished = await _snapshot();
       if (mounted) setState(() => _capturing = false);
-      final path = finished == null ? null : await _recorder.render(finished);
+      final path = finished == null ? null : await _recorder.render(finished, real: _realVideo);
       if (path == null) {
         error = '圖片已收好，但縮時影片做不出來';
       } else {

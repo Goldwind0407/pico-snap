@@ -132,14 +132,14 @@ void main() {
     await t.tap(find.text('去放照片'));
     await t.pumpAndSettle();
     expect(prints(), findsNWidgets(4));
-    expect(find.text('同時做「製作過程」縮時影片'), findsNothing);
+    expect(find.text('同時做「製作過程」影片'), findsNothing);
     await t.tap(find.text('完成'));
     await t.pumpAndSettle();
     await t.tap(find.text('拿掉空白的'));
     await t.pumpAndSettle();
     expect(prints(), findsNWidgets(2));
     expect(find.byWidgetPredicate((w) => w is InstantPrint && w.caption.isNotEmpty && w.image != null), findsNWidgets(2));
-    expect(find.text('同時做「製作過程」縮時影片'), findsOneWidget, reason: '接著照常完成');
+    expect(find.text('同時做「製作過程」影片'), findsOneWidget, reason: '接著照常完成');
   });
 
   testWidgets('拍立得拼貼：背景可以選圖案和顏色，復原會回去', (t) async {

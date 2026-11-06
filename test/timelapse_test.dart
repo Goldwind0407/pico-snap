@@ -92,6 +92,31 @@ void main() {
     rec.dispose();
   });
 
+  test('完整版：照實際速度，每格停到下一格為止；停太久的地方縮短', () async {
+    const channel = MethodChannel('picosnap/video');
+    MethodCall? sent;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      sent = call;
+      return (call.arguments as Map)['out'];
+    });
+    addTearDown(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null));
+    final rec = TimelapseRecorder(dir: tmp);
+    await rec.add(await _art(const Color(0xFFFF0000)));
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    await rec.add(await _art(const Color(0xFF00FF00)));
+    await Future<void>.delayed(const Duration(milliseconds: 2500)); // 停下來想事情
+    await rec.add(await _art(const Color(0xFF0000FF)));
+    expect(rec.realSeconds, greaterThanOrEqualTo(rec.seconds), reason: '完整版比縮時長');
+    await rec.render(await _art(const Color(0xFFFFFFFF)), real: true);
+    final frames = ((sent!.arguments as Map)['frames'] as List).cast<String>();
+    int count(String name) => frames.where((f) => f.contains(name)).length;
+    expect(count('/f00000'), inInclusiveRange(5, 8), reason: '紅色停了約 0.5 秒（12 格／秒）');
+    expect(count('/f00001'), 18, reason: '停 2.5 秒縮成 1.5 秒');
+    expect(count('/f00002'), greaterThanOrEqualTo(1));
+    expect(frames.where((f) => f.contains('final_')), hasLength(TimelapseRecorder.fps * TimelapseRecorder.holdSeconds));
+    rec.dispose();
+  });
+
   test('拍貼機的即時影片：畫格只做一次，重播兩遍', () async {
     const channel = MethodChannel('picosnap/video');
     MethodCall? sent;
