@@ -19,6 +19,62 @@ import Vision
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     SubjectSegmenter.register(messenger: engineBridge.applicationRegistrar.messenger())
     VideoEncoder.register(messenger: engineBridge.applicationRegistrar.messenger())
+    PencilTaps.register(messenger: engineBridge.applicationRegistrar.messenger())
+  }
+}
+
+/// Apple Pencil(第二代、Pro、USB-C 款有些不支援)筆身點兩下。
+///
+/// Dart 那邊(lib/widgets/doodle.dart 的 PencilTaps)第一次要聽的時候叫
+/// `listen`,這裡把 UIPencilInteraction 掛到畫面上;使用者點兩下就送 `tap`,
+/// 帶著 iPad「設定 > Apple Pencil」裡選的動作:
+/// `eraser`(切換到橡皮擦)、`previous`(切換到上一個工具)、`palette`(顯示
+/// 顏色)、`ignore`(關閉)。點兩下的訊號是筆透過藍牙送的,要先配對好。
+final class PencilTaps: NSObject, UIPencilInteractionDelegate {
+  private static var channel: FlutterMethodChannel?
+  private static let shared = PencilTaps()
+  private static var attached = false
+
+  static func register(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "picosnap/pencil", binaryMessenger: messenger)
+    Self.channel = channel
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "listen" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      result(attach())
+    }
+  }
+
+  /// 掛到目前視窗的畫面上;還沒有視窗(App 剛打開)回 false,Dart 之後再叫一次。
+  private static func attach() -> Bool {
+    if attached { return true }
+    let window = UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .flatMap { $0.windows }
+      .first { $0.isKeyWindow } ?? UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }.first?.windows.first
+    guard let view = window?.rootViewController?.view else { return false }
+    let interaction = UIPencilInteraction()
+    interaction.delegate = shared
+    view.addInteraction(interaction)
+    attached = true
+    return true
+  }
+
+  static var action: String {
+    switch UIPencilInteraction.preferredTapAction {
+    case .ignore: return "ignore"
+    case .switchEraser: return "eraser"
+    case .switchPrevious: return "previous"
+    case .showColorPalette: return "palette"
+    default: return "eraser"
+    }
+  }
+
+  func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
+    Self.channel?.invokeMethod("tap", arguments: Self.action)
   }
 }
 

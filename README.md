@@ -105,6 +105,7 @@
   - 用力畫粗、輕畫細（畫筆有壓力感應）
   - 用過筆之後 20 秒內只有筆會畫，寫字時手掌靠在螢幕上不會畫出線；放下筆一陣子，手指又能畫
   - 筆尾（Apple Pencil 沒有，部分 Windows／Android 筆有）或按著 S Pen 側鍵畫過去是橡皮擦
+  - Apple Pencil 筆身點兩下：照 iPad「設定 → Apple Pencil」選的動作，切換橡皮擦、切回上一個工具，或換下一個顏色
   - 拍立得相片上的手寫也一樣
   - 便宜的橡膠頭電容筆螢幕分不出來，照手指處理
 - 寫完的筆畫會合成一張圖，只有正在寫的那一筆即時重畫，寫再多字也不會越來越卡。
@@ -285,7 +286,7 @@
 | `lib/services/editor_drafts.dart` | 編輯器草稿存在手機裡 |
 | `lib/services/file_store.dart` | 一次寫一個檔案、先寫暫存檔再換上去 |
 | `android/app/src/main/kotlin/com/goldwind/picosnap/` | Android 原生：ML Kit 主體分割、影片編碼 |
-| `ios/Runner/AppDelegate.swift` | iPhone 原生：Vision 主體分割、影片編碼 |
+| `ios/Runner/AppDelegate.swift` | iPhone 原生：Vision 主體分割、影片編碼、Apple Pencil 點兩下 |
 | `assets/stickers/` | 舊的手繪貼紙 PNG（模板的裝飾和自己設計模板用） |
 | `assets/sticker_sheets/` | 貼紙本：整張貼紙紙和切下來的每一張貼紙 |
 | `assets/templates/` | 拍貼機模板（照片格已去背的 WebP） |
@@ -344,6 +345,26 @@ zip -qr ~/Desktop/pico_snap-unsigned.ipa Payload
 ```
 
 之後更新只要 `git pull`，再從 `flutter build` 那一步開始。
+
+### 用 Mac 裝到 iPad 測觸控筆
+
+模擬器分不出 Apple Pencil 和手指，測壓力、防手掌、點兩下都要用實機。
+
+1. Mac 上要有 Xcode、Flutter、CocoaPods（`flutter doctor` 全部打勾）。
+2. `git clone`（或 `git pull`）之後在專案根目錄跑 `flutter pub get`。
+3. 用 Xcode 打開 `ios/Runner.xcworkspace`，點左邊的 **Runner** → **Signing & Capabilities** → **Team** 選自己的 Apple ID（沒有就按 Add Account 登入，免費帳號就可以）。
+4. iPad 用線接上 Mac，iPad 上按「信任這台電腦」；iPadOS 16 以上要打開「設定 → 隱私權與安全性 → 開發者模式」，iPad 會重新開機。
+5. 在專案根目錄跑 `flutter devices` 找到 iPad，再跑 `flutter run --release -d <iPad 的 id>`。release 版拔線之後還能打開；debug 版拔線就開不起來。
+6. 第一次打開前，到 iPad 的「設定 → 一般 → VPN 與裝置管理」信任自己的 Apple ID。免費帳號裝的 App 7 天後要重裝。
+
+App 目前只支援 iPhone，在 iPad 上會用 iPhone 的大小放大顯示，觸控筆照樣能用。要測的：
+
+- 畫筆工具用 Pencil 寫字：用力粗、輕細。
+- 手掌靠在螢幕上寫：不會多出線；放下筆 20 秒後手指又能畫。
+- 筆身點兩下（第二代、Pro）：依「設定 → Apple Pencil」選的動作，在畫筆和橡皮擦之間切換，或切回上一個工具；選「顯示調色盤」的話是換下一個顏色。
+- 拍立得相片上的手寫也用筆寫寫看。
+
+公司的 Mac 或 iPad 如果被公司管理（MDM），可能不能裝自己簽的 App，要問 IT。
 
 ### 沒有 Mac：Codemagic 雲端建置
 

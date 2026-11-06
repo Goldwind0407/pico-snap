@@ -232,6 +232,23 @@ void main() {
     expect(_strokes(t).single.pressures, isNull, reason: '沒在用筆了，手指又能畫');
   });
 
+  testWidgets('畫筆：Apple Pencil 點兩下切換橡皮擦、再點兩下切回來', (t) async {
+    await _phone(t, const EditorScreen());
+    await t.tap(find.text('畫筆'));
+    await t.pumpAndSettle();
+    final c = t.getRect(find.byType(PhotoStrip)).center;
+    await _draw(t, c - const Offset(40, 0), const Offset(80, 0));
+    expect(_strokes(t), hasLength(1));
+    PencilTaps.debugTap('eraser');
+    await t.pump();
+    await _draw(t, c - const Offset(0, 30), const Offset(0, 60));
+    expect(_strokes(t), isEmpty, reason: '點兩下變橡皮擦');
+    PencilTaps.debugTap('eraser');
+    await t.pump();
+    await _draw(t, c - const Offset(40, 0), const Offset(80, 0));
+    expect(_strokes(t).single.style, PenStyle.pen, reason: '再點兩下回到畫筆');
+  });
+
   testWidgets('畫筆：其他工具時不能畫，照片格還是點得到', (t) async {
     await _phone(t, const EditorScreen(mode: EditorMode.polaroid));
     expect(find.text('畫筆'), findsOneWidget, reason: '拼貼也有畫筆');

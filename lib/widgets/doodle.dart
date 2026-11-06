@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme.dart';
 
@@ -347,6 +350,43 @@ class _FlatInkPainter extends CustomPainter {
   @override
   bool shouldRepaint(_FlatInkPainter old) => old.version != version || old.strokes.length != strokes.length ||
       Iterable.generate(strokes.length).any((i) => !identical(strokes[i], old.strokes[i]));
+}
+
+/// Apple Pencil double-taps on the pen's side (iPad only;
+/// ios/Runner/AppDelegate.swift). Each says what the user chose in the
+/// iPad's Apple Pencil settings: `eraser` (to the eraser and back),
+/// `previous` (the last tool and back), `palette` (the colours), `ignore`.
+abstract final class PencilTaps {
+  static const _channel = MethodChannel('picosnap/pencil');
+  static final _taps = StreamController<String>.broadcast();
+  static bool _asked = false;
+
+  static Stream<String> get taps {
+    _listen();
+    return _taps.stream;
+  }
+
+  /// A double-tap, as if from the pencil (tests).
+  @visibleForTesting
+  static void debugTap(String action) => _taps.add(action);
+
+  static void _listen() {
+    if (_asked || kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
+    _asked = true;
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'tap') _taps.add(call.arguments as String? ?? 'eraser');
+    });
+    Future<void> attach([int tries = 0]) async {
+      try {
+        final ok = await _channel.invokeMethod<bool>('listen') ?? false;
+        // No window yet: try again a little later.
+        if (!ok && tries < 10) Future.delayed(const Duration(milliseconds: 500), () => attach(tries + 1));
+      } catch (_) {
+        // Not on an iPad build with the channel: no double-taps.
+      }
+    }
+    attach();
+  }
 }
 
 /// What touched the canvas: a pen's pressure (null for a finger) and

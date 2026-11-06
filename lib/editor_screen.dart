@@ -174,6 +174,33 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   /// Ticks as a line grows: repaints the ink without rebuilding the screen.
   final _inkTick = ValueNotifier(0);
   PenStyle _pen = PenStyle.pen;
+  /// The pen before the last change, for Apple Pencil's double-tap.
+  PenStyle _lastPen = PenStyle.pen;
+  StreamSubscription<String>? _pencil;
+
+  void _setPen(PenStyle s) {
+    if (s == _pen) return;
+    _lastPen = _pen;
+    _pen = s;
+  }
+
+  /// Apple Pencil double-tap while drawing: what the iPad is set to do.
+  void _pencilTap(String action) {
+    if (!mounted || _tool != _Tool.brush) return;
+    setState(() {
+      switch (action) {
+        case 'eraser':
+          _setPen(_pen == PenStyle.eraser ? (_lastPen == PenStyle.eraser ? PenStyle.pen : _lastPen) : PenStyle.eraser);
+        case 'previous':
+          _setPen(_lastPen);
+        case 'palette':
+          // Next colour round the palette.
+          final i = penColors.indexOf(_penColor);
+          _penColor = penColors[(i + 1) % penColors.length];
+          if (_pen == PenStyle.eraser) _setPen(_lastPen);
+      }
+    });
+  }
   Color _penColor = coral;
   int _penWidth = 1;
   /// The eraser already saved an undo step for this swipe.
@@ -296,6 +323,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     }
     if (widget.draft case final draft?) _restore(draft);
     if (widget.mode == EditorMode.sticker) _upgradeStickerPiece();
+    _pencil = PencilTaps.taps.listen(_pencilTap);
     _savedKey = widget.draft == null || widget.saved ? _contentKey() : null;
   }
 
@@ -322,6 +350,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   void dispose() {
     if (widget.mode == EditorMode.sticker) PhotoStickers.sync(const {}, cutLines: false);
     WidgetsBinding.instance.removeObserver(this);
+    _pencil?.cancel();
     _draftTimer?.cancel();
     unawaited(_writeDraft().whenComplete(() => EditorDrafts.release(_draftId)));
     _recorder.dispose();
@@ -1976,7 +2005,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
             Expanded(child: Padding(
               padding: EdgeInsets.only(right: s == PenStyle.values.last ? 0 : 6),
               child: GestureDetector(
-                onTap: () => setState(() => _pen = s),
+                onTap: () => setState(() => _setPen(s)),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 160),
                   padding: const EdgeInsets.symmetric(vertical: 7),
