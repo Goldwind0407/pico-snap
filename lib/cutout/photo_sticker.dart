@@ -339,13 +339,13 @@ List<Uint8List> _splitJob(({Uint8List fg, int w, int h}) a) => splitSubjects(a.f
 }
 
 /// How long one loop of every motion takes: 轉圈 turns once in it (slow
-/// enough not to make anyone dizzy), the others go round twice.
-const motionLoop = Duration(milliseconds: 3000);
+/// enough not to make anyone dizzy), the others go round three times.
+const motionLoop = Duration(milliseconds: 5000);
 
 /// Where [motion] puts a sticker at [loop] (0–1 through [motionLoop]): how
 /// far it moves (as a fraction of its size), turns and grows.
 ({Offset shift, double turn, double grow}) motionAt(StickerMotion motion, double loop) {
-  final t = (loop * 2) % 1;
+  final t = (loop * 3) % 1;
   final a = 2 * math.pi * t;
   return switch (motion) {
     StickerMotion.none => (shift: Offset.zero, turn: 0, grow: 1),
