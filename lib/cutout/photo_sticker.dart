@@ -338,16 +338,21 @@ List<Uint8List> _splitJob(({Uint8List fg, int w, int h}) a) => splitSubjects(a.f
   return (rgba: out, w: cw, h: ch);
 }
 
-/// Where [motion] puts a sticker at [t] (0–1 through one loop): how far it
-/// moves (as a fraction of its size), turns and grows.
-({Offset shift, double turn, double grow}) motionAt(StickerMotion motion, double t) {
+/// How long one loop of every motion takes: 轉圈 turns once in it (slow
+/// enough not to make anyone dizzy), the others go round twice.
+const motionLoop = Duration(milliseconds: 3000);
+
+/// Where [motion] puts a sticker at [loop] (0–1 through [motionLoop]): how
+/// far it moves (as a fraction of its size), turns and grows.
+({Offset shift, double turn, double grow}) motionAt(StickerMotion motion, double loop) {
+  final t = (loop * 2) % 1;
   final a = 2 * math.pi * t;
   return switch (motion) {
     StickerMotion.none => (shift: Offset.zero, turn: 0, grow: 1),
     StickerMotion.bounce => (shift: Offset(0, -.16 * math.sin(math.pi * t * 2).abs()), turn: 0, grow: 1 + .04 * math.cos(a * 2)),
     StickerMotion.wiggle => (shift: Offset.zero, turn: .16 * math.sin(a), grow: 1),
     StickerMotion.float => (shift: Offset(.03 * math.sin(a), .07 * math.sin(a + math.pi / 2)), turn: .05 * math.sin(a), grow: 1),
-    StickerMotion.spin => (shift: Offset.zero, turn: a, grow: 1),
+    StickerMotion.spin => (shift: Offset.zero, turn: 2 * math.pi * loop, grow: 1),
     StickerMotion.pulse => (shift: Offset.zero, turn: 0, grow: 1 + .1 * math.pow(math.max(0, math.sin(a * 2)), 3)),
   };
 }
@@ -364,7 +369,7 @@ class PhotoStickerView extends StatefulWidget {
 }
 
 class _PhotoStickerViewState extends State<PhotoStickerView> with SingleTickerProviderStateMixin {
-  late final _loop = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600));
+  late final _loop = AnimationController(vsync: this, duration: motionLoop);
   bool _watching = false;
 
   @override

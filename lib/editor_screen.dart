@@ -643,18 +643,18 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   /// Some photo sticker moves: 完成 can make a video of them.
   bool get _moving => _stickers.any((s) => (_cutouts[s.sticker]?.motion ?? StickerMotion.none) != StickerMotion.none);
 
-  /// The page with its stickers moving, two seconds looped: a video file
+  /// The page with its stickers moving, one [motionLoop] played twice: a video file
   /// and the recorder holding it (to dispose once it is copied).
   Future<(String?, TimelapseRecorder)> _motionVideo() async {
     final rec = TimelapseRecorder(subtitle: 'my photo stickers ♡');
-    const frames = 20;
+    final frames = (motionLoop.inMilliseconds * TimelapseRecorder.fps / 1000).round();
     for (var k = 0; k < frames; k++) {
       PhotoStickers.clock.value = k / frames;
       await WidgetsBinding.instance.endOfFrame;
       final shot = await _snapshot();
       if (shot != null) await rec.add(shot);
     }
-    rec.loop(3);
+    rec.loop(2);
     PhotoStickers.clock.value = 0;
     await WidgetsBinding.instance.endOfFrame;
     final still = await _snapshot();
@@ -734,7 +734,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(motion ? '同時做「動態貼紙」影片' : '同時做「製作過程」影片', style: const TextStyle(fontSize: 14, color: ink, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 2),
-                  Text(motion ? '會動的貼紙錄成約 7 秒的影片，適合發限動、Reels' : canVideo ? '你放照片、去背、貼貼紙的過程，適合發 Reels、TikTok' : '多編輯一下就能做成影片',
+                  Text(motion ? '會動的貼紙錄成約 8 秒的影片，適合發限動、Reels' : canVideo ? '你放照片、去背、貼貼紙的過程，適合發 Reels、TikTok' : '多編輯一下就能做成影片',
                     style: const TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
                 ])),
                 Checkbox(value: canVideo && _withVideo, activeColor: coral, onChanged: canVideo ? (v) => setSheet(() => _withVideo = v ?? false) : null),
