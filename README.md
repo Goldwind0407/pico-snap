@@ -246,16 +246,6 @@
 - 濾鏡強度、亮度、對比調整
 - 作品角落的 QR Code，掃描下載縮時影片（要先決定影片放在哪個雲端）
 
-### 上架前要處理
-
-這些現在放在 App 裡只是為了自己測試，**沒有授權，不能上架**：
-
-- 拍立得底片的 **三麗鷗、寶可夢、中職、動漫** 系列：用了別人的角色、名字、吉祥物和商標（`lib/widgets/instant_print.dart` 的 `FilmStock`；`assets/instant/` 裡的 `sanrio_*`、`pokemon_*`、`cpbl_*`、`anime_*`、`frame_keroro`、`frame_pokemon`）。
-- `assets/luts/fuji_classic_neg_raw.cube`：濃烈負片恢復使用原始 Fujifilm LUT；只供自己測試，上架前需移除或換成有散布授權的素材。
-- 貼紙本：「亮片」幾乎照抄 Pico Cam 的付費貼紙；「日本風」裡有哥吉拉；「吉伊卡哇」、「寶可夢」、「Keroro」是別人的角色；「中職」是球隊商標；「UNO」是 Mattel 的牌面設計；「Life is Good」是那個品牌的商標（`lib/sticker_book.dart`）。「甜點」和「英文字」可以直接上架；「閃閃」裡那朵彩虹笑臉花很像村上隆的花，上架前最好拿掉或重畫。
-- 拼貼背景圖「海邊街道」（`assets/backdrops/seaside_street.jpg`）：左邊有 emart24 便利商店的招牌和韓文店招，上架前要把招牌修掉或換一張。
-- `assets/samples/` 的佔位人物照片、很像 instax mini 7 的相機外型（見「素材來源」）。
-
 ## 專案結構
 
 | 路徑 | 內容 |
