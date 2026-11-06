@@ -985,24 +985,30 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     _redoHistory.clear();
   }
 
-  void _penDown(Offset at, Size size) => setState(() {
-    if (_pen == PenStyle.eraser) {
+  /// This line erases: the eraser tool, or a pen's eraser end or button.
+  bool _erasing = false;
+
+  void _penDown(Offset at, Size size, PenTouch touch) => setState(() {
+    _erasing = _pen == PenStyle.eraser || touch.erase;
+    if (_erasing) {
       _erased = false;
       return _erase(at, size);
     }
     _remember();
-    _strokes = [..._strokes, Stroke(points: [normalise(at, size)], color: _penColor, width: penWidths[_penWidth], style: _pen)];
+    _strokes = [..._strokes, Stroke(points: [normalise(at, size)], color: _penColor, width: penWidths[_penWidth], style: _pen,
+      pressures: touch.pressure == null ? null : [touch.pressure!])];
   });
 
-  void _penMove(Offset at, Size size) {
-    if (_pen == PenStyle.eraser) return setState(() => _erase(at, size));
+  void _penMove(Offset at, Size size, PenTouch touch) {
+    if (_erasing) return setState(() => _erase(at, size));
     if (_strokes.isEmpty) return;
-    final points = _strokes.last.points;
+    final stroke = _strokes.last, points = stroke.points;
     final p = normalise(at, size);
     // Skip points closer than about a pixel; they only make the path heavier.
     final last = points.last;
     if (Offset((p.dx - last.dx) * size.width, (p.dy - last.dy) * size.height).distance < 1.5) return;
     points.add(p);
+    stroke.pressures?.add(touch.pressure ?? stroke.pressures!.last);
     _inkTick.value++;
   }
 

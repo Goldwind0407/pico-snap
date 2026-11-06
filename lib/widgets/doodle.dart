@@ -2,6 +2,7 @@ import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
@@ -32,7 +33,17 @@ class Stroke {
   final Color color;
   final double width;
   final PenStyle style;
-  Stroke({required this.points, required this.color, required this.width, required this.style});
+  /// How hard a pen pressed at each point (0–1), drawn by a stylus; null
+  /// for a finger.
+  final List<double>? pressures;
+  Stroke({required this.points, required this.color, required this.width, required this.style, this.pressures});
+
+  /// How much wider than usual the line is where the pen pressed [i]'s way.
+  double _press(int i) {
+    final p = pressures;
+    if (p == null || p.isEmpty) return 1;
+    return .45 + 1.1 * p[min(i, p.length - 1)].clamp(0.0, 1.0);
+  }
 
   // The marker drawing is costly to work out; keep it until the stroke grows
   // or the canvas changes size.
@@ -95,7 +106,7 @@ class Stroke {
     for (var i = 0; i < p.length; i++) {
       final v = i == 0 ? 0.0 : ((p[i] - p[i - 1]).distance / (w * 2.2)).clamp(0.0, 1.0);
       speed += (v - speed) * .4;
-      width += (w * (1.1 - .32 * speed) - width) * .35;
+      width += (w * (1.1 - .32 * speed) * _press(i) - width) * .35;
       widths.add(width);
       speeds.add(speed);
     }
@@ -338,33 +349,82 @@ class _FlatInkPainter extends CustomPainter {
       Iterable.generate(strokes.length).any((i) => !identical(strokes[i], old.strokes[i]));
 }
 
-/// 畫筆工具開著的時候蓋在畫布最上面，接住手指。只跟第一根手指，
+/// What touched the canvas: a pen's pressure (null for a finger) and
+/// whether it is erasing (a pen's back end, or its side button held).
+typedef PenTouch = ({double? pressure, bool erase});
+
+/// 畫筆工具開著的時候蓋在畫布最上面，接住手指或筆。只跟第一根手指，
 /// 第二根手指不會畫出線來。
+///
+/// 筆（S Pen、Apple Pencil）是螢幕自己認出來的，不用藍牙：每次觸碰都說得出
+/// 是筆還是手指。用過筆之後一陣子，只有筆會畫，手掌、手指碰到畫布都不算
+/// （寫字時手掌靠在螢幕上不會畫出線）。筆的壓力讓線條變粗變細；筆尾或按著
+/// 側鍵是橡皮擦。
 class DoodleInput extends StatefulWidget {
-  /// 手指按下、移動、放開的位置（畫布像素）。
-  final void Function(Offset at, Size size) onStart, onMove;
+  /// 按下、移動的位置（畫布像素），和是什麼碰的。
+  final void Function(Offset at, Size size, PenTouch touch) onStart, onMove;
   final VoidCallback onEnd;
   const DoodleInput({super.key, required this.onStart, required this.onMove, required this.onEnd});
+
+  /// Only a pen draws right now (one was used lately).
+  static bool get penMode => _DoodleInputState.penMode;
+
+  /// Fingers draw again (tests).
+  @visibleForTesting
+  static void forgetPen() => _DoodleInputState._penAt = DateTime(0);
 
   @override
   State<DoodleInput> createState() => _DoodleInputState();
 }
 
 class _DoodleInputState extends State<DoodleInput> {
+  /// When a pen last touched or hovered over a canvas: for a while after,
+  /// fingers don't draw.
+  static DateTime _penAt = DateTime(0);
+  static const penWhile = Duration(seconds: 20);
+
   int? _pointer;
+  /// Erasing for the whole of this line, as it started.
+  bool _erase = false;
 
   Size get _size => (context.findRenderObject()! as RenderBox).size;
+
+  static bool _isPen(PointerEvent e) => e.kind == PointerDeviceKind.stylus || e.kind == PointerDeviceKind.invertedStylus;
+
+  /// Lately a pen has been drawing.
+  static bool get penMode => DateTime.now().difference(_penAt) < penWhile;
+
+  PenTouch _touch(PointerEvent e) {
+    if (!_isPen(e)) return (pressure: null, erase: false);
+    final range = e.pressureMax - e.pressureMin;
+    final p = range > 0 ? (e.pressure - e.pressureMin) / range : .5;
+    return (pressure: p.clamp(0.0, 1.0), erase: _erase);
+  }
 
   @override
   Widget build(BuildContext context) => Listener(
     behavior: HitTestBehavior.opaque,
+    onPointerHover: (e) {
+      if (_isPen(e)) _penAt = DateTime.now();
+    },
     onPointerDown: (e) {
+      final pen = _isPen(e);
+      if (pen) {
+        _penAt = DateTime.now();
+        // A palm got there first: the pen takes over.
+        if (_pointer != null) _end(_pointer!);
+      } else if (penMode) {
+        return;
+      }
       if (_pointer != null) return;
       _pointer = e.pointer;
-      widget.onStart(e.localPosition, _size);
+      _erase = pen && (e.kind == PointerDeviceKind.invertedStylus || e.buttons & kSecondaryStylusButton != 0);
+      widget.onStart(e.localPosition, _size, _touch(e));
     },
     onPointerMove: (e) {
-      if (e.pointer == _pointer) widget.onMove(e.localPosition, _size);
+      if (e.pointer != _pointer) return;
+      if (_isPen(e)) _penAt = DateTime.now();
+      widget.onMove(e.localPosition, _size, _touch(e));
     },
     onPointerUp: (e) => _end(e.pointer),
     onPointerCancel: (e) => _end(e.pointer),

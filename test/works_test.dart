@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/editor_document.dart';
@@ -192,6 +194,42 @@ void main() {
     await t.tap(find.byIcon(CupertinoIcons.arrow_uturn_left));
     await t.pumpAndSettle();
     expect(_strokes(t), hasLength(2));
+  });
+
+  testWidgets('畫筆：用筆畫有粗細；用過筆之後手掌不會畫；筆的側鍵是橡皮擦', (t) async {
+    addTearDown(DoodleInput.forgetPen);
+    await _phone(t, const EditorScreen());
+    await t.tap(find.text('畫筆'));
+    await t.pumpAndSettle();
+    final c = t.getRect(find.byType(PhotoStrip)).center;
+    Future<void> pen(int id, Offset from, Offset by, {List<double> pressure = const [.2, .5, .9], int buttons = kPrimaryButton}) async {
+      t.binding.handlePointerEvent(PointerDownEvent(pointer: id, kind: PointerDeviceKind.stylus, position: from, pressure: pressure.first, pressureMin: 0, pressureMax: 1, buttons: buttons));
+      for (var k = 1; k <= 8; k++) {
+        t.binding.handlePointerEvent(PointerMoveEvent(pointer: id, kind: PointerDeviceKind.stylus, position: from + by * (k / 8),
+          pressure: pressure[min(pressure.length - 1, k * pressure.length ~/ 9)], pressureMin: 0, pressureMax: 1, buttons: buttons));
+        await t.pump(const Duration(milliseconds: 16));
+      }
+      t.binding.handlePointerEvent(PointerUpEvent(pointer: id, kind: PointerDeviceKind.stylus, position: from + by));
+      await t.pump();
+    }
+
+    await pen(1, c - const Offset(40, 20), const Offset(80, 0));
+    expect(_strokes(t), hasLength(1));
+    final p = _strokes(t).single.pressures!;
+    expect(p.first, lessThan(p.last), reason: '記下筆的壓力');
+    expect(DoodleInput.penMode, isTrue);
+
+    // 手掌（手指）碰到畫布：不畫
+    await _draw(t, c + const Offset(-40, 60), const Offset(80, 0));
+    expect(_strokes(t), hasLength(1), reason: '用筆的時候手掌不會畫出線');
+
+    // 按著側鍵畫過去：擦掉
+    await pen(2, c - const Offset(0, 50), const Offset(0, 60), buttons: kPrimaryButton | kSecondaryStylusButton);
+    expect(_strokes(t), isEmpty);
+
+    DoodleInput.forgetPen();
+    await _draw(t, c + const Offset(-40, 60), const Offset(80, 0));
+    expect(_strokes(t).single.pressures, isNull, reason: '沒在用筆了，手指又能畫');
   });
 
   testWidgets('畫筆：其他工具時不能畫，照片格還是點得到', (t) async {

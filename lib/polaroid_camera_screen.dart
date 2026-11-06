@@ -545,17 +545,34 @@ class _PolaroidCameraScreenState extends State<PolaroidCameraScreen> with Ticker
 
   Offset _toPrint(Offset global) => (_stickerLayerKey.currentContext!.findRenderObject()! as RenderBox).globalToLocal(global);
 
-  void _penDown(Offset at, Size size) => setState(() {
+  /// This line erases (a pen's eraser end or button).
+  bool _erasing = false;
+
+  void _penDown(Offset at, Size size, PenTouch touch) => setState(() {
     _current!.saved = false;
-    _current!.handwriting.add(Stroke(points: [normalise(at, size)], color: _pen, width: _handWidths[_penWidth], style: PenStyle.pen));
+    _erasing = touch.erase;
+    if (_erasing) return _eraseAt(at, size);
+    _current!.handwriting.add(Stroke(points: [normalise(at, size)], color: _pen, width: _handWidths[_penWidth], style: PenStyle.pen,
+      pressures: touch.pressure == null ? null : [touch.pressure!]));
     _inkVersion++;
   });
 
-  void _penMove(Offset at, Size size) {
-    final p = normalise(at, size), last = _current!.handwriting.last.points;
+  void _penMove(Offset at, Size size, PenTouch touch) {
+    if (_erasing) return setState(() => _eraseAt(at, size));
+    if (_current!.handwriting.isEmpty) return;
+    final stroke = _current!.handwriting.last;
+    final p = normalise(at, size), last = stroke.points;
     if ((p - last.last).distance * size.width < 1) return;
     last.add(p);
+    stroke.pressures?.add(touch.pressure ?? stroke.pressures!.last);
     _inkTick.value++;
+  }
+
+  /// Wipe out the lines the pen's eraser touches.
+  void _eraseAt(Offset at, Size size) {
+    final before = _current!.handwriting.length;
+    _current!.handwriting.removeWhere((s) => s.touches(at, size.width * .03, size));
+    if (_current!.handwriting.length != before) _inkVersion++;
   }
 
   void _editInk(void Function(List<Stroke> strokes) edit) => setState(() {

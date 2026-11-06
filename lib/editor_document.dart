@@ -128,7 +128,8 @@ class EditorDocument {
               points: List.of(s.points),
               color: s.color,
               width: s.width,
-              style: s.style)
+              style: s.style,
+              pressures: s.pressures == null ? null : List.of(s.pressures!))
       ];
 
   static String keyForTemplate(int index) => index < stripTemplates.length
@@ -151,6 +152,7 @@ class EditorDocument {
         'color': s.color.toARGB32(),
         'width': s.width,
         'style': s.style.name,
+        if (s.pressures case final p?) 'pressures': [for (final v in p) (v * 1000).round() / 1000],
       };
 
   /// Binary assets live alongside this JSON, and are only written once.
@@ -231,7 +233,8 @@ class EditorDocument {
                 ],
                 color: Color(raw['color'] as int),
                 width: (raw['width'] as num).toDouble(),
-                style: PenStyle.values.byName(raw['style'] as String))
+                style: PenStyle.values.byName(raw['style'] as String),
+                pressures: (raw['pressures'] as List?)?.map((v) => (v as num).toDouble()).toList())
         ];
     return EditorDocument(
       mode: mode,
