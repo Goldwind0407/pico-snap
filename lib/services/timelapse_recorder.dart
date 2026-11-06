@@ -18,13 +18,17 @@ import '../theme.dart';
 /// 編碼器做成 MP4。編輯得少、畫格少的時候每格多停一下（最多 [_maxRepeat]
 /// 格），過程至少有 [minProcessSeconds] 秒，不會一閃而過。
 class TimelapseRecorder {
-  TimelapseRecorder({Directory? dir, this.maxFrames = 360, this.subtitle = 'the making of ♡'}) : _baseDir = dir;
+  TimelapseRecorder({Directory? dir, this.maxFrames = 360, this.subtitle = 'the making of ♡', this.minProcessSeconds = 6}) : _baseDir = dir;
 
-  static const width = 720, height = 1280, fps = 12, holdSeconds = 2, minProcessSeconds = 4;
+  static const width = 720, height = 1280, fps = 12, holdSeconds = 2;
+  /// The process lasts at least this long (frames held longer); 0 plays
+  /// every frame once, as taken (the booth's live moments).
+  final int minProcessSeconds;
   /// 完整版（照實際速度）：停下來想事情最多停這麼久，整段最長這麼長
   /// （超過就整段平均加速）。
   static const realPause = Duration(milliseconds: 1500), realLongest = Duration(minutes: 3);
-  static const _maxRepeat = 6;
+  /// 一格最多停 2 秒：只錄到幾格的作品，過程也有個幾秒。
+  static const _maxRepeat = 24;
   static const _channel = MethodChannel('picosnap/video');
 
   final int maxFrames;

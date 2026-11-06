@@ -83,9 +83,9 @@ void main() {
     expect(out, endsWith('.mp4'));
     final args = sent!.arguments as Map;
     final frames = (args['frames'] as List).cast<String>();
-    // 只有 3 格：每格停 6 格（0.5 秒），成品停 2 秒
-    expect(frames, hasLength(3 * 6 + TimelapseRecorder.fps * TimelapseRecorder.holdSeconds));
-    expect(frames.take(6).toSet(), hasLength(1));
+    // 只有 3 格：每格停 24 格（2 秒，過程共 6 秒），成品停 2 秒
+    expect(frames, hasLength(3 * 24 + TimelapseRecorder.fps * TimelapseRecorder.holdSeconds));
+    expect(frames.take(24).toSet(), hasLength(1));
     expect(frames.toSet(), hasLength(4), reason: '3 張過程 + 1 張成品');
     expect(frames.every((f) => File(f).existsSync()), isTrue);
     expect([args['width'], args['height'], args['fps']], [720, 1280, 12]);
@@ -106,7 +106,7 @@ void main() {
     await rec.add(await _art(const Color(0xFF00FF00)));
     await Future<void>.delayed(const Duration(milliseconds: 2500)); // 停下來想事情
     await rec.add(await _art(const Color(0xFF0000FF)));
-    expect(rec.realSeconds, greaterThanOrEqualTo(rec.seconds), reason: '完整版比縮時長');
+    expect(rec.realSeconds, inInclusiveRange(4, 7), reason: '0.5 + 1.5 + 一點點，加上成品停 2 秒');
     await rec.render(await _art(const Color(0xFFFFFFFF)), real: true);
     final frames = ((sent!.arguments as Map)['frames'] as List).cast<String>();
     int count(String name) => frames.where((f) => f.contains(name)).length;
@@ -125,7 +125,7 @@ void main() {
       return (call.arguments as Map)['out'];
     });
     addTearDown(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null));
-    final rec = TimelapseRecorder(dir: tmp);
+    final rec = TimelapseRecorder(dir: tmp, minProcessSeconds: 0);
     for (var i = 0; i < 30; i++) {
       await rec.add(await _art(Color(0xFF000000 + i * 8)));
     }

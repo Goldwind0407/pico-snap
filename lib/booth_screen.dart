@@ -13,6 +13,7 @@ import 'package:flutter/services.dart';
 import 'editor_document.dart';
 import 'editor_screen.dart';
 import 'filters.dart';
+import 'gallery_screen.dart';
 import 'models.dart';
 import 'polaroid_camera_screen.dart' show mainCamera;
 import 'services/my_works.dart';
@@ -515,7 +516,8 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
         _savedWhat = done.endsWith('影片') ? '圖片和影片都收進作品集了' : '收進作品集了';
       }
     });
-    showMessage(context, error ?? done, error: error != null, above: 150);
+    // Saved is said under the strip; only trouble pops up.
+    if (error != null) showMessage(context, error, error: true, above: 150);
   }
 
   /// The finished strip (and its video) from the gallery into the album.
@@ -532,6 +534,14 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
     showMessage(context, error ?? (work.video != null ? '圖片和影片都存到相簿了 ♡' : '已存到相簿 ♡'), error: error != null, above: 150);
   }
 
+  /// The strip as it went into the gallery: share it from there.
+  Future<void> _viewWork() async {
+    final works = MyWorks.works;
+    final i = works.indexWhere((w) => w.id == _kept);
+    if (i < 0) return;
+    await Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => WorkViewer(works: List.of(works), initial: i)));
+  }
+
   Future<ui.Image?> _stripShot() async {
     final b = _stripKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (!mounted || b == null || !b.attached) return null;
@@ -543,7 +553,8 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   /// once and played again ([TimelapseRecorder.loop]).
   Future<String?> _renderVideo() async {
     _video?.dispose();
-    final video = _video = TimelapseRecorder(subtitle: 'live four cuts ♡');
+    // Its moments play at the speed they were filmed.
+    final video = _video = TimelapseRecorder(subtitle: 'live four cuts ♡', minProcessSeconds: 0);
     final cache = PaintingBinding.instance.imageCache;
     // Each window's real frames; one with none shows its photo, still.
     final clips = <List<ImageProvider>>[];
@@ -710,7 +721,8 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
           IconButton(onPressed: _flipCamera, icon: const Icon(CupertinoIcons.camera_rotate), color: ink),
       ]),
       Expanded(child: Padding(
-        padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+        // Room at the sides: the frame doesn't run into the screen's edge.
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         child: Center(child: Stack(alignment: Alignment.center, children: [
             _framedFinder(i, live: frozen == null),
             if (_count != null) AnimatedBuilder(
@@ -759,9 +771,10 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
   /// already taken in the others. So you can pose with the decorations.
   Widget _framedFinder(int i, {required bool live}) {
     final design = _t.designSize, cell = cellRect(_t, i);
-    // A thin ring of the frame around the window: the window is wide, so
-    // the screen's width is what limits it; the less frame, the bigger you are.
-    final m = cell.shortestSide * .08;
+    // A ring of the frame around the window, wide enough for its drawings
+    // to show: the window is wide, so the screen's width is what limits it;
+    // the less frame, the bigger you are.
+    final m = cell.shortestSide * .13;
     // Above and below, stop halfway to the next window so its edge doesn't peek in.
     var top = max(0.0, cell.top - m), bottom = min(design.height, cell.bottom + m);
     for (var k = 0; k < _shots; k++) {
@@ -926,6 +939,25 @@ class _BoothScreenState extends State<BoothScreen> with WidgetsBindingObserver, 
             )),
             ]),
     ),
+    // Saved: like the editor's, see it (and share it) or go home.
+    if (_saved)
+      Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          TextButton.icon(
+            onPressed: _viewWork,
+            icon: const Icon(CupertinoIcons.share, size: 16),
+            label: const Text('看作品、分享', style: TextStyle(fontWeight: FontWeight.w800)),
+            style: TextButton.styleFrom(foregroundColor: muted),
+          ),
+          const Text('·', style: TextStyle(color: muted)),
+          TextButton(
+            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+            style: TextButton.styleFrom(foregroundColor: muted),
+            child: const Text('回首頁', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ]),
+      ),
   ];
 }
 

@@ -103,7 +103,8 @@ class _StickerBookViewState extends State<StickerBookView> with SingleTickerProv
     valueListenable: MyLibrary.changes,
     builder: (context, _, __) {
       final mine = _mine;
-      final labels = [for (final s in mine) s.name, '裝飾', for (final b in stickerBooks) b.label];
+      // The user's own sheets say so: 📷, and the loose ones are 我的.
+      final labels = [for (final s in mine) s.id.isEmpty ? '📷 我的' : '📷 ${s.name}', '裝飾', for (final b in stickerBooks) b.label];
       return Column(children: [
         SizedBox(height: 46, child: Row(children: [
           Padding(

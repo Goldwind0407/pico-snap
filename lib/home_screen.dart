@@ -359,12 +359,25 @@ class _CollageArt extends StatelessWidget {
 class _StickerArt extends StatelessWidget {
   const _StickerArt();
 
+  /// A photo cut into a sticker: the picture in a soft shape, a thick white
+  /// border round it and a shadow, as 照片貼紙 makes them.
+  static Widget _cut(ImageProvider photo, double w, double h, double phase) => SizedBox(width: w, height: h, child: Stack(children: [
+    Positioned.fill(child: PhysicalShape(
+      clipper: BlobClipper(phase: phase), color: Colors.white, elevation: 3, shadowColor: ink.withValues(alpha: .45),
+      child: const SizedBox.expand(),
+    )),
+    Positioned.fill(child: Padding(
+      padding: const EdgeInsets.all(4),
+      child: ClipPath(clipper: BlobClipper(phase: phase), child: Image(image: photo, fit: BoxFit.cover, alignment: const Alignment(0, -.4))),
+    )),
+  ]));
+
   @override
-  Widget build(BuildContext context) => const SizedBox(width: 76, height: 70, child: Stack(clipBehavior: Clip.none, children: [
-    Center(child: EmojiSticker('😉', size: 44)),
-    Positioned(left: 0, top: 2, child: Sparkle(size: 14)),
-    Positioned(right: 2, top: 0, child: DoodleHeart(size: 14)),
-    Positioned(right: 4, bottom: 4, child: Sparkle(size: 11)),
+  Widget build(BuildContext context) => SizedBox(width: 88, height: 74, child: Stack(clipBehavior: Clip.none, children: [
+    Positioned(left: 4, top: 2, child: Transform.rotate(angle: -.1, child: _cut(samplePhotos[0], 52, 60, 1.3))),
+    Positioned(right: 0, bottom: 0, child: Transform.rotate(angle: .14, child: _cut(samplePhotos[2], 38, 42, .4))),
+    const Positioned(left: -6, top: -2, child: Sparkle(size: 13)),
+    const Positioned(right: 4, top: 0, child: DoodleHeart(size: 13)),
   ]));
 }
 

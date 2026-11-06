@@ -230,7 +230,7 @@ void main() {
     // 貼紙：自己的貼紙紙在貼紙本最前面，只能貼，沒有新增、刪除
     await t.tap(find.text('貼紙').last);
     await t.pumpAndSettle();
-    expect(find.text(unsortedSheet), findsOneWidget);
+    expect(find.text('📷 我的'), findsOneWidget, reason: '沒分類的自己的貼紙，在貼紙本叫「我的」');
     expect(find.text('照片去背'), findsNothing);
     expect(find.byTooltip('刪除'), findsNothing);
     await t.tap(visual(sticker));
