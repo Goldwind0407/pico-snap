@@ -6,7 +6,7 @@ import 'dart:typed_data';
 ///
 /// 做法是「魔術棒」:從照片四邊往裡長,顏色跟起點接近的就當作背景挖掉。
 /// 背景單純(牆、天空、桌面、草地)時一次就切得乾淨;背景雜的時候會切壞,
-/// 再用 [paintMask] 手動擦掉/補回、或 [removeRegion] 點一下挖掉一整塊來修。
+/// 再用 [paintMask] 手動擦掉/補回來修。
 ///
 /// 遮罩 [Uint8List] 一格一個像素:255 留下,0 挖掉。
 class Cutout {
@@ -34,20 +34,6 @@ class Cutout {
     _dropSpecks(mask, width, height);
     _smooth(mask, width, height);
     return mask;
-  }
-
-  /// 點一下:把 (x, y) 那塊顏色接近的區域整片挖掉。
-  static void removeRegion(
-    Uint8List rgba,
-    int width,
-    int height,
-    Uint8List mask,
-    int x,
-    int y, {
-    double tolerance = 18,
-  }) {
-    if (x < 0 || y < 0 || x >= width || y >= height) return;
-    _grow(rgba, width, height, mask, [y * width + x], tolerance);
   }
 
   /// 用圓形筆刷擦掉([keep] false)或補回([keep] true)。

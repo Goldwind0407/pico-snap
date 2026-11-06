@@ -471,7 +471,6 @@ void finishFilm(Uint8List rgba, Uint8List source, int w, int h,
   }
 }
 
-// Keep the GPU equivalents in shaders/film.frag in sync.
 const filmGrainAmplitude = 44.0;
 double filmGrainCellSize(double longestSide) => math.max(1.0, longestSide / 480);
 double filmGrainAt(int x, int y) => _noise(x, y) * .65 + _noise(x >> 1, (y >> 1) + 9173) * .35;

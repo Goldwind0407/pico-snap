@@ -97,8 +97,6 @@ class MyLibrary {
     return id;
   }
 
-  static void removeSticker(String id) => removeStickers([id]);
-
   static void removeStickers(Iterable<String> ids) {
     final gone = ids.toSet();
     for (final id in gone) {

@@ -23,8 +23,6 @@ dev_dependencies:
     sdk: flutter
 flutter:
   uses-material-design: true
-  shaders:
-    - shaders/film.frag
   assets:
     - assets/samples/
     - assets/stickers/

@@ -84,13 +84,6 @@ BoxDecoration studioSurface({double radius = 24, Color color = Colors.white}) =>
 TextStyle hand(double size, {Color color = ink}) =>
     TextStyle(fontFamily: 'Caveat', fontFamilyFallback: const ['ChenYuluoyan'], fontSize: size, color: color, fontWeight: FontWeight.w600, height: 1.1);
 
-void showSoonToast(BuildContext context, String feature) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-  content: Text('$feature：即將推出，敬請期待 ♡'),
-  behavior: SnackBarBehavior.floating,
-  backgroundColor: ink,
-  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-));
-
 /// Asks before deleting something; true when the user confirms.
 Future<bool> confirmDelete(BuildContext context, String title, String message, {String delete = '刪除'}) async =>
     await showGlassDialog<bool>(context, (context) => GlassDialog(
