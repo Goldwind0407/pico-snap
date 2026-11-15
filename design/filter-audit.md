@@ -32,3 +32,19 @@ flutter test tool/filter_audit.dart --dart-define=AUDIT_LABEL=after
 產物在 `build/filter_audit/after.png` 與 `after.json`，使用實際 CPU 濾鏡管線及暗角，附灰階與色票。
 標籤以穩定 ID 顯示，避免測試環境缺少中文字體；JSON 包含中文名稱。
 `before` 是修改前保存的比較圖，重新執行工具只會產生當下版本的結果。
+
+## 2026-11 底片類濾鏡重調
+
+先查資料（Fujifilm 對 CLASSIC Neg. 的說明、Imaging Resource 的色彩分析、Dehancer 與 ProVideo Coalition 對負片密度與亮部褪色的說明、Instax 評測），再照特性調，不比對、不複製任何現成濾鏡或 LUT。
+
+調色引擎新增 `density`（越鮮豔越深）與 `shadowDesat`／`highlightDesat`（顏色留在中間調）。
+
+| 名稱 | 之前 | 現在 |
+| --- | --- | --- |
+| 濃烈負片 | 直接套 F-Log2 影片 LUT：臉燒白、頭髮變紅 | 自己的配方：硬調、暗部青綠、亮部微洋紅、紅深、綠偏青變深 |
+| 拍立得暖金 | 整張偏暗、灰綠、發悶 | 亮部洗成奶油白、黑位微抬帶青綠、偏金、藍色深 |
+| 拍立得冷閃 | 偏暗 | 臉亮而略白、暗部藍綠、藍色深、暗角較重 |
+| 復古柔和 | 只是變灰變平 | 暖棕黑位、泛黃亮部、橄欖綠、淡藍 |
+| 黑白 | 沒有顆粒 | 加底片顆粒 |
+
+比較圖現在每款有兩張人像、兩張風景（海邊街道、野花）。

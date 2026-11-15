@@ -60,7 +60,7 @@ void main() {
     final dir = await Directory('build/filter_audit').create(recursive: true);
     final record = ui.PictureRecorder();
     final canvas = Canvas(record);
-    const tileW = 400, tileH = 375, columns = 3;
+    const tileW = 780, tileH = 375, columns = 2;
     final rows = (looks.length / columns).ceil();
     canvas.drawColor(const Color(0xFFF3F3F3), BlendMode.src);
     final report = <String, Object>{};
@@ -70,10 +70,10 @@ void main() {
       final dy = (index ~/ columns) * tileH.toDouble();
       canvas.save();
       canvas.translate(dx, dy);
-      canvas.drawRect(const Rect.fromLTWH(5, 5, 390, 365), Paint()..color = Colors.white);
+      canvas.drawRect(const Rect.fromLTWH(5, 5, 770, 365), Paint()..color = Colors.white);
       _text(canvas, '${index + 1}. ${filter.id}', 15, 12);
-      for (final (i, asset) in ['girl1.jpg', 'duo.jpg'].indexed) {
-        final image = await _resolve(filtered(AssetImage('assets/samples/$asset'), filter, maxSide: 400));
+      for (final (i, asset) in ['samples/girl1.jpg', 'samples/duo.jpg', 'backdrops/seaside_street.jpg', 'backdrops/wildflowers.jpg'].indexed) {
+        final image = await _resolve(filtered(AssetImage('assets/$asset'), filter, maxSide: 400));
         final box = Rect.fromLTWH(15 + i * 190, 45, 180, 195);
         final fit = applyBoxFit(BoxFit.contain, Size(image.width.toDouble(), image.height.toDouble()), box.size);
         final dst = Alignment.center.inscribe(fit.destination, box);

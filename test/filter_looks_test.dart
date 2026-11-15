@@ -18,16 +18,55 @@ void main() {
       expect(filterById('lut:${entry.key}').name, entry.value.name);
     }
     expect(filterById('korean_cream').name, '韓系奶油');
-    expect(filterById('lut:fuji_classic_neg_raw').table, isNotNull);
+    expect(filterById('lut:fuji_classic_neg_raw').name, '濃烈負片');
+    expect(filterById('lut:fuji_classic_neg_raw').table, isNull, reason: '自己的配方，不是相機廠的檔案');
     expect(filterById('lut:retro_soft').table, isNull);
   });
 
-  test('negative retains the original LUT with visible film grain', () async {
+  test('strong negative: hard but not burnt, cyan-green shadows, deep reds, dark cyan greens', () {
     final filter = filterById('lut:fuji_classic_neg_raw');
-    final source = parseCube(await rootBundle.loadString('assets/luts/fuji_classic_neg_raw.cube'));
-    expect(filter.lut, orderedEquals(resampleLut(source.table, source.size, lutSize)));
     expect(filter.grain, greaterThan(0));
-    expect(filter.soften, 0);
+    var previous = rgb(filter, [0, 0, 0]);
+    expect(previous[1], greaterThan(previous[0]), reason: '暗部偏青綠');
+    expect(previous[2], greaterThan(previous[0]));
+    for (var v = 1; v <= 255; v++) {
+      final current = rgb(filter, [v, v, v]);
+      for (var c = 0; c < 3; c++) {
+        expect(current[c] - previous[c], inInclusiveRange(0, 4), reason: '灰階不能跳色或反轉');
+      }
+      previous = current;
+    }
+    expect(previous.every((v) => v < 255), isTrue, reason: '白色留一點奶油感');
+    // Harder than the photo: the mid tones are steeper than a straight line.
+    expect(rgb(filter, [170, 170, 170])[1] - rgb(filter, [85, 85, 85])[1], greaterThan(95));
+    for (final skin in [[220, 164, 140], [160, 106, 80], [85, 56, 43]]) {
+      final out = rgb(filter, skin);
+      expect(out[0], greaterThan(out[1]));
+      expect(out[1], greaterThan(out[2]));
+      expect(out.every((v) => v > 0 && v < 250), isTrue, reason: '膚色不能燒白');
+    }
+    final red = rgb(filter, [190, 55, 45]);
+    expect(red[0], lessThan(190), reason: '紅色變深而不是變亮');
+    expect(red[0] - red[1], greaterThan(110), reason: '但還是濃');
+    final foliage = rgb(filter, [70, 130, 65]), plain = [70, 130, 65];
+    expect(foliage[1], lessThan(plain[1]), reason: '綠色變深');
+    expect(foliage[2] - foliage[0], greaterThan(plain[2] - plain[0]), reason: '綠色往青偏');
+  });
+
+  test('film density and tone-dependent colour', () {
+    const vivid = Grade(density: 1), drain = Grade(shadowDesat: 1, highlightDesat: 1);
+    final (r, g, b) = vivid.apply(1, 0, 0);
+    expect(r, closeTo(.5, 1e-6), reason: '最鮮豔的顏色最深');
+    expect([g, b], [0, 0]);
+    final (gr, gg, gb) = vivid.apply(.5, .5, .5);
+    expect([gr, gg, gb], everyElement(closeTo(.5, 1e-6)), reason: '灰色不變');
+    final (dr, dg, db) = drain.apply(.12, .02, .02);
+    expect(dr - dg, lessThan(.03), reason: '最暗的地方沒什麼顏色');
+    final (hr, hg, hb) = drain.apply(1, .9, .9);
+    expect(hr - hg, lessThan(.02), reason: '最亮的地方也是');
+    final (mr, mg, mb) = drain.apply(.7, .4, .4);
+    expect(mr - mg, greaterThan(.25), reason: '顏色留在中間調');
+    expect([db, hb, mb], everyElement(isNonNegative));
   });
 
   test('film presets enable grain while clean looks stay clean', () {

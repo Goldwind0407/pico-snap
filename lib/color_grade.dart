@@ -40,11 +40,19 @@ class Grade {
   final (double, double, double) shadowTone, midTone, highlightTone;
   /// Saturation multiplier; vibrance boosts dull colours more than vivid ones.
   final double saturation, vibrance;
+  /// Film dye density, 0–1: vivid colours get deeper and darker instead of
+  /// brighter (film makes colour by taking light away), so nothing goes neon.
+  final double density;
+  /// How much colour drains out of the darkest / brightest tones, 0–1.
+  /// Negative film keeps its colour in the mid tones: highlights roll off
+  /// towards paper white and deep shadows go nearly neutral.
+  final double shadowDesat, highlightDesat;
 
   const Grade({
     this.temp = 0, this.tint = 0, this.exposure = 0, this.contrast = 0, this.shadows = 0, this.highlights = 0,
     this.hsl = const {}, this.curve = const [], this.red = const [], this.green = const [], this.blue = const [],
     this.shadowTone = (0, 0, 0), this.midTone = (0, 0, 0), this.highlightTone = (0, 0, 0), this.saturation = 1, this.vibrance = 0,
+    this.density = 0, this.shadowDesat = 0, this.highlightDesat = 0,
   });
 
   static const none = Grade();
@@ -141,6 +149,25 @@ class _Prepared {
       r = y + (r - y) * k;
       gg = y + (gg - y) * k;
       b = y + (b - y) * k;
+    }
+    // Colour lives in the mid tones.
+    if (g.shadowDesat != 0 || g.highlightDesat != 0) {
+      final y = _luma(r, gg, b).clamp(0.0, 1.0);
+      final k = 1 - g.shadowDesat * (1 - _smooth(0, .35, y)) - g.highlightDesat * _smooth(.6, 1, y);
+      r = y + (r - y) * k;
+      gg = y + (gg - y) * k;
+      b = y + (b - y) * k;
+    }
+    // Dye density: the more vivid, the deeper.
+    if (g.density != 0) {
+      final mx = math.max(r, math.max(gg, b)), mn = math.min(r, math.min(gg, b));
+      if (mx > 0) {
+        final sat = ((mx - mn) / mx).clamp(0.0, 1.0);
+        final k = 1 - g.density * .5 * sat * sat;
+        r *= k;
+        gg *= k;
+        b *= k;
+      }
     }
     return (r.clamp(0.0, 1.0), gg.clamp(0.0, 1.0), b.clamp(0.0, 1.0));
   }

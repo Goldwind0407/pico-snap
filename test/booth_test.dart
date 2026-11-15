@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pico_snap/booth_screen.dart';
+import 'package:pico_snap/widgets/filter_thumbs.dart';
 import 'package:pico_snap/editor_screen.dart';
 import 'package:pico_snap/models.dart';
 import 'package:pico_snap/services/my_works.dart';
@@ -76,6 +77,7 @@ void main() {
     expect(shots, 4);
     // 5. 拍完才挑濾鏡，套在全部照片
     expect(find.text('挑濾鏡'), findsOneWidget);
+    await t.scrollUntilVisible(find.text('測試青橙'), 200, scrollable: find.descendant(of: find.byType(FilterThumbs), matching: find.byType(Scrollable)));
     await t.tap(find.text('測試青橙'));
     await t.pump();
     final strip = t.widget<PhotoStrip>(find.byType(PhotoStrip));
