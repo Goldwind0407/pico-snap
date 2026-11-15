@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The parchment of the opening animation (lib/widgets/launch_intro.dart):
+         the system's launch screen is the same colour, so nothing flashes. -->
+    <color name="parchment">#EEE3CD</color>
+</resources>

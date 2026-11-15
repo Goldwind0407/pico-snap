@@ -9,6 +9,7 @@ import 'services/my_works.dart';
 import 'services/editor_drafts.dart';
 import 'services/app_sounds.dart';
 import 'theme.dart';
+import 'widgets/launch_intro.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,13 +25,16 @@ Future<void> main() async {
 
 class PicoSnapApp extends StatelessWidget {
   final Future<void>? ready;
-  const PicoSnapApp({super.key, this.ready});
+  /// The studio's opening animation over the app as it loads (off in tests).
+  final bool intro;
+  const PicoSnapApp({super.key, this.ready, this.intro = true});
 
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: '快趣拍',
     debugShowCheckedModeBanner: false,
     theme: buildAppTheme(),
+    builder: (context, child) => LaunchIntro(enabled: intro, child: child!),
     home: ready == null ? const HomeScreen() : FutureBuilder<void>(
       future: ready,
       builder: (context, snapshot) => snapshot.connectionState == ConnectionState.done
