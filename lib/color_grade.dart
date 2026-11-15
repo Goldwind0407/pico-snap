@@ -386,8 +386,10 @@ List<double> fitMatrix(Float32List lut, int n) {
 /// - [soften] (0–1): takes the edge off phone sharpening.
 /// - [halation] (0–1): light glowing out of bright areas in [halationColor]
 ///   (r, g, b 0–1), like light bouncing back through film emulsion.
-/// - [grain] (0–1): film grain, strongest in the mid tones, fading out in
-///   deep shadows and bright highlights.
+/// - [grain] (0–1): film grain, strongest in the mid tones and still there
+///   (weaker) in shadows and highlights. Where the photo has colour the
+///   grain has a little too, like the dye clouds of colour film; greys and
+///   black-and-white keep neutral grain.
 /// [source] is the ungraded photo; halation follows its real highlights.
 void finishFilm(Uint8List rgba, Uint8List source, int w, int h,
     {double soften = 0, double halation = 0, (double, double, double) halationColor = (1, .38, .18), double grain = 0}) {
@@ -474,9 +476,13 @@ void finishFilm(Uint8List rgba, Uint8List source, int w, int h,
     // a 2K/4K photo is displayed in a small print or phone preview.
     final cell = filmGrainCellSize(math.max(w, h).toDouble());
     final gw = ((w - 1) / cell).floor() + 2, gh = ((h - 1) / cell).floor() + 2;
-    final field = Float32List(gw * gh);
+    final field = Float32List(gw * gh), warm = Float32List(gw * gh), cool = Float32List(gw * gh);
     for (var y = 0; y < gh; y++) {
-      for (var x = 0; x < gw; x++) { field[y * gw + x] = filmGrainAt(x, y); }
+      for (var x = 0; x < gw; x++) {
+        field[y * gw + x] = filmGrainAt(x, y);
+        warm[y * gw + x] = filmGrainAt(x + 4099, y + 131);
+        cool[y * gw + x] = filmGrainAt(x + 977, y + 7919);
+      }
     }
     for (var y = 0; y < h; y++) {
       final gy = y / cell, y0 = gy.floor();
@@ -485,13 +491,24 @@ void finishFilm(Uint8List rgba, Uint8List source, int w, int h,
         final i = (y * w + x) * 4;
         if (rgba[i + 3] == 0) continue;
         final l = (.2126 * rgba[i] + .7152 * rgba[i + 1] + .0722 * rgba[i + 2]) / 255;
-        final a = grain * filmGrainAmplitude * (.2 + 3.2 * l * (1 - l));
+        final a = grain * filmGrainAmplitude * (.3 + 2.8 * l * (1 - l));
         final gx = x / cell, x0 = gx.floor(), tx = _smooth(0, 1, gx - x0);
-        final top = field[y0 * gw + x0] * (1 - tx) + field[y0 * gw + x0 + 1] * tx;
-        final bottom = field[(y0 + 1) * gw + x0] * (1 - tx) + field[(y0 + 1) * gw + x0 + 1] * tx;
-        final v = (top * (1 - ty) + bottom * ty) * a;
-        for (var c = 0; c < 3; c++) {
-          rgba[i + c] = (rgba[i + c] + v).round().clamp(0, 255);
+        final p = y0 * gw + x0, q = p + gw;
+        double at(Float32List f) => (f[p] * (1 - tx) + f[p + 1] * tx) * (1 - ty) + (f[q] * (1 - tx) + f[q + 1] * tx) * ty;
+        final v = at(field) * a;
+        // Colour in the grain only where there is colour in the photo.
+        final r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
+        final mx = math.max(r, math.max(g, b)), mn = math.min(r, math.min(g, b));
+        final k = mx == 0 ? 0.0 : math.min(1.0, (mx - mn) / mx * 3) * a * filmGrainColor;
+        if (k == 0) {
+          for (var c = 0; c < 3; c++) {
+            rgba[i + c] = (rgba[i + c] + v).round().clamp(0, 255);
+          }
+        } else {
+          final cr = at(warm) * k, cb = at(cool) * k;
+          rgba[i] = (r + v + cr).round().clamp(0, 255);
+          rgba[i + 1] = (g + v - (cr + cb) * .5).round().clamp(0, 255);
+          rgba[i + 2] = (b + v + cb).round().clamp(0, 255);
         }
       }
     }
@@ -499,6 +516,8 @@ void finishFilm(Uint8List rgba, Uint8List source, int w, int h,
 }
 
 const filmGrainAmplitude = 44.0;
+/// How much of the grain is colour, where the photo has colour.
+const filmGrainColor = .45;
 double filmGrainCellSize(double longestSide) => math.max(1.0, longestSide / 480);
 double filmGrainAt(int x, int y) => _noise(x, y) * .65 + _noise(x >> 1, (y >> 1) + 9173) * .35;
 

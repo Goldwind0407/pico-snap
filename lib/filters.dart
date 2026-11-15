@@ -87,15 +87,15 @@ final photoFilters = <PhotoFilter>[
   const PhotoFilter('none', '原圖', Grade.none),
   const PhotoFilter('korean_cream', '韓系奶油', koreanCreamGrade, soften: .18),
   const PhotoFilter('instant_golden', '拍立得暖金', instantGoldenGrade,
-    grain: .27, vignette: .16, soften: .42, halation: .12,
+    grain: .38, vignette: .16, soften: .42, halation: .12,
     halationColor: (1, .66, .32)),
   const PhotoFilter('instant_cool', '拍立得冷閃', instantCoolGrade,
-    grain: .32, vignette: .22, soften: .18, halation: .10,
+    grain: .42, vignette: .22, soften: .18, halation: .10,
     halationColor: (1, .42, .24)),
   // Our own recipe. The id is from when this was a camera maker's lookup
   // file (an F-Log2 video LUT, wrong for photos): saved drafts keep working.
   const PhotoFilter('lut:fuji_classic_neg_raw', '濃烈負片', strongNegativeGrade,
-    grain: .23, soften: .12, halation: .08),
+    grain: .4, soften: .12, halation: .08),
 ];
 
 PhotoFilter filterById(String? id) => photoFilters.firstWhere((f) => f.id == id, orElse: () => photoFilters.first);

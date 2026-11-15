@@ -105,7 +105,7 @@ class LutLook {
 /// 濾鏡檔的中文名字和底片效果（key 是檔名，不含副檔名）。
 const lutLooks = <String, LutLook>{
   // Warm amber skin against cool teal backgrounds, like Japanese street snaps.
-  'teal_amber_street': LutLook('日系街拍', grain: .21, vignette: .12, soften: .2, halation: .1),
+  'teal_amber_street': LutLook('日系街拍', grain: .34, vignette: .12, soften: .2, halation: .1),
   // Our own grades, made on design/hald/hald_identity_8.png in a photo app
   // (exported as JPEG, so smoothed a touch before saving as PNG).
   'cool': LutLook('冷調'),
@@ -113,10 +113,10 @@ const lutLooks = <String, LutLook>{
   'soft': LutLook('柔軟', soften: .32),
   'late_autumn': LutLook('深秋'),
   'warm_cool': LutLook('冷暖對比'),
-  'retro_soft': LutLook('復古柔和', grade: retroSoftGrade, grain: .17, soften: .18),
+  'retro_soft': LutLook('復古柔和', grade: retroSoftGrade, grain: .3, soften: .18),
   'macaron': LutLook('馬卡龍'),
   'cyberpunk': LutLook('賽博朋克'),
-  'mono': LutLook('黑白', grain: .18),
+  'mono': LutLook('黑白', grain: .38),
 };
 
 /// A LUT as read from a file: [size]³ entries of r, g, b (0–1), blue
